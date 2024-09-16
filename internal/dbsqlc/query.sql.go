@@ -20,6 +20,33 @@ func (q *Queries) AcquireLock(ctx context.Context, db DBTX, lockNum int64) error
 	return err
 }
 
+const allExistingMigrationVersions = `-- name: AllExistingMigrationVersions :many
+SELECT version
+FROM migrations
+WHERE namespace = $1
+ORDER BY version
+`
+
+func (q *Queries) AllExistingMigrationVersions(ctx context.Context, db DBTX, namespace string) ([]int64, error) {
+	rows, err := db.Query(ctx, allExistingMigrationVersions, namespace)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []int64
+	for rows.Next() {
+		var version int64
+		if err := rows.Scan(&version); err != nil {
+			return nil, err
+		}
+		items = append(items, version)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 type ApplyMigrationParams struct {
 	ID        uuid.UUID
 	Version   int64
@@ -38,59 +65,12 @@ func (q *Queries) DoesTableExist(ctx context.Context, db DBTX, tableName string)
 	return column_1, err
 }
 
-const findAllExistingMigrations = `-- name: FindAllExistingMigrations :many
-SELECT version, name
-FROM migrations
-WHERE namespace = $1
-ORDER BY version
-`
-
-type FindAllExistingMigrationsRow struct {
-	Version int64
-	Name    string
-}
-
-func (q *Queries) FindAllExistingMigrations(ctx context.Context, db DBTX, namespace string) ([]FindAllExistingMigrationsRow, error) {
-	rows, err := db.Query(ctx, findAllExistingMigrations, namespace)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []FindAllExistingMigrationsRow
-	for rows.Next() {
-		var i FindAllExistingMigrationsRow
-		if err := rows.Scan(&i.Version, &i.Name); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const releaseLock = `-- name: ReleaseLock :exec
 SELECT pg_advisory_unlock($1::BIGINT)
 `
 
 func (q *Queries) ReleaseLock(ctx context.Context, db DBTX, lockNum int64) error {
 	_, err := db.Exec(ctx, releaseLock, lockNum)
-	return err
-}
-
-const rollbackMigration = `-- name: RollbackMigration :exec
-DELETE FROM migrations
-WHERE version = $1 AND namespace = $2
-`
-
-type RollbackMigrationParams struct {
-	Version   int64
-	Namespace string
-}
-
-func (q *Queries) RollbackMigration(ctx context.Context, db DBTX, arg RollbackMigrationParams) error {
-	_, err := db.Exec(ctx, rollbackMigration, arg.Version, arg.Namespace)
 	return err
 }
 

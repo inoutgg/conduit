@@ -4,8 +4,8 @@ SELECT pg_advisory_lock(@lock_num::BIGINT);
 -- name: ReleaseLock :exec
 SELECT pg_advisory_unlock(@lock_num::BIGINT);
 
--- name: FindAllExistingMigrations :many
-SELECT version, name
+-- name: AllExistingMigrationVersions :many
+SELECT version
 FROM migrations
 WHERE namespace = @namespace
 ORDER BY version;

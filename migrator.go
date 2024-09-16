@@ -99,11 +99,6 @@ type MigrationResult struct {
 	Version int64
 }
 
-type existingMigration struct {
-	Version int64
-	Name    string
-}
-
 func NewMigrator(conn *pgx.Conn, config *Config) Migrator {
 	debug.Assert(conn == nil, "expected conn to be defined")
 	debug.Assert(config.Logger == nil, "config.Logger must be defined")
@@ -136,36 +131,13 @@ type migrator struct {
 
 // existingMigrationVerions returns a list of migration versions that
 // have been already applied.
-func (m *migrator) existingMigrationVerions(ctx context.Context) ([]int64, error) {
-	existingMigrations, err := m.existingMigrations(ctx)
+func (m *migrator) existingMigrationVerions(ctx context.Context, tx pgx.Tx) ([]int64, error) {
+	versions, err := dbsqlc.New().AllExistingMigrationVersions(ctx, tx, m.registry.Namespace)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("conduit: unable to fetch existing versions", err)
 	}
 
-	version := make([]int64, len(existingMigrations))
-	for i, existingMigration := range existingMigrations {
-		version[i] = existingMigration.Version
-	}
-
-	return version, nil
-}
-
-func (m *migrator) existingMigrations(ctx context.Context) ([]*existingMigration, error) {
-	existingMigrations, err := dbsqlc.New().FindAllExistingMigrations(
-		ctx,
-		m.conn,
-		m.registry.Namespace,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	return sliceutil.Map(existingMigrations, func(m dbsqlc.FindAllExistingMigrationsRow) *existingMigration {
-		return &existingMigration{
-			Version: m.Version,
-			Name:    m.Name,
-		}
-	}), nil
+	return versions, nil
 }
 
 func (m *migrator) Migrate(ctx context.Context, direction Direction) (*MigrateResult, error) {
@@ -200,14 +172,14 @@ func (m *migrator) MigrateTx(ctx context.Context, direction Direction, tx pgx.Tx
 }
 
 func (m *migrator) migrateUp(ctx context.Context, tx pgx.Tx) (*MigrateResult, error) {
-	existingMigrations, err := m.existingMigrations(ctx)
+	existingMigrationVersions, err := m.existingMigrationVerions(ctx, tx)
 	if err != nil {
 		return nil, err
 	}
 
 	targetMigrations := m.registry.Migrations()
-	for _, m := range existingMigrations {
-		delete(targetMigrations, m.Version)
+	for _, existingVersion := range existingMigrationVersions {
+		delete(targetMigrations, existingVersion)
 	}
 
 	migrations := slices.Collect(maps.Values(targetMigrations))
@@ -243,7 +215,7 @@ func (m *migrator) migrateUp(ctx context.Context, tx pgx.Tx) (*MigrateResult, er
 }
 
 func (m *migrator) migrateDown(ctx context.Context, tx pgx.Tx) (*MigrateResult, error) {
-	existingMigrations, err := m.existingMigrationVerions(ctx)
+	existingMigrations, err := m.existingMigrationVerions(ctx, tx)
 	if err != nil {
 		return nil, err
 	}
