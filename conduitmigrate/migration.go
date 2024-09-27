@@ -11,7 +11,7 @@ import (
 )
 
 type Migrate struct {
-	migrator conduit.MigratorTx
+	migrator conduit.Migrator
 }
 
 type Config struct {
@@ -20,19 +20,20 @@ type Config struct {
 
 func New(config *Config) *Migrate {
 	return &Migrate{
-		migrator: conduit.NewMigratorTx(&conduit.Config{
-			Logger:   config.Logger,
-			Registry: migrations.Registry,
-		}),
+		migrator: conduit.NewMigrator(conduit.NewConfig(func(c *conduit.Config) {
+			c.Logger = config.Logger
+			c.Registry = migrations.Registry
+		})),
 	}
 }
 
-// 
-func (m *Migrate) Up(ctx context.Context, tx pgx.Tx) error {
-	return m.migrator.MigrateTx(ctx, conduit.DirectionUp, tx)
+func (m *Migrate) Up(ctx context.Context, conn *pgx.Conn) error {
+	_, err := m.migrator.Migrate(ctx, conduit.DirectionUp, conn)
+	return err
 }
 
 // Down rolls back migration.
-func (m *Migrate) Down(ctx context.Context, tx pgx.Tx) error {
-	return m.migrator.MigrateTx(ctx, conduit.DirectionDown, tx)
+func (m *Migrate) Down(ctx context.Context, conn *pgx.Conn) error {
+	_, err := m.migrator.Migrate(ctx, conduit.DirectionDown, conn)
+	return err
 }

@@ -22,4 +22,8 @@ WHERE
   );
 
 -- name: DoesTableExist :one
-SELECT COALESCE(to_regclass(@table_name), FALSE) = FALSE;
+SELECT
+  CASE
+    WHEN to_regclass(@table_name) IS NULL THEN FALSE
+    ELSE TRUE
+  END;

@@ -55,7 +55,11 @@ type ApplyMigrationParams struct {
 }
 
 const doesTableExist = `-- name: DoesTableExist :one
-SELECT COALESCE(to_regclass($1), FALSE) = FALSE
+SELECT
+  CASE
+    WHEN to_regclass($1) IS NULL THEN FALSE
+    ELSE TRUE
+  END
 `
 
 func (q *Queries) DoesTableExist(ctx context.Context, db DBTX, tableName string) (bool, error) {

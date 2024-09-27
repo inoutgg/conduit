@@ -8,6 +8,7 @@ import (
 	"io/fs"
 
 	"go.inout.gg/conduit/conduitregistry"
+	"go.inout.gg/foundations/debug"
 )
 
 const (
@@ -17,12 +18,14 @@ const (
 	GlobalRegistryNamespace = "default"
 )
 
+var d = debug.Debuglog("conduit: conduit")
+
 var globalRegistry = conduitregistry.New(GlobalRegistryNamespace)
 
-// Add registers a new migration with up and down Go functions in the global registry.
-func Add(up, down MigrateFunc) error {
-	return globalRegistry.Add(up, down)
-}
+func Up(up MigrateFunc) error         { return globalRegistry.Up(up) }
+func UpTx(up MigrateFuncTx) error     { return globalRegistry.UpTx(up) }
+func Down(down MigrateFunc) error     { return globalRegistry.Down(down) }
+func DownTx(down MigrateFuncTx) error { return globalRegistry.DownTx(down) }
 
 // FromFS registers one or more SQL migrations from the fsys in the global registry.
 func FromFS(fsys fs.FS) error {

@@ -7,7 +7,7 @@ import (
 	"go.inout.gg/foundations/must"
 )
 
-var Registry *conduitregistry.Registry = conduitregistry.New("conduit/versioning")
+var Registry *conduitregistry.Registry = conduitregistry.New("inout/conduit")
 
 //go:embed **.sql
 var migrations embed.FS

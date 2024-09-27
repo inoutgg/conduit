@@ -1,5 +1,5 @@
 {
-  description = "foundations - a modular library designed to build maintainable production-grade systems.";
+  description = "conduit is an SQL migrator that is easy to embed";
 
   inputs = {
     nixpkgs.url = "nixpkgs/nixos-unstable";
@@ -18,7 +18,7 @@
             go_1_23
             sqlc
             golangci-lint
-            postgresql_16
+            gofumpt
           ];
         };
       }

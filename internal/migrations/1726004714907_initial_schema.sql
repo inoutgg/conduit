@@ -1,6 +1,7 @@
 -- migration 1726004714907 initial_schema
+---- disable-tx
 
-CREATE TABLE migrations (
+CREATE TABLE IF NOT EXISTS migrations (
   id UUID NOT NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   version BIGINT NOT NULL,
@@ -13,4 +14,4 @@ CREATE TABLE migrations (
 
 ---- create above / drop below ----
 
-DROP TABLE migrations;
+DROP TABLE IF EXISTS migrations;
