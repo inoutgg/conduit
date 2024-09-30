@@ -22,7 +22,7 @@ func (q *Queries) AcquireLock(ctx context.Context, db DBTX, lockNum int64) error
 
 const allExistingMigrationVersions = `-- name: AllExistingMigrationVersions :many
 SELECT version
-FROM migrations
+FROM conduitmigrations
 WHERE namespace = $1
 ORDER BY version
 `
@@ -47,11 +47,26 @@ func (q *Queries) AllExistingMigrationVersions(ctx context.Context, db DBTX, nam
 	return items, nil
 }
 
+const applyMigration = `-- name: ApplyMigration :exec
+INSERT INTO conduitmigrations (id, version, name, namespace)
+VALUES ($1, $2, $3, $4)
+`
+
 type ApplyMigrationParams struct {
 	ID        uuid.UUID
 	Version   int64
 	Name      string
 	Namespace string
+}
+
+func (q *Queries) ApplyMigration(ctx context.Context, db DBTX, arg ApplyMigrationParams) error {
+	_, err := db.Exec(ctx, applyMigration,
+		arg.ID,
+		arg.Version,
+		arg.Name,
+		arg.Namespace,
+	)
+	return err
 }
 
 const doesTableExist = `-- name: DoesTableExist :one
@@ -78,20 +93,26 @@ func (q *Queries) ReleaseLock(ctx context.Context, db DBTX, lockNum int64) error
 	return err
 }
 
-const rollbackMigrations = `-- name: RollbackMigrations :exec
-DELETE FROM migrations
-WHERE
-  (version, namespace) = ANY (
-    SELECT unnest($1::BIGINT[]), unnest($2::VARCHAR[])
-  )
+const resetConn = `-- name: ResetConn :exec
+RESET ALL
 `
 
-type RollbackMigrationsParams struct {
-	Versions   []int64
-	Namespaces []string
+func (q *Queries) ResetConn(ctx context.Context, db DBTX) error {
+	_, err := db.Exec(ctx, resetConn)
+	return err
 }
 
-func (q *Queries) RollbackMigrations(ctx context.Context, db DBTX, arg RollbackMigrationsParams) error {
-	_, err := db.Exec(ctx, rollbackMigrations, arg.Versions, arg.Namespaces)
+const rollbackMigration = `-- name: RollbackMigration :exec
+DELETE FROM conduitmigrations
+WHERE version = $1 AND namespace = $2
+`
+
+type RollbackMigrationParams struct {
+	Version   int64
+	Namespace string
+}
+
+func (q *Queries) RollbackMigration(ctx context.Context, db DBTX, arg RollbackMigrationParams) error {
+	_, err := db.Exec(ctx, rollbackMigration, arg.Version, arg.Namespace)
 	return err
 }

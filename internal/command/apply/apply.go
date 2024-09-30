@@ -45,13 +45,9 @@ func apply(
 	if err != nil {
 		return err
 	}
-	result, err := migrator.Migrate(ctx.Context, direction, conn)
+	_, err = migrator.Migrate(ctx.Context, direction, conn)
 	if err != nil {
 		return err
-	}
-
-	for _, r := range result.MigrationResults {
-		print(r.Name, r.DurationTotal, r.Namespace, "\n")
 	}
 
 	return nil

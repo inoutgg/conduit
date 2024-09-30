@@ -1,4 +1,5 @@
-// Package conduitmigrate exposes conduit migration script via conduit.Migrator.
+// Package conduitmigrate exposes conduit migration script via conduit
+// interface.
 package conduitmigrate
 
 import (
@@ -32,7 +33,6 @@ func (m *Migrate) Up(ctx context.Context, conn *pgx.Conn) error {
 	return err
 }
 
-// Down rolls back migration.
 func (m *Migrate) Down(ctx context.Context, conn *pgx.Conn) error {
 	_, err := m.migrator.Migrate(ctx, conduit.DirectionDown, conn)
 	return err

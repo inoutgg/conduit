@@ -1,7 +1,6 @@
 -- migration 1726004714907 initial_schema
----- disable-tx
 
-CREATE TABLE IF NOT EXISTS migrations (
+CREATE TABLE IF NOT EXISTS conduitmigrations (
   id UUID NOT NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   version BIGINT NOT NULL,
@@ -11,7 +10,3 @@ CREATE TABLE IF NOT EXISTS migrations (
   UNIQUE (version, namespace),
   CONSTRAINT version CHECK (version >= 1)
 );
-
----- create above / drop below ----
-
-DROP TABLE IF EXISTS migrations;

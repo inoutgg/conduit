@@ -9,7 +9,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-type Migration struct {
+type Conduitmigration struct {
 	ID        uuid.UUID
 	CreatedAt pgtype.Timestamp
 	Version   int64

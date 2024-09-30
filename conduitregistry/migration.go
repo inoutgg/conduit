@@ -8,6 +8,11 @@ import (
 	"go.inout.gg/foundations/debug"
 )
 
+var emptyMigrateFunc = &migrateFunc{
+	fn:  func(_ context.Context, _ *pgx.Conn) error { return nil },
+	fnx: func(_ context.Context, _ pgx.Tx) error { return nil },
+}
+
 type migrateFunc struct {
 	fn   MigrateFunc
 	fnx  MigrateFuncTx

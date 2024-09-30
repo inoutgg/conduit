@@ -22,12 +22,12 @@ var d = debug.Debuglog("conduit: conduit")
 
 var globalRegistry = conduitregistry.New(GlobalRegistryNamespace)
 
-func Up(up MigrateFunc) error         { return globalRegistry.Up(up) }
-func UpTx(up MigrateFuncTx) error     { return globalRegistry.UpTx(up) }
-func Down(down MigrateFunc) error     { return globalRegistry.Down(down) }
-func DownTx(down MigrateFuncTx) error { return globalRegistry.DownTx(down) }
+func Up(up MigrateFunc)         { globalRegistry.Up(up) }
+func UpTx(up MigrateFuncTx)     { globalRegistry.UpTx(up) }
+func Down(down MigrateFunc)     { globalRegistry.Down(down) }
+func DownTx(down MigrateFuncTx) { globalRegistry.DownTx(down) }
 
 // FromFS registers one or more SQL migrations from the fsys in the global registry.
-func FromFS(fsys fs.FS) error {
-	return globalRegistry.FromFS(fsys)
+func FromFS(fsys fs.FS) {
+	globalRegistry.FromFS(fsys)
 }

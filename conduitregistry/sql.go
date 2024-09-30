@@ -75,6 +75,8 @@ func parseSQLMigration(fsys fs.FS, path string) (*Migration, error) {
 		if err != nil {
 			return nil, err
 		}
+	} else {
+		migration.down = emptyMigrateFunc
 	}
 
 	return &migration, nil

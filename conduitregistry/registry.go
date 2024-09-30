@@ -9,11 +9,14 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"go.inout.gg/conduit/internal/version"
+	"go.inout.gg/foundations/must"
 )
 
 var (
 	UndefinedTxErr    = errors.New("conduit: expected tx to be defined")
 	EmptyMigrationErr = errors.New("conduit: empty migration")
+	UpExistsErr       = errors.New("conduit: up migration is already registered")
+	DownExistsErr     = errors.New("conduit: down migration is already registered")
 )
 
 // MigrateFunc applies either up or down migration.
@@ -41,83 +44,58 @@ func New(namespace string) *Registry {
 
 // FromFS loads SQL migration files from the given fs.
 // Typically fs is an embedded filesystem.
-func (r *Registry) FromFS(fsys fs.FS) error {
-	migrations, err := parseSQLMigrationsFromFS(fsys, ".")
-	if err != nil {
-		return err
-	}
-
+func (r *Registry) FromFS(fsys fs.FS) {
+	migrations := must.Must(parseSQLMigrationsFromFS(fsys, "."))
 	for _, m := range migrations {
 		r.migrations[m.Version()] = m
 	}
-
-	return nil
 }
 
 // Up adds Go migration to registry to run on migration rolling.
-func (r *Registry) Up(up MigrateFunc) error {
-	m, err := r.goMigration()
-	if err != nil {
-		return err
-	}
+func (r *Registry) Up(up MigrateFunc) {
+	m := must.Must(r.goMigration())
 
 	if m.up != nil {
-		return errors.New("conduit: up migration is already registered")
+		panic(UpExistsErr)
 	}
 
 	m.up = &migrateFunc{fn: up, inTx: false}
-
-	return nil
 }
 
 // UpTx adds Go migration to registry to run in transaction on migration rolling.
-func (r *Registry) UpTx(up MigrateFuncTx) error {
-	m, err := r.goMigration()
-	if err != nil {
-		return err
-	}
+func (r *Registry) UpTx(up MigrateFuncTx) {
+	m := must.Must(r.goMigration())
 
 	if m.up != nil {
-		return errors.New("conduit: up migration is already registered")
+		panic(UpExistsErr)
 	}
 
 	m.up = &migrateFunc{fnx: up, inTx: true}
-
-	return nil
 }
 
 // Down adds Go migration to registry to run on migration rolling back.
-func (r *Registry) Down(down MigrateFunc) error {
-	m, err := r.goMigration()
-	if err != nil {
-		return err
-	}
+func (r *Registry) Down(down MigrateFunc) {
+	m := must.Must(r.goMigration())
 
 	if m.down != nil {
-		return errors.New("conduit: down migration is already registered")
+		panic(DownExistsErr)
 	}
 
 	m.down = &migrateFunc{fn: down, inTx: false}
-
-	return nil
 }
 
 // DownTx adds Go migration to registry to run in transaction on migration rolling back.
-func (r *Registry) DownTx(down MigrateFuncTx) error {
-	m, err := r.goMigration()
-	if err != nil {
-		return err
-	}
+func (r *Registry) DownTx(down MigrateFuncTx) {
+	m := must.Must(r.goMigration())
 
 	if m.down != nil {
-		return errors.New("conduit: down migration is already registered")
+		panic(DownExistsErr)
 	}
 
 	m.down = &migrateFunc{fnx: down, inTx: true}
-
-	return nil
 }
 
+// goMigration makes a new migration from a Go registration function.
 func (r *Registry) goMigration() (*Migration, error) {
 	_, filename, _, ok := runtime.Caller(2)
 	if !ok {
@@ -146,6 +124,5 @@ func (r *Registry) goMigration() (*Migration, error) {
 
 // Migrations returns a cloned map of registered migrations.
 func (r *Registry) Migrations() map[int64]*Migration {
-	println("migrations len: ", len(r.migrations))
 	return maps.Clone(r.migrations)
 }

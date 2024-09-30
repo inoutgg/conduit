@@ -15,6 +15,7 @@ import (
 	"go.inout.gg/conduit/conduitregistry"
 	"go.inout.gg/conduit/internal/dbsqlc"
 	"go.inout.gg/conduit/internal/direction"
+	internalmigrations "go.inout.gg/conduit/internal/migrations"
 	"go.inout.gg/conduit/internal/sliceutil"
 	"go.inout.gg/conduit/internal/uuidv7"
 	"go.inout.gg/foundations/debug"
@@ -68,7 +69,7 @@ func NewConfig(cfgs ...func(*Config)) *Config {
 func (c *Config) defaults() {
 	if c.Logger == nil {
 		c.Logger = slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
-			Level: slog.LevelWarn,
+			Level: slog.LevelInfo,
 		}))
 	}
 
@@ -114,7 +115,7 @@ type migrator struct {
 // existingMigrationVerions returns a list of migration versions that
 // have been already applied.
 func (m *migrator) existingMigrationVerions(ctx context.Context, conn *pgx.Conn) ([]int64, error) {
-	ok, err := dbsqlc.New().DoesTableExist(ctx, conn, "migrations")
+	ok, err := dbsqlc.New().DoesTableExist(ctx, conn, "conduitmigrations")
 	if err != nil {
 		return nil, fmt.Errorf("conduit: unable to fetch info about migrations table: %w", err)
 	}
@@ -173,35 +174,7 @@ func (m *migrator) migrateUp(ctx context.Context, conn *pgx.Conn) (*MigrateResul
 		return int(a.Version() - b.Version())
 	})
 
-	for _, m := range migrations {
-		fmt.Printf("%s %d\n", m.Name(), m.Version())
-	}
-
-	result, err := m.applyMigrations(ctx, migrations, DirectionUp, conn)
-	if err != nil {
-		return nil, err
-	}
-
-	rows := make([]dbsqlc.ApplyMigrationParams, len(result.MigrationResults))
-	for i, r := range result.MigrationResults {
-		rows[i] = dbsqlc.ApplyMigrationParams{
-			ID:        uuidv7.Must(),
-			Name:      r.Name,
-			Version:   r.Version,
-			Namespace: m.registry.Namespace,
-		}
-	}
-
-	if len(rows) > 0 {
-		if _, err := dbsqlc.New().ApplyMigration(ctx, conn, rows); err != nil {
-			return nil, fmt.Errorf(
-				"conduit: an error occurred while updating migrations table: %w",
-				err,
-			)
-		}
-	}
-
-	return result, nil
+	return m.applyMigrations(ctx, migrations, DirectionUp, conn)
 }
 
 func (m *migrator) migrateDown(ctx context.Context, conn *pgx.Conn) (*MigrateResult, error) {
@@ -226,20 +199,7 @@ func (m *migrator) migrateDown(ctx context.Context, conn *pgx.Conn) (*MigrateRes
 		return int(b.Version() - a.Version())
 	})
 
-	result, err := m.applyMigrations(ctx, migrations, DirectionDown, conn)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := dbsqlc.New().RollbackMigrations(ctx, conn, dbsqlc.RollbackMigrationsParams{
-		Namespaces: sliceutil.Map(result.MigrationResults, func(r MigrationResult) string { return r.Namespace }),
-		Versions:   sliceutil.Map(result.MigrationResults, func(r MigrationResult) int64 { return r.Version }),
-	}); err != nil {
-		print("rollback")
-		return nil, fmt.Errorf("conduit: occurred while updating migrations table: %w", err)
-	}
-
-	return result, err
+	return m.applyMigrations(ctx, migrations, DirectionDown, conn)
 }
 
 func (m *migrator) applyMigrations(
@@ -253,8 +213,8 @@ func (m *migrator) applyMigrations(
 		var tx pgx.Tx
 		inTx := must.Must(migration.UseTx(dir))
 
-		m.logger.Debug(
-			"applying migartion",
+		m.logger.Info(
+			"applying migration",
 			slog.String("direction", string(dir)),
 			slog.Group(
 				"migration",
@@ -285,12 +245,40 @@ func (m *migrator) applyMigrations(
 		}
 
 		duration := time.Since(start)
-		results[i] = MigrationResult{
+		migrationResult := MigrationResult{
 			DurationTotal: duration,
 			Version:       migration.Version(),
 			Name:          migration.Name(),
 			Namespace:     m.registry.Namespace,
 		}
+		results[i] = migrationResult
+
+		switch dir {
+		case DirectionDown:
+			// "migrations" table won't be available by this time.
+			isFirstConduitMigration := migrationResult.Version == int64(internalmigrations.FirstMigrationVersion) && migrationResult.Namespace == internalmigrations.RegistryNamespace
+			if isFirstConduitMigration {
+				break
+			}
+
+			err = dbsqlc.New().RollbackMigration(ctx, conn, dbsqlc.RollbackMigrationParams{
+				Version:   migrationResult.Version,
+				Namespace: migrationResult.Namespace,
+			})
+
+		case DirectionUp:
+			err = dbsqlc.New().ApplyMigration(ctx, conn, dbsqlc.ApplyMigrationParams{
+				ID:        uuidv7.Must(),
+				Version:   migrationResult.Version,
+				Namespace: migrationResult.Namespace,
+				Name:      migrationResult.Name,
+			})
+		}
+		if err != nil {
+			return nil, fmt.Errorf("conduit: an error occurred while updating migrations table (%v): %w", dir, err)
+		}
+
+		_ = dbsqlc.New().ResetConn(ctx, conn)
 
 		if inTx {
 			if err := tx.Commit(ctx); err != nil {
