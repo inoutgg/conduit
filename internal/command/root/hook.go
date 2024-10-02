@@ -17,13 +17,14 @@ var kCtx = &ctx{}
 
 func OnBeforeHook(ctx *cli.Context) error {
 	// Attach migration directory to the context.
-	mdir := ctx.String("dir")
-	if mdir == "" {
+	migrationsDir := ctx.String("dir")
+	if migrationsDir == "" {
 		return fmt.Errorf("conduit: expected migration directory to be provided.")
 	}
 
-	dir := filepath.Clean(filepath.Join(must.Must(os.Getwd()), ctx.String("dir")))
-	ctx.Context = context.WithValue(ctx.Context, kCtx, dir)
+	resolvedMigrationDir := filepath.Clean(filepath.Join(must.Must(os.Getwd()), ctx.String("dir")))
+	ctx.Context = context.WithValue(ctx.Context, kCtx, resolvedMigrationDir)
+
 	return nil
 }
 

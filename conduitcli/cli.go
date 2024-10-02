@@ -12,34 +12,17 @@ import (
 	"go.inout.gg/conduit/internal/command/root"
 )
 
-var _ Interface = (*app)(nil)
-
-// Inferface exposes public CLI interface.
-type Interface interface {
-	// Execute executes a command if matched.
-	Execute(context.Context) error
-}
-
-type app struct {
-	cmd *cli.App
-}
-
-// New creates a new command-line interface with a given dialer
-// to connect to the database.
-func New(m conduit.Migrator) Interface {
+// Execute evaluates given os.Args and executes a matched command.
+func Execute(ctx context.Context, migrator conduit.Migrator) error {
 	cmd := &cli.App{
-		Flags: root.Flags,
+		Flags: root.GlobalFlags,
 		Commands: []*cli.Command{
 			initialise.NewCommand(),
 			create.NewCommand(),
-			apply.NewCommand(m),
+			apply.NewCommand(migrator),
 		},
 		Before: root.OnBeforeHook,
 	}
 
-	return &app{cmd}
-}
-
-func (c *app) Execute(ctx context.Context) error {
-	return c.cmd.Run(os.Args)
+	return cmd.Run(os.Args)
 }

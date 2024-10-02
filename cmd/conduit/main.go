@@ -7,7 +7,6 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/jackc/pgx/v5"
 	dotenv "github.com/joho/godotenv"
 	"go.inout.gg/conduit"
 	"go.inout.gg/conduit/conduitcli"
@@ -19,12 +18,9 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM)
 	defer cancel()
 
-	dialer := conduit.NewDialer(func(conn *pgx.Conn) (conduit.Migrator, error) {
-		return conduit.NewMigrator(conn, conduit.NewConfig()), nil
-	})
+	migrator := conduit.NewMigrator(conduit.NewConfig())
 
-	cli := conduitcli.New(dialer)
-	if err := cli.Execute(ctx); err != nil {
+	if err := conduitcli.Execute(ctx, migrator); err != nil {
 		log.Fatal(err)
 		os.Exit(1)
 		return

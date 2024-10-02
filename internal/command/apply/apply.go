@@ -1,12 +1,10 @@
 package apply
 
 import (
-	"fmt"
-	"strings"
-
-	"github.com/jackc/pgx/v5"
 	"github.com/urfave/cli/v2"
 	"go.inout.gg/conduit"
+	"go.inout.gg/conduit/internal/command/root"
+	"go.inout.gg/conduit/internal/direction"
 )
 
 func NewCommand(migrator conduit.Migrator) *cli.Command {
@@ -14,7 +12,7 @@ func NewCommand(migrator conduit.Migrator) *cli.Command {
 		Name:  "apply",
 		Args:  true,
 		Usage: "apply migrations in the given direction",
-		Flags: []cli.Flag{},
+		Flags: []cli.Flag{root.DatabaseURLFlag},
 		Action: func(ctx *cli.Context) error {
 			return apply(ctx, migrator)
 		},
@@ -26,43 +24,20 @@ func apply(
 	ctx *cli.Context,
 	migrator conduit.Migrator,
 ) error {
-	dir := ctx.Args().First()
-	if dir == "" {
-		return fmt.Errorf("conduit: missing `direction\" argument")
-	}
-
-	url := ctx.String("database-url")
-	if url == "" {
-		return fmt.Errorf("conduit: missing `database-url\" flag.")
-	}
-
-	direction, err := stringToDirection(dir)
+	dir, err := direction.FromString(ctx.Args().First())
 	if err != nil {
 		return err
 	}
 
-	conn, err := pgx.Connect(ctx.Context, url)
+	conn, err := root.Conn(ctx)
 	if err != nil {
 		return err
 	}
-	_, err = migrator.Migrate(ctx.Context, direction, conn)
+
+	_, err = migrator.Migrate(ctx.Context, dir, conn)
 	if err != nil {
 		return err
 	}
 
 	return nil
-}
-
-func stringToDirection(str string) (conduit.Direction, error) {
-	switch strings.TrimSpace(str) {
-	case string(conduit.DirectionUp):
-		return conduit.DirectionUp, nil
-	case string(conduit.DirectionDown):
-		return conduit.DirectionDown, nil
-	}
-
-	return "", fmt.Errorf(
-		"conduit: invalid direction, expected \"up\" or \"down\", received: %s",
-		str,
-	)
 }
