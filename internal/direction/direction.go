@@ -4,18 +4,17 @@ import (
 	"errors"
 )
 
-// Direction denotes whether SQL migration should be rolled up, or rolled back.
+// Direction represents the SQL migration direction: up (rollup) or down (rollback).
 type Direction string
 
 const (
-	DirectionUp   Direction = "up"   // rollup
-	DirectionDown           = "down" // rollback
+	DirectionUp   Direction = "up"   // rolling up
+	DirectionDown Direction = "down" // rolling back
 )
 
 var UnknownDirectionErr = errors.New("conduit: unknown direction")
 
-// FromString converts a string to a direction if possible, otherwise
-// it returns an error
+// FromString converts a string to a Direction. It returns UnknownDirectionErr for invalid inputs.
 func FromString(s string) (Direction, error) {
 	switch s {
 	case string(DirectionUp):

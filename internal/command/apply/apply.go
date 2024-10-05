@@ -3,7 +3,7 @@ package apply
 import (
 	"github.com/urfave/cli/v2"
 	"go.inout.gg/conduit"
-	"go.inout.gg/conduit/internal/command/root"
+	"go.inout.gg/conduit/internal/command/common"
 	"go.inout.gg/conduit/internal/direction"
 )
 
@@ -12,7 +12,7 @@ func NewCommand(migrator conduit.Migrator) *cli.Command {
 		Name:  "apply",
 		Args:  true,
 		Usage: "apply migrations in the given direction",
-		Flags: []cli.Flag{root.DatabaseURLFlag},
+		Flags: []cli.Flag{common.DatabaseURLFlag},
 		Action: func(ctx *cli.Context) error {
 			return apply(ctx, migrator)
 		},
@@ -29,12 +29,12 @@ func apply(
 		return err
 	}
 
-	conn, err := root.Conn(ctx)
+	conn, err := common.Conn(ctx)
 	if err != nil {
 		return err
 	}
 
-	_, err = migrator.Migrate(ctx.Context, dir, conn)
+	_, err = migrator.Migrate(ctx.Context, dir, conn, nil)
 	if err != nil {
 		return err
 	}

@@ -8,12 +8,8 @@ import (
 
 const RegistryNamespace = "inout/conduit"
 
-var (
-	Registry *conduitregistry.Registry = conduitregistry.New(RegistryNamespace)
-
-	// Version of the very first migration in the conduit project.
-	FirstMigrationVersion = 1726004714907
-)
+// Conduit's own migrations scripts registry.
+var Registry *conduitregistry.Registry = conduitregistry.New(RegistryNamespace)
 
 //go:embed **.sql
 var migrations embed.FS

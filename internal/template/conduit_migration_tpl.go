@@ -22,17 +22,19 @@ var m{{.Version}} = conduitmigrate.New(&conduitmigrate.Config{})
 
 func init() {
 {{- if .HasCustomRegistry}}
-	Registry.Add(up{{.Version}}, down{{.Version}})
+	Registry.Up(up{{.Version}})
+	Registry.Down(down{{.Version}})
 {{- else}}
-	conduit.Add(up{{.Version}}, down{{.Version}})
+	conduit.Up(up{{.Version}})
+	conduit.Down(down{{.Version}})
 {{- end}}
 }
 
-func up{{.Version}}(ctx context.Context, tx pgx.Tx) error {
-	return m{{.Version}}.Up(ctx, tx)
+func up{{.Version}}(ctx context.Context, conn *pgx.Conn) error {
+	return m{{.Version}}.Up(ctx, conn)
 }
 
-func down{{.Version}}(ctx context.Context, tx pgx.Tx) error {
-	return m{{.Version}}.Down(ctx, tx)
+func down{{.Version}}(ctx context.Context, conn *pgx.Tx) error {
+	return m{{.Version}}.Down(ctx, con)
 }
 `))

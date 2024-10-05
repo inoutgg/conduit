@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/urfave/cli/v2"
-	"go.inout.gg/conduit/internal/command/root"
+	"go.inout.gg/conduit/internal/command/common"
 	internaltpl "go.inout.gg/conduit/internal/template"
 	"go.inout.gg/conduit/internal/version"
 )
@@ -32,7 +32,7 @@ func NewCommand() *cli.Command {
 }
 
 func create(ctx *cli.Context) error {
-	dir, err := root.MigrationDir(ctx)
+	dir, err := common.MigrationDir(ctx)
 	if err != nil {
 		return err
 	}

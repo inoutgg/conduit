@@ -2,7 +2,6 @@ package version_test
 
 import (
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -13,7 +12,7 @@ func TestParseMigrationFilename(t *testing.T) {
 	tests := []struct {
 		name           string
 		filename       string
-		expectedVer    time.Time
+		expectedVer    int64
 		expectedName   string
 		expectedExt    string
 		expectedErrMsg string
@@ -21,43 +20,43 @@ func TestParseMigrationFilename(t *testing.T) {
 		{
 			name:         "Valid SQL migration",
 			filename:     "1257894000000_create_user.sql",
-			expectedVer:  time.UnixMilli(1257894000000),
+			expectedVer:  1257894000000,
 			expectedName: "create_user",
 			expectedExt:  "sql",
 		},
 		{
 			name:         "Valid Go migration",
 			filename:     "1257894454320_update_schema.go",
-			expectedVer:  time.UnixMilli(1257894454320),
+			expectedVer:  1257894454320,
 			expectedName: "update_schema",
 			expectedExt:  "go",
 		},
 		{
 			name:         "Valid migration with path",
 			filename:     "/path/to/migrations/1257894900000_add_index.sql",
-			expectedVer:  time.UnixMilli(1257894900000),
+			expectedVer:  1257894900000,
 			expectedName: "add_index",
 			expectedExt:  "sql",
 		},
 		{
 			name:           "Invalid extension",
 			filename:       "1257895000000_invalid_extension.txt",
-			expectedErrMsg: "conduit: unknown migration file extension \".txt\", expected: \".sql\" or \".go\"",
+			expectedErrMsg: `conduit: unknown migration file extension ".txt", expected: .sql or .go`,
 		},
 		{
 			name:           "Malformed filename, no underscore",
 			filename:       "1257895100000malformed.go",
-			expectedErrMsg: "conduit: malformed migration filename, expected format: <numeric-version-part>_<string-part>.[go|sql], was: 1257895100000malformed.go",
+			expectedErrMsg: `conduit: malformed migration filename, expected: <version>_<name>.[go|sql], got: 1257895100000malformed.go`,
 		},
 		{
 			name:           "Malformed filename, only version",
 			filename:       "1257895200000.go",
-			expectedErrMsg: "conduit: malformed migration filename, expected format: <numeric-version-part>_<string-part>.[go|sql], was: 1257895200000.go",
+			expectedErrMsg: `conduit: malformed migration filename, expected: <version>_<name>.[go|sql], got: 1257895200000.go`,
 		},
 		{
 			name:           "Non-numeric version",
 			filename:       "abc_invalid_version.sql",
-			expectedErrMsg: "conduit: unable parse version \"abc\":",
+			expectedErrMsg: `conduit: unable to parse version "abc":`,
 		},
 		{
 			name:           "Empty filename",
@@ -65,7 +64,7 @@ func TestParseMigrationFilename(t *testing.T) {
 			expectedErrMsg: "conduit: filename cannot be empty",
 		},
 		{
-			name:           "Invalid version (zero)",
+			name:           "Invalid version (negative)",
 			filename:       "-1_invalid_version.sql",
 			expectedErrMsg: "conduit: invalid version",
 		},

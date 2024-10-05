@@ -1,7 +1,8 @@
+// Package sliceutil provides utility functions for working with slices.
 package sliceutil
 
-// Map passes each element of the slice s to the function f and returns
-// result as a slice.
+// Map applies function f to each element of slice s and
+// returns the results as a new slice.
 func Map[S ~[]E, E, V any](s S, f func(E) V) []V {
 	values := make([]V, len(s))
 	for i, e := range s {
@@ -11,8 +12,8 @@ func Map[S ~[]E, E, V any](s S, f func(E) V) []V {
 	return values
 }
 
-// KeyBy passes each element of the slices s to the function f and
-// returns a map consisting of (f(e), e) pairs, where e is a single entry in s.
+// KeyBy creates a map from slice s, using function f to generate keys for each element.
+// The resulting map consists of key-value pairs where the key is f(e) and the value is e.
 func KeyBy[S ~[]E, E any, V comparable](s S, f func(E) V) map[V]E {
 	m := make(map[V]E, len(s))
 	for _, e := range s {

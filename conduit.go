@@ -5,29 +5,7 @@
 package conduit
 
 import (
-	"io/fs"
-
-	"go.inout.gg/conduit/conduitregistry"
 	"go.inout.gg/foundations/debug"
 )
 
-const (
-	// Then namespace name of the global registry.
-	// The global registry is used by default by the Migrator in case
-	// when no alternative registry is provided via  Config.
-	GlobalRegistryNamespace = "default"
-)
-
 var d = debug.Debuglog("conduit: conduit")
-
-var globalRegistry = conduitregistry.New(GlobalRegistryNamespace)
-
-func Up(up MigrateFunc)         { globalRegistry.Up(up) }
-func UpTx(up MigrateFuncTx)     { globalRegistry.UpTx(up) }
-func Down(down MigrateFunc)     { globalRegistry.Down(down) }
-func DownTx(down MigrateFuncTx) { globalRegistry.DownTx(down) }
-
-// FromFS registers one or more SQL migrations from the fsys in the global registry.
-func FromFS(fsys fs.FS) {
-	globalRegistry.FromFS(fsys)
-}

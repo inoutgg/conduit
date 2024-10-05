@@ -21,9 +21,11 @@ import (
 
 func init() {
 {{- if .HasCustomRegistry}}
-	Registry.Add(up{{.Version}}, down{{.Version}})
+	Registry.UpTx(up{{.Version}})
+	Regsitry.DownTx(down{{.Version}})
 {{- else}}
-	conduit.Add(up{{.Version}}, down{{.Version}})
+	conduit.UpTx(up{{.Version}})
+	conduit.DownTx(down{{.Version}})
 {{- end}}
 }
 
