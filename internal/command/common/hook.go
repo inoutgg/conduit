@@ -17,9 +17,9 @@ var kCtx = &ctx{}
 
 func OnBeforeHook(ctx *cli.Context) error {
 	// Attach migration directory to the context.
-	migrationsDir := ctx.String("dir")
+	migrationsDir := ctx.String(migrationsDirFlagName)
 	if migrationsDir == "" {
-		return fmt.Errorf("conduit: expected migration directory to be provided.")
+		return fmt.Errorf("conduit: missing `%s' flag.", migrationsDirFlagName)
 	}
 
 	resolvedMigrationDir := filepath.Clean(filepath.Join(must.Must(os.Getwd()), ctx.String("dir")))

@@ -61,7 +61,7 @@ func create(ctx *cli.Context) error {
 	f, err := os.Create(path)
 	if err != nil {
 		return fmt.Errorf(
-			"conduit: unable to create migration file %s: %w",
+			"conduit: failed to create migration file %s: %w",
 			path,
 			err,
 		)
@@ -74,8 +74,6 @@ func create(ctx *cli.Context) error {
 		tpl = internaltpl.GoMigrationTemplate
 	case "sql":
 		tpl = internaltpl.SQLMigrationTemplate
-	default:
-		return errors.New("conduit: unsupported extension")
 	}
 
 	hasCustomRegistry := exists(filepath.Join(dir, "registry.go"))
@@ -85,7 +83,7 @@ func create(ctx *cli.Context) error {
 		Name              string
 		Version           int64
 	}{hasCustomRegistry, ext, name, ver}); err != nil {
-		return fmt.Errorf("conduit: unable to write template: %w", err)
+		return fmt.Errorf("conduit: failed to write template: %w", err)
 	}
 
 	if err := f.Sync(); err != nil {

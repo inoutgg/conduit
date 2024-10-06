@@ -3,6 +3,7 @@ package conduit
 import (
 	"cmp"
 	"context"
+	"errors"
 	"fmt"
 	"hash/fnv"
 	"log/slog"
@@ -23,8 +24,19 @@ import (
 var _ Migrator = (*migrator)(nil)
 
 const (
+	allSteps = -1
+
+	defaultUpStep   = allSteps
+	defaultDownStep = 1
+)
+
+const (
 	DirectionUp   Direction = direction.DirectionUp
 	DirectionDown           = direction.DirectionDown
+)
+
+var InvalidStepErr = errors.New(
+	"conduit: invalid migration step. Expected: -1 (all) or positive integer.",
 )
 
 type (
@@ -102,7 +114,15 @@ type MigrationResult struct {
 
 // MigrateOptions specifies options for a Migrator.Migrate operation.
 type MigrateOptions struct {
-	Step int
+	Steps int
+}
+
+func (m *MigrateOptions) validate() error {
+	if !(m.Steps == -1 || m.Steps > 0) {
+		return InvalidStepErr
+	}
+
+	return nil
 }
 
 // NewMigrator creates a new migrator with the given config.
@@ -129,6 +149,7 @@ func (m *migrator) existingMigrationVerions(ctx context.Context, conn *pgx.Conn)
 	}
 
 	if !ok {
+		d("conduitmigrations table is not found")
 		return []int64{}, nil
 	}
 
@@ -158,7 +179,21 @@ func (m *migrator) Migrate(
 ) (result *MigrateResult, err error) {
 	debug.Assert(conn != nil, "expected conn to be defined")
 
+	if opts == nil {
+		opts = &MigrateOptions{Steps: defaultUpStep}
+		if dir == DirectionDown {
+			opts.Steps = defaultDownStep
+		}
+
+		d("opts is ommitted, using the default one: %v", opts)
+	}
+
+	if err := opts.validate(); err != nil {
+		return nil, err
+	}
+
 	lockNum := pgLockNum(m.registry.Namespace)
+
 	if err := dbsqlc.New().AcquireLock(ctx, conn, lockNum); err != nil {
 		return nil, fmt.Errorf("conduit: failed to acquire a lock: %w", err)
 	}
@@ -166,9 +201,9 @@ func (m *migrator) Migrate(
 
 	switch dir {
 	case DirectionUp:
-		result, err = m.migrateUp(ctx, conn)
+		result, err = m.migrateUp(ctx, conn, opts)
 	case DirectionDown:
-		result, err = m.migrateDown(ctx, conn)
+		result, err = m.migrateDown(ctx, conn, opts)
 	default:
 		return nil, direction.UnknownDirectionErr
 	}
@@ -182,7 +217,11 @@ func (m *migrator) Migrate(
 // migrateUp applies pending migrations in the up direction.
 //
 // Migrations are rolled up in ascending order.
-func (m *migrator) migrateUp(ctx context.Context, conn *pgx.Conn) (*MigrateResult, error) {
+func (m *migrator) migrateUp(
+	ctx context.Context,
+	conn *pgx.Conn,
+	opts *MigrateOptions,
+) (*MigrateResult, error) {
 	existingMigrationVersions, err := m.existingMigrationVerions(ctx, conn)
 	if err != nil {
 		return nil, err
@@ -197,13 +236,17 @@ func (m *migrator) migrateUp(ctx context.Context, conn *pgx.Conn) (*MigrateResul
 		return int(a.Version() - b.Version())
 	})
 
-	return m.applyMigrations(ctx, migrations, DirectionUp, conn)
+	return m.applyMigrations(ctx, migrations, DirectionUp, conn, opts)
 }
 
 // migrateDown rolls back applied migrations in the down direction.
 //
 // Migrations are rolled back in descending order.
-func (m *migrator) migrateDown(ctx context.Context, conn *pgx.Conn) (*MigrateResult, error) {
+func (m *migrator) migrateDown(
+	ctx context.Context,
+	conn *pgx.Conn,
+	opts *MigrateOptions,
+) (*MigrateResult, error) {
 	existingMigrations, err := m.existingMigrationVerions(ctx, conn)
 	if err != nil {
 		return nil, err
@@ -225,7 +268,7 @@ func (m *migrator) migrateDown(ctx context.Context, conn *pgx.Conn) (*MigrateRes
 		return int(b.Version() - a.Version())
 	})
 
-	return m.applyMigrations(ctx, migrations, DirectionDown, conn)
+	return m.applyMigrations(ctx, migrations, DirectionDown, conn, opts)
 }
 
 // applyMigrations executes the given migrations in the specified direction.]
@@ -236,7 +279,12 @@ func (m *migrator) applyMigrations(
 	migrations []*conduitregistry.Migration,
 	dir Direction,
 	conn *pgx.Conn,
+	opts *MigrateOptions,
 ) (result *MigrateResult, err error) {
+	if opts.Steps != allSteps {
+		migrations = migrations[0:min(opts.Steps, len(migrations))]
+	}
+
 	results := make([]MigrationResult, len(migrations))
 	for i, migration := range migrations {
 		var tx pgx.Tx
@@ -328,5 +376,9 @@ func (m *migrator) applyMigrations(
 func pgLockNum(s string) int64 {
 	h := fnv.New64()
 	h.Write([]byte(s))
-	return int64(h.Sum64())
+	n := int64(h.Sum64())
+
+	d("generated advisory lock id: %d", n)
+
+	return n
 }

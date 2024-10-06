@@ -7,12 +7,20 @@ import (
 	"go.inout.gg/conduit/internal/direction"
 )
 
+var stepsFlagName = "steps"
+
 func NewCommand(migrator conduit.Migrator) *cli.Command {
 	return &cli.Command{
 		Name:  "apply",
 		Args:  true,
 		Usage: "apply migrations in the given direction",
-		Flags: []cli.Flag{common.DatabaseURLFlag},
+		Flags: []cli.Flag{
+			common.DatabaseURLFlag,
+			&cli.IntFlag{
+				Name:  stepsFlagName,
+				Usage: "maximum migrations steps",
+			},
+		},
 		Action: func(ctx *cli.Context) error {
 			return apply(ctx, migrator)
 		},
@@ -34,7 +42,10 @@ func apply(
 		return err
 	}
 
-	_, err = migrator.Migrate(ctx.Context, dir, conn, nil)
+	opts := &conduit.MigrateOptions{
+		Steps: ctx.Int(stepsFlagName),
+	}
+	_, err = migrator.Migrate(ctx.Context, dir, conn, opts)
 	if err != nil {
 		return err
 	}
