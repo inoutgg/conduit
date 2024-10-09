@@ -9,7 +9,7 @@ import (
 
 var stepsFlagName = "steps"
 
-func NewCommand(migrator conduit.Migrator) *cli.Command {
+func NewCommand(migrator *conduit.Migrator) *cli.Command {
 	return &cli.Command{
 		Name:  "apply",
 		Args:  true,
@@ -30,7 +30,7 @@ func NewCommand(migrator conduit.Migrator) *cli.Command {
 // apply applies a migration in the defined direction.
 func apply(
 	ctx *cli.Context,
-	migrator conduit.Migrator,
+	migrator *conduit.Migrator,
 ) error {
 	dir, err := direction.FromString(ctx.Args().First())
 	if err != nil {

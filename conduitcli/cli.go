@@ -13,7 +13,7 @@ import (
 )
 
 // Execute evaluates given os.Args and executes a matched command.
-func Execute(ctx context.Context, migrator conduit.Migrator) error {
+func Execute(ctx context.Context, migrator *conduit.Migrator) error {
 	cmd := &cli.App{
 		Flags: common.GlobalFlags,
 		Commands: []*cli.Command{

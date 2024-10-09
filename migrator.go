@@ -151,7 +151,7 @@ func (m *Migrator) existingMigrationVerions(ctx context.Context, conn *pgx.Conn)
 
 	versions, err := dbsqlc.New().AllExistingMigrationVersions(ctx, conn, m.registry.Namespace)
 	if err != nil {
-		return nil, fmt.Errorf("conduit: failed to fetch existing versions", err)
+		return nil, fmt.Errorf("conduit: failed to fetch existing versions: %w", err)
 	}
 
 	return versions, nil

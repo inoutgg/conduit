@@ -8,7 +8,7 @@ require (
 	github.com/joho/godotenv v1.5.1
 	github.com/stretchr/testify v1.9.0
 	github.com/urfave/cli/v2 v2.27.4
-	go.inout.gg/foundations v0.0.0-20240831223942-78800f394231
+	go.inout.gg/foundations v0.0.0-20240922153347-0be999149d7c
 )
 
 require (

@@ -19,7 +19,7 @@ import (
 // It wraps up the conduit.Migrator and exposes Up and Down methods for rolling up
 // and back migrations respectively.
 type Migrator struct {
-	migrator conduit.Migrator
+	migrator *conduit.Migrator
 }
 
 type Config struct {
