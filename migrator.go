@@ -21,8 +21,6 @@ import (
 	"go.inout.gg/foundations/must"
 )
 
-var _ Migrator = (*migrator)(nil)
-
 const (
 	allSteps = -1
 
@@ -47,10 +45,6 @@ type (
 	MigrateFuncTx = conduitregistry.MigrateFuncTx
 	Migration     = conduitregistry.Migration
 )
-
-type Migrator interface {
-	Migrate(context.Context, Direction, *pgx.Conn, *MigrateOptions) (*MigrateResult, error)
-}
 
 // Config is the configuration for the Migrator.
 //
@@ -126,23 +120,25 @@ func (m *MigrateOptions) validate() error {
 }
 
 // NewMigrator creates a new migrator with the given config.
-func NewMigrator(config *Config) Migrator {
+func NewMigrator(config *Config) *Migrator {
 	debug.Assert(config.Logger != nil, "config.Logger must be defined")
 	debug.Assert(config.Registry != nil, "config.Registry must be defined")
 
-	return &migrator{
+	return &Migrator{
 		logger:   config.Logger,
 		registry: config.Registry,
 	}
 }
 
-type migrator struct {
+// Migrator is a database migration tool that can rolls up and down migrations
+// in order.
+type Migrator struct {
 	logger   *slog.Logger
 	registry *conduitregistry.Registry
 }
 
 // existingMigrationVerions retrieves a list of already applied migration versions.
-func (m *migrator) existingMigrationVerions(ctx context.Context, conn *pgx.Conn) ([]int64, error) {
+func (m *Migrator) existingMigrationVerions(ctx context.Context, conn *pgx.Conn) ([]int64, error) {
 	ok, err := dbsqlc.New().DoesTableExist(ctx, conn, "conduitmigrations")
 	if err != nil {
 		return nil, fmt.Errorf("conduit: failed to fetch from migrations table: %w", err)
@@ -171,7 +167,7 @@ func (m *migrator) existingMigrationVerions(ctx context.Context, conn *pgx.Conn)
 //
 // If a migration is registered in transaction mode, it creates a new transaction
 // before applying the migration.
-func (m *migrator) Migrate(
+func (m *Migrator) Migrate(
 	ctx context.Context,
 	dir Direction,
 	conn *pgx.Conn,
@@ -217,7 +213,7 @@ func (m *migrator) Migrate(
 // migrateUp applies pending migrations in the up direction.
 //
 // Migrations are rolled up in ascending order.
-func (m *migrator) migrateUp(
+func (m *Migrator) migrateUp(
 	ctx context.Context,
 	conn *pgx.Conn,
 	opts *MigrateOptions,
@@ -242,7 +238,7 @@ func (m *migrator) migrateUp(
 // migrateDown rolls back applied migrations in the down direction.
 //
 // Migrations are rolled back in descending order.
-func (m *migrator) migrateDown(
+func (m *Migrator) migrateDown(
 	ctx context.Context,
 	conn *pgx.Conn,
 	opts *MigrateOptions,
@@ -274,7 +270,7 @@ func (m *migrator) migrateDown(
 // applyMigrations executes the given migrations in the specified direction.]
 //
 // It assumes the passed migrations are already sorted in the necessary order.
-func (m *migrator) applyMigrations(
+func (m *Migrator) applyMigrations(
 	ctx context.Context,
 	migrations []*conduitregistry.Migration,
 	dir Direction,
