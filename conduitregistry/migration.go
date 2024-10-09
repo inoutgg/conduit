@@ -37,7 +37,7 @@ func (m *Migration) UseTx(dir direction.Direction) (bool, error) {
 		return m.down.inTx, nil
 	}
 
-	return false, direction.UnknownDirectionErr
+	return false, direction.ErrUnknownDirection
 }
 
 // Version returns the version of this migration.
@@ -57,7 +57,7 @@ func (m *Migration) Apply(ctx context.Context, dir direction.Direction, conn *pg
 		return m.migrateDown(ctx, conn, tx)
 	}
 
-	return direction.UnknownDirectionErr
+	return direction.ErrUnknownDirection
 }
 
 func (m *Migration) migrateDown(ctx context.Context, conn *pgx.Conn, tx pgx.Tx) error {

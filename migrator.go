@@ -35,7 +35,7 @@ const (
 	DirectionDown           = direction.DirectionDown
 )
 
-var InvalidStepErr = errors.New(
+var ErrInvalidStep = errors.New(
 	"conduit: invalid migration step. Expected: -1 (all) or positive integer.",
 )
 
@@ -119,7 +119,7 @@ type MigrateOptions struct {
 
 func (m *MigrateOptions) validate() error {
 	if !(m.Steps == -1 || m.Steps > 0) {
-		return InvalidStepErr
+		return ErrInvalidStep
 	}
 
 	return nil
@@ -205,7 +205,7 @@ func (m *migrator) Migrate(
 	case DirectionDown:
 		result, err = m.migrateDown(ctx, conn, opts)
 	default:
-		return nil, direction.UnknownDirectionErr
+		return nil, direction.ErrUnknownDirection
 	}
 	if err != nil {
 		return nil, err
@@ -227,7 +227,7 @@ func (m *migrator) migrateUp(
 		return nil, err
 	}
 
-	targetMigrations := m.registry.Migrations()
+	targetMigrations := m.registry.CloneMigrations()
 	for _, existingVersion := range existingMigrationVersions {
 		delete(targetMigrations, existingVersion)
 	}
@@ -254,7 +254,7 @@ func (m *migrator) migrateDown(
 
 	// Filter only applied migrations.
 	existingMigrationsMap := sliceutil.KeyBy(existingMigrations, func(e int64) int64 { return e })
-	targetMigrations := m.registry.Migrations()
+	targetMigrations := m.registry.CloneMigrations()
 	for _, m := range targetMigrations {
 		if _, ok := existingMigrationsMap[m.Version()]; !ok {
 			delete(targetMigrations, m.Version())

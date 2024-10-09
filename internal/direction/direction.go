@@ -12,7 +12,7 @@ const (
 	DirectionDown Direction = "down" // rolling back
 )
 
-var UnknownDirectionErr = errors.New("conduit: unknown direction")
+var ErrUnknownDirection = errors.New("conduit: unknown direction")
 
 // FromString converts a string to a Direction. It returns UnknownDirectionErr for invalid inputs.
 func FromString(s string) (Direction, error) {
@@ -23,5 +23,5 @@ func FromString(s string) (Direction, error) {
 		return DirectionDown, nil
 	}
 
-	return "", UnknownDirectionErr
+	return "", ErrUnknownDirection
 }

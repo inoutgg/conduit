@@ -7,9 +7,9 @@ import (
 	"github.com/urfave/cli/v2"
 	"go.inout.gg/conduit"
 	"go.inout.gg/conduit/internal/command/apply"
+	"go.inout.gg/conduit/internal/command/common"
 	"go.inout.gg/conduit/internal/command/create"
 	"go.inout.gg/conduit/internal/command/initialise"
-	"go.inout.gg/conduit/internal/command/common"
 )
 
 // Execute evaluates given os.Args and executes a matched command.
