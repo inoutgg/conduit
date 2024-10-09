@@ -2,6 +2,22 @@
 
 An SQL migrator that is easy to embed.
 
+## Getting started
+
+### Creating a new Conduit migration project
+
+To create a new conduit project run in the current directory:
+
+```
+$ conduit init
+```
+
+By default conduit initialises a new project in `$(cwd)/migrations` to create the project in a different location.
+
+```
+$ conduit init --migrations-dir path/to/project
+```
+
 ## FAQ
 
 <details>

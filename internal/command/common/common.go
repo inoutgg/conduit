@@ -9,7 +9,7 @@ import (
 
 var (
 	databaseUrlFlagName   = "database-url"
-	migrationsDirFlagName = "dir"
+	migrationsDirFlagName = "migrations-dir"
 )
 
 var DatabaseURLFlag = &cli.StringFlag{

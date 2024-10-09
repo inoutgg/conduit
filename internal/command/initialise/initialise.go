@@ -18,6 +18,7 @@ func NewCommand() *cli.Command {
 		Aliases: []string{"i"},
 		Usage:   "initialise migration directory",
 		Flags: []cli.Flag{
+			common.MigrationsDirFlag,
 			&cli.StringFlag{
 				Name:    "namespace",
 				Aliases: []string{"ns"},
