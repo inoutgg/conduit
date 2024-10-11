@@ -21,16 +21,17 @@ import (
 	"go.inout.gg/foundations/must"
 )
 
-const (
-	allSteps = -1
+// AllSteps tells migrator to run all available migrations either up or down.
+const AllSteps = -1
 
-	defaultUpStep   = allSteps
-	defaultDownStep = 1
+const (
+	DefaultUpStep   = AllSteps // roll up
+	DefaultDownStep = 1        // roll back
 )
 
 const (
-	DirectionUp   Direction = direction.DirectionUp
-	DirectionDown           = direction.DirectionDown
+	DirectionUp   Direction = direction.DirectionUp   // roll up
+	DirectionDown           = direction.DirectionDown // roll down
 )
 
 var ErrInvalidStep = errors.New(
@@ -38,7 +39,6 @@ var ErrInvalidStep = errors.New(
 )
 
 type (
-	// Direction denotes whether SQL migration should be rolled up, or rolled back.
 	Direction = direction.Direction
 
 	MigrateFunc   = conduitregistry.MigrateFunc
@@ -176,9 +176,9 @@ func (m *Migrator) Migrate(
 	debug.Assert(conn != nil, "expected conn to be defined")
 
 	if opts == nil {
-		opts = &MigrateOptions{Steps: defaultUpStep}
+		opts = &MigrateOptions{Steps: DefaultUpStep}
 		if dir == DirectionDown {
-			opts.Steps = defaultDownStep
+			opts.Steps = DefaultDownStep
 		}
 
 		d("opts is ommitted, using the default one: %v", opts)
@@ -277,7 +277,7 @@ func (m *Migrator) applyMigrations(
 	conn *pgx.Conn,
 	opts *MigrateOptions,
 ) (result *MigrateResult, err error) {
-	if opts.Steps != allSteps {
+	if opts.Steps != AllSteps {
 		migrations = migrations[0:min(opts.Steps, len(migrations))]
 	}
 
