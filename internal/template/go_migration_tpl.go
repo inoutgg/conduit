@@ -22,7 +22,7 @@ import (
 func init() {
 {{- if .HasCustomRegistry}}
 	Registry.UpTx(up{{.Version}})
-	Regsitry.DownTx(down{{.Version}})
+	Registry.DownTx(down{{.Version}})
 {{- else}}
 	conduit.UpTx(up{{.Version}})
 	conduit.DownTx(down{{.Version}})

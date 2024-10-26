@@ -12,7 +12,6 @@ import (
 	"embed"
 
 	"go.inout.gg/conduit/conduitregistry"
-	"go.inout.gg/foundations/must"
 )
 
 var Registry = conduitregistry.New({{.Namespace}})
@@ -21,6 +20,6 @@ var Registry = conduitregistry.New({{.Namespace}})
 var migrationFS embed.FS
 
 func init() {
-	must.Must1(Registry.FromFS(migrationFS))
+	Registry.FromFS(migrationFS)
 }
 `))
