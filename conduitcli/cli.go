@@ -4,7 +4,8 @@ import (
 	"context"
 	"os"
 
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
+
 	"go.inout.gg/conduit"
 	"go.inout.gg/conduit/internal/command/apply"
 	"go.inout.gg/conduit/internal/command/common"
@@ -14,7 +15,8 @@ import (
 
 // Execute evaluates given os.Args and executes a matched command.
 func Execute(ctx context.Context, migrator *conduit.Migrator) error {
-	cmd := &cli.App{
+	//nolint:exhaustruct
+	cmd := &cli.Command{
 		Flags: common.GlobalFlags,
 		Commands: []*cli.Command{
 			initialise.NewCommand(),
@@ -24,5 +26,6 @@ func Execute(ctx context.Context, migrator *conduit.Migrator) error {
 		Before: common.OnBeforeHook,
 	}
 
-	return cmd.Run(os.Args)
+	//nolint:wrapcheck
+	return cmd.Run(ctx, os.Args)
 }

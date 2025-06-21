@@ -4,13 +4,17 @@ import (
 	"context"
 
 	"github.com/jackc/pgx/v5"
-	"go.inout.gg/conduit/internal/direction"
 	"go.inout.gg/foundations/debug"
+
+	"go.inout.gg/conduit/internal/direction"
+	"go.inout.gg/conduit/internal/version"
 )
 
+//nolint:gochecknoglobals
 var emptyMigrateFunc = &migrateFunc{
-	fn:  func(_ context.Context, _ *pgx.Conn) error { return nil },
-	fnx: func(_ context.Context, _ pgx.Tx) error { return nil },
+	fn:   func(_ context.Context, _ *pgx.Conn) error { return nil },
+	fnx:  func(_ context.Context, _ pgx.Tx) error { return nil },
+	inTx: false,
 }
 
 type migrateFunc struct {
@@ -21,14 +25,13 @@ type migrateFunc struct {
 
 // Migration represents a single database migration.
 type Migration struct {
-	version int64
+	up      *migrateFunc
+	down    *migrateFunc
+	version *version.Version
 	name    string
-
-	up   *migrateFunc
-	down *migrateFunc
 }
 
-// InTx tests whether migration should run in transation for given direction.
+// InTx tests whether migration should run in transition for given direction.
 func (m *Migration) UseTx(dir direction.Direction) (bool, error) {
 	switch dir {
 	case direction.DirectionUp:
@@ -41,7 +44,7 @@ func (m *Migration) UseTx(dir direction.Direction) (bool, error) {
 }
 
 // Version returns the version of this migration.
-func (m *Migration) Version() int64 { return m.version }
+func (m *Migration) Version() *version.Version { return m.version }
 
 // Name returns the name of this migration.
 func (m *Migration) Name() string { return m.name }
@@ -63,8 +66,9 @@ func (m *Migration) Apply(ctx context.Context, dir direction.Direction, conn *pg
 func (m *Migration) migrateDown(ctx context.Context, conn *pgx.Conn, tx pgx.Tx) error {
 	if m.down.inTx {
 		if tx == nil {
-			return UndefinedTxErr
+			return ErrUndefinedTx
 		}
+
 		return m.down.fnx(ctx, tx)
 	}
 
@@ -74,8 +78,9 @@ func (m *Migration) migrateDown(ctx context.Context, conn *pgx.Conn, tx pgx.Tx) 
 func (m *Migration) migrateUp(ctx context.Context, conn *pgx.Conn, tx pgx.Tx) error {
 	if m.down.inTx {
 		if tx == nil {
-			return UndefinedTxErr
+			return ErrUndefinedTx
 		}
+
 		return m.up.fnx(ctx, tx)
 	}
 

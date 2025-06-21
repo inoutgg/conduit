@@ -1,53 +1,62 @@
 package apply
 
 import (
-	"github.com/urfave/cli/v2"
+	"context"
+	"fmt"
+
+	"github.com/urfave/cli/v3"
+
 	"go.inout.gg/conduit"
 	"go.inout.gg/conduit/internal/command/common"
 	"go.inout.gg/conduit/internal/direction"
 )
 
+//nolint:gochecknoglobals
 var stepsFlagName = "steps"
 
 func NewCommand(migrator *conduit.Migrator) *cli.Command {
+	//nolint:exhaustruct
 	return &cli.Command{
 		Name:  "apply",
-		Args:  true,
 		Usage: "apply migrations in the given direction",
 		Flags: []cli.Flag{
 			common.DatabaseURLFlag,
+
+			//nolint:exhaustruct
 			&cli.IntFlag{
 				Name:  stepsFlagName,
 				Usage: "maximum migrations steps",
 			},
 		},
-		Action: func(ctx *cli.Context) error {
-			return apply(ctx, migrator)
+		Action: func(ctx context.Context, cmd *cli.Command) error {
+			return apply(ctx, cmd, migrator)
 		},
 	}
 }
 
 // apply applies a migration in the defined direction.
 func apply(
-	ctx *cli.Context,
+	ctx context.Context,
+	cmd *cli.Command,
 	migrator *conduit.Migrator,
 ) error {
-	dir, err := direction.FromString(ctx.Args().First())
+	dir, err := direction.FromString(cmd.Args().First())
 	if err != nil {
-		return err
+		return fmt.Errorf("conduit: failed to parse direction: %w", err)
 	}
 
-	conn, err := common.Conn(ctx)
+	conn, err := common.Conn(ctx, cmd)
 	if err != nil {
-		return err
+		return fmt.Errorf("conduit: failed to get database connection: %w", err)
 	}
 
 	opts := &conduit.MigrateOptions{
-		Steps: ctx.Int(stepsFlagName),
+		Steps: cmd.Int(stepsFlagName),
 	}
-	_, err = migrator.Migrate(ctx.Context, dir, conn, opts)
+
+	_, err = migrator.Migrate(ctx, dir, conn, opts)
 	if err != nil {
-		return err
+		return fmt.Errorf("conduit: failed to apply migrations: %w", err)
 	}
 
 	return nil

@@ -1,60 +1,60 @@
 package create
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"text/template"
-	"time"
 
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
+
 	"go.inout.gg/conduit/internal/command/common"
 	internaltpl "go.inout.gg/conduit/internal/template"
 	"go.inout.gg/conduit/internal/version"
 )
 
 func NewCommand() *cli.Command {
+	//nolint:exhaustruct
 	return &cli.Command{
 		Name:  "create",
 		Usage: "create a new migration file",
 		Flags: []cli.Flag{
+			//nolint:exhaustruct
 			&cli.StringFlag{
 				Name:  "ext",
 				Usage: "migration file extension (values: \"go\", \"sql\")",
 				Value: "sql",
 			},
 		},
-		Args:   true,
 		Action: create,
 	}
 }
 
-func create(ctx *cli.Context) error {
+func create(ctx context.Context, cmd *cli.Command) error {
 	dir, err := common.MigrationDir(ctx)
 	if err != nil {
-		return err
+		return fmt.Errorf("conduit: failed to get migration directory: %w", err)
 	}
 
 	// Ensure migration dir exists.
 	if !exists(dir) {
-		return fmt.Errorf(
-			"conduit: migrations directory does not exist. Try to initialise it first.",
-		)
+		return errors.New("conduit: migrations directory does not exist, try to initialise it first")
 	}
 
-	name := ctx.Args().First()
+	name := cmd.Args().First()
 	if name == "" {
 		return errors.New("conduit: missing `name\" argument")
 	}
 
-	ext := ctx.String("ext")
+	ext := cmd.String("ext")
 	if ext != "sql" && ext != "go" {
 		return fmt.Errorf("conduit: unsupported extension \"%s\", expected \"sql\" or \"go\"", ext)
 	}
 
-	ver := time.Now().UnixMilli()
+	ver := version.NewVersion()
 	filename := version.MigrationFilename(ver, name, ext)
 	path := filepath.Join(dir, filename)
 
@@ -69,6 +69,7 @@ func create(ctx *cli.Context) error {
 	defer f.Close()
 
 	var tpl *template.Template
+
 	switch ext {
 	case "go":
 		tpl = internaltpl.GoMigrationTemplate
@@ -78,11 +79,11 @@ func create(ctx *cli.Context) error {
 
 	hasCustomRegistry := exists(filepath.Join(dir, "registry.go"))
 	if err := tpl.Execute(f, struct {
-		HasCustomRegistry bool
+		Version           *version.Version
 		Ext               string
 		Name              string
-		Version           int64
-	}{hasCustomRegistry, ext, name, ver}); err != nil {
+		HasCustomRegistry bool
+	}{ver, ext, name, hasCustomRegistry}); err != nil {
 		return fmt.Errorf("conduit: failed to write template: %w", err)
 	}
 

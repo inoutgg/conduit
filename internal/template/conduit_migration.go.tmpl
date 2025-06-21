@@ -1,12 +1,4 @@
-package template
-
-import (
-	"text/template"
-
-	"go.inout.gg/foundations/must"
-)
-
-var ConduitMigrationTemplate = must.Must(template.New("conduit: Conduit Migration Template").Parse(`package migrations
+package {{.Package}}
 
 import (
 	"context"
@@ -18,8 +10,9 @@ import (
 	"go.inout.gg/conduit/conduitmigrate"
 )
 
-var m{{.Version}} = conduitmigrate.New(&conduitmigrate.Config{})
+var m{{.Version}} = conduitmigrate.New(&conduitmigrate.Config{}) //nolint:gochecknoglobals
 
+//nolint:gochecknoinits
 func init() {
 {{- if .HasCustomRegistry}}
 	Registry.Up(up{{.Version}})
@@ -31,10 +24,11 @@ func init() {
 }
 
 func up{{.Version}}(ctx context.Context, conn *pgx.Conn) error {
+    //nolint:wrapcheck
 	return m{{.Version}}.Up(ctx, conn)
 }
 
-func down{{.Version}}(ctx context.Context, conn *pgx.Tx) error {
-	return m{{.Version}}.Down(ctx, con)
+func down{{.Version}}(ctx context.Context, conn *pgx.Conn) error {
+    //nolint:wrapcheck
+	return m{{.Version}}.Down(ctx, conn)
 }
-`))

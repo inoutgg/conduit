@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "license": "MIT",
   "devDependencies": {
-    "prettier": "^3.2.5",
-    "prettier-plugin-sql-cst": "^0.11.5"
+    "prettier": "^3.5.3",
+    "prettier-plugin-sql-cst": "^0.13.0"
   }
 }

@@ -12,13 +12,15 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"go.inout.gg/foundations/debug"
+	"go.inout.gg/foundations/must"
+
 	"go.inout.gg/conduit/conduitregistry"
 	"go.inout.gg/conduit/internal/dbsqlc"
 	"go.inout.gg/conduit/internal/direction"
 	"go.inout.gg/conduit/internal/sliceutil"
 	"go.inout.gg/conduit/internal/uuidv7"
-	"go.inout.gg/foundations/debug"
-	"go.inout.gg/foundations/must"
+	"go.inout.gg/conduit/internal/version"
 )
 
 // AllSteps tells migrator to run all available migrations either up or down.
@@ -35,7 +37,7 @@ const (
 )
 
 var ErrInvalidStep = errors.New(
-	"conduit: invalid migration step. Expected: -1 (all) or positive integer.",
+	"conduit: invalid migration step. Expected: -1 (all) or positive integer",
 )
 
 type (
@@ -68,13 +70,18 @@ func WithLogger(l *slog.Logger) func(*Config) {
 // NewConfig creates a new Config and applies the provided configurations.
 //
 // If Config.Registry is not provided, it falls back to the global registry.
+// If Config.Logger is not provided, it falls back to slog.Default.
 func NewConfig(cfgs ...func(*Config)) *Config {
+	//nolint:exhaustruct
 	config := &Config{}
 	for _, c := range cfgs {
 		c(config)
 	}
 
 	config.defaults()
+
+	debug.Assert(config.Logger != nil, "Logger is required")
+	debug.Assert(config.Registry != nil, "Registry is required")
 
 	return config
 }
@@ -99,11 +106,10 @@ type MigrateResult struct {
 
 // MigrationResult represents the outcome of a single applied migration.
 type MigrationResult struct {
-	// Total time it took to apply migration
-	DurationTotal time.Duration
+	Version       *version.Version
 	Name          string
 	Namespace     string
-	Version       int64
+	DurationTotal time.Duration
 }
 
 // MigrateOptions specifies options for a Migrator.Migrate operation.
@@ -112,7 +118,7 @@ type MigrateOptions struct {
 }
 
 func (m *MigrateOptions) validate() error {
-	if !(m.Steps == -1 || m.Steps > 0) {
+	if m.Steps != -1 && m.Steps <= 0 {
 		return ErrInvalidStep
 	}
 
@@ -137,8 +143,8 @@ type Migrator struct {
 	registry *conduitregistry.Registry
 }
 
-// existingMigrationVerions retrieves a list of already applied migration versions.
-func (m *Migrator) existingMigrationVerions(ctx context.Context, conn *pgx.Conn) ([]int64, error) {
+// existingMigrationVersions retrieves a list of already applied migration versions.
+func (m *Migrator) existingMigrationVerions(ctx context.Context, conn *pgx.Conn) ([]string, error) {
 	ok, err := dbsqlc.New().DoesTableExist(ctx, conn, "conduitmigrations")
 	if err != nil {
 		return nil, fmt.Errorf("conduit: failed to fetch from migrations table: %w", err)
@@ -146,7 +152,7 @@ func (m *Migrator) existingMigrationVerions(ctx context.Context, conn *pgx.Conn)
 
 	if !ok {
 		d("conduitmigrations table is not found")
-		return []int64{}, nil
+		return []string{}, nil
 	}
 
 	versions, err := dbsqlc.New().AllExistingMigrationVersions(ctx, conn, m.registry.Namespace)
@@ -167,6 +173,8 @@ func (m *Migrator) existingMigrationVerions(ctx context.Context, conn *pgx.Conn)
 //
 // If a migration is registered in transaction mode, it creates a new transaction
 // before applying the migration.
+//
+//nolint:nonamedreturns
 func (m *Migrator) Migrate(
 	ctx context.Context,
 	dir Direction,
@@ -181,7 +189,7 @@ func (m *Migrator) Migrate(
 			opts.Steps = DefaultDownStep
 		}
 
-		d("opts is ommitted, using the default one: %v", opts)
+		d("opts is omitted, using the default one: %v", opts)
 	}
 
 	if err := opts.validate(); err != nil {
@@ -193,7 +201,10 @@ func (m *Migrator) Migrate(
 	if err := dbsqlc.New().AcquireLock(ctx, conn, lockNum); err != nil {
 		return nil, fmt.Errorf("conduit: failed to acquire a lock: %w", err)
 	}
-	defer dbsqlc.New().ReleaseLock(ctx, conn, lockNum)
+
+	defer func() {
+		_ = dbsqlc.New().ReleaseLock(ctx, conn, lockNum)
+	}()
 
 	switch dir {
 	case DirectionUp:
@@ -203,6 +214,7 @@ func (m *Migrator) Migrate(
 	default:
 		return nil, direction.ErrUnknownDirection
 	}
+
 	if err != nil {
 		return nil, err
 	}
@@ -227,9 +239,10 @@ func (m *Migrator) migrateUp(
 	for _, existingVersion := range existingMigrationVersions {
 		delete(targetMigrations, existingVersion)
 	}
+
 	migrations := slices.Collect(maps.Values(targetMigrations))
 	slices.SortFunc(migrations, func(a, b *Migration) int {
-		return int(a.Version() - b.Version())
+		return a.Version().Compare(b.Version())
 	})
 
 	return m.applyMigrations(ctx, migrations, DirectionUp, conn, opts)
@@ -249,11 +262,12 @@ func (m *Migrator) migrateDown(
 	}
 
 	// Filter only applied migrations.
-	existingMigrationsMap := sliceutil.KeyBy(existingMigrations, func(e int64) int64 { return e })
+	existingMigrationsMap := sliceutil.KeyBy(existingMigrations, func(e string) string { return e })
 	targetMigrations := m.registry.CloneMigrations()
+
 	for _, m := range targetMigrations {
-		if _, ok := existingMigrationsMap[m.Version()]; !ok {
-			delete(targetMigrations, m.Version())
+		if _, ok := existingMigrationsMap[m.Version().String()]; !ok {
+			delete(targetMigrations, m.Version().String())
 		}
 	}
 
@@ -261,15 +275,17 @@ func (m *Migrator) migrateDown(
 	// last applied migration to the first one.
 	migrations := slices.Collect(maps.Values(targetMigrations))
 	slices.SortFunc(migrations, func(a, b *Migration) int {
-		return int(b.Version() - a.Version())
+		return b.Version().Compare(a.Version())
 	})
 
 	return m.applyMigrations(ctx, migrations, DirectionDown, conn, opts)
 }
 
-// applyMigrations executes the given migrations in the specified direction.]
+// applyMigrations executes the given migrations in the specified direction.
 //
 // It assumes the passed migrations are already sorted in the necessary order.
+//
+//nolint:nonamedreturns
 func (m *Migrator) applyMigrations(
 	ctx context.Context,
 	migrations []*conduitregistry.Migration,
@@ -282,16 +298,19 @@ func (m *Migrator) applyMigrations(
 	}
 
 	results := make([]MigrationResult, len(migrations))
+
 	for i, migration := range migrations {
 		var tx pgx.Tx
+
 		inTx := must.Must(migration.UseTx(dir))
 
-		m.logger.Debug(
+		m.logger.DebugContext(
+			ctx,
 			"applying migration",
 			slog.String("direction", string(dir)),
 			slog.Group(
 				"migration",
-				slog.Int64("version", migration.Version()),
+				slog.String("version", migration.Version().String()),
 				slog.String("name", migration.Name()),
 			),
 			slog.Bool("transacting", inTx),
@@ -305,14 +324,16 @@ func (m *Migrator) applyMigrations(
 					err,
 				)
 			}
-			defer tx.Rollback(ctx)
+
+			defer func() { _ = tx.Rollback(ctx) }()
 		}
 
 		start := time.Now()
+
 		if err := migration.Apply(ctx, dir, conn, tx); err != nil {
 			return nil, fmt.Errorf(
-				"conduit: failed to apply migration %d: %w",
-				migration.Version(),
+				"conduit: failed to apply migration %s: %w",
+				migration.Version().String(),
 				err,
 			)
 		}
@@ -329,33 +350,34 @@ func (m *Migrator) applyMigrations(
 		switch dir {
 		case DirectionDown:
 			err = dbsqlc.New().RollbackMigration(ctx, conn, dbsqlc.RollbackMigrationParams{
-				Version:   migrationResult.Version,
+				Version:   migrationResult.Version.String(),
 				Namespace: migrationResult.Namespace,
 			})
 
 		case DirectionUp:
 			err = dbsqlc.New().ApplyMigration(ctx, conn, dbsqlc.ApplyMigrationParams{
 				ID:        uuidv7.Must(),
-				Version:   migrationResult.Version,
+				Version:   migrationResult.Version.String(),
 				Namespace: migrationResult.Namespace,
 				Name:      migrationResult.Name,
 			})
 		}
+
 		if err != nil {
 			return nil, fmt.Errorf("conduit: failed to update migrations table %v: %w", dir, err)
 		}
 
-		_ = dbsqlc.New().ResetConn(ctx, conn)
-
 		if inTx {
 			if err := tx.Commit(ctx); err != nil {
 				return nil, fmt.Errorf(
-					"conduit: failed to commit transaction for migration %d: %w",
-					migration.Version(),
+					"conduit: failed to commit transaction for migration %s: %w",
+					migrationResult.Version.String(),
 					err,
 				)
 			}
 		}
+
+		_ = dbsqlc.New().ResetConn(ctx, conn)
 	}
 
 	result = &MigrateResult{
@@ -363,18 +385,18 @@ func (m *Migrator) applyMigrations(
 		Direction:        DirectionDown,
 	}
 
-	return result, err
+	return result, nil
 }
 
 // pgLockNum computes a lock number for a PostgreSQL advisory lock.
 //
 // The input string is typically a registry namespace.
 func pgLockNum(s string) int64 {
-	h := fnv.New64()
+	h := fnv.New32a()
 	h.Write([]byte(s))
-	n := int64(h.Sum64())
+	n := h.Sum32()
 
 	d("generated advisory lock id: %d", n)
 
-	return n
+	return int64(n)
 }

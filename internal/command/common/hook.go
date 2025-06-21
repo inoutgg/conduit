@@ -7,29 +7,30 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 	"go.inout.gg/foundations/must"
 )
 
 type ctx struct{}
 
+//nolint:gochecknoglobals
 var kCtx = &ctx{}
 
-func OnBeforeHook(ctx *cli.Context) error {
+func OnBeforeHook(ctx context.Context, cmd *cli.Command) (context.Context, error) {
 	// Attach migration directory to the context.
-	migrationsDir := ctx.String(migrationsDirFlagName)
+	migrationsDir := cmd.String(migrationsDirFlagName)
 	if migrationsDir == "" {
-		return fmt.Errorf("conduit: missing `%s' flag.", migrationsDirFlagName)
+		return ctx, fmt.Errorf("conduit: missing `%s' flag", migrationsDirFlagName)
 	}
 
-	resolvedMigrationDir := filepath.Clean(filepath.Join(must.Must(os.Getwd()), ctx.String("dir")))
-	ctx.Context = context.WithValue(ctx.Context, kCtx, resolvedMigrationDir)
+	resolvedMigrationDir := filepath.Clean(filepath.Join(must.Must(os.Getwd()), cmd.String("dir")))
+	ctx = context.WithValue(ctx, kCtx, resolvedMigrationDir)
 
-	return nil
+	return ctx, nil
 }
 
-func MigrationDir(ctx *cli.Context) (string, error) {
-	if v, ok := ctx.Context.Value(kCtx).(string); ok {
+func MigrationDir(ctx context.Context) (string, error) {
+	if v, ok := ctx.Value(kCtx).(string); ok {
 		return v, nil
 	}
 

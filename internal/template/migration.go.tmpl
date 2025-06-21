@@ -1,14 +1,6 @@
-package template
+// migration: {{.Version}}_{{.Name}}.go
 
-import (
-	"text/template"
-
-	"go.inout.gg/foundations/must"
-)
-
-var GoMigrationTemplate = must.Must(template.New("Go Migration Template").Parse(`// migration: {{.Version}}_{{.Name}}.go
-
-package migrations
+package {{.Package}}
 
 import (
 	"context"
@@ -19,6 +11,7 @@ import (
 {{- end}}
 )
 
+//nolint:gochecknoinits
 func init() {
 {{- if .HasCustomRegistry}}
 	Registry.UpTx(up{{.Version}})
@@ -36,4 +29,3 @@ func up{{.Version}}(ctx context.Context, tx pgx.Tx) error {
 func down{{.Version}}(ctx context.Context, tx pgx.Tx) error {
 	return nil
 }
-`))

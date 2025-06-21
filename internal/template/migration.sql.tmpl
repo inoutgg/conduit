@@ -1,0 +1,7 @@
+-- migration: {{.Version}}_{{.Name}}.sql
+
+SELECT "up_{{.Version}}";
+
+---- create above / drop below ----
+
+SELECT "down_{{.Version}}";

@@ -16,10 +16,31 @@ func Map[S ~[]E, E, V any](s S, f func(E) V) []V {
 // The resulting map consists of key-value pairs where the key is f(e) and the value is e.
 func KeyBy[S ~[]E, E any, V comparable](s S, f func(E) V) map[V]E {
 	m := make(map[V]E, len(s))
+
 	for _, e := range s {
 		k := f(e)
 		m[k] = e
 	}
 
 	return m
+}
+
+func Some[S ~[]E, E any](s S, f func(E) bool) bool {
+	for _, e := range s {
+		if f(e) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func Until[S ~[]E, E any](s S, f func(E) bool) int {
+	for i, e := range s {
+		if f(e) {
+			return i
+		}
+	}
+
+	return len(s)
 }

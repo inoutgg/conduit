@@ -8,15 +8,16 @@ import (
 	"runtime"
 
 	"github.com/jackc/pgx/v5"
-	"go.inout.gg/conduit/internal/version"
 	"go.inout.gg/foundations/must"
+
+	"go.inout.gg/conduit/internal/version"
 )
 
 var (
-	UndefinedTxErr    = errors.New("conduit: tx must be defined")
-	EmptyMigrationErr = errors.New("conduit: migration is empty")
-	UpExistsErr       = errors.New("conduit: up migration already registered")
-	DownExistsErr     = errors.New("conduit: down migration already registered")
+	ErrUndefinedTx    = errors.New("conduit: tx must be defined")
+	ErrEmptyMigration = errors.New("conduit: migration is empty")
+	ErrUpExists       = errors.New("conduit: up migration already registered")
+	ErrDownExists     = errors.New("conduit: down migration already registered")
 )
 
 // MigrateFunc applies an up or down migration.
@@ -27,15 +28,15 @@ type MigrateFuncTx func(context.Context, pgx.Tx) error
 
 // Registry stores migration files, both SQL and Go-sourced.
 type Registry struct {
+	migrations map[string]*Migration
 	Namespace  string
-	migrations map[int64]*Migration
 }
 
 // New creates a new Registry with the given namespace.
 func New(namespace string) *Registry {
 	return &Registry{
-		namespace,
-		make(map[int64]*Migration),
+		migrations: make(map[string]*Migration),
+		Namespace:  namespace,
 	}
 }
 
@@ -48,7 +49,7 @@ func New(namespace string) *Registry {
 func (r *Registry) FromFS(fsys fs.FS) {
 	migrations := must.Must(parseSQLMigrationsFromFS(fsys, "."))
 	for _, m := range migrations {
-		r.migrations[m.Version()] = m
+		r.migrations[m.Version().String()] = m
 	}
 }
 
@@ -56,8 +57,10 @@ func (r *Registry) FromFS(fsys fs.FS) {
 func (r *Registry) Up(up MigrateFunc) {
 	m := must.Must(r.goMigration())
 	if m.up != nil {
-		panic(UpExistsErr)
+		panic(ErrUpExists)
 	}
+
+	//nolint:exhaustruct
 	m.up = &migrateFunc{fn: up, inTx: false}
 }
 
@@ -65,8 +68,10 @@ func (r *Registry) Up(up MigrateFunc) {
 func (r *Registry) UpTx(up MigrateFuncTx) {
 	m := must.Must(r.goMigration())
 	if m.up != nil {
-		panic(UpExistsErr)
+		panic(ErrUpExists)
 	}
+
+	//nolint:exhaustruct
 	m.up = &migrateFunc{fnx: up, inTx: true}
 }
 
@@ -74,8 +79,10 @@ func (r *Registry) UpTx(up MigrateFuncTx) {
 func (r *Registry) Down(down MigrateFunc) {
 	m := must.Must(r.goMigration())
 	if m.down != nil {
-		panic(DownExistsErr)
+		panic(ErrDownExists)
 	}
+
+	//nolint:exhaustruct
 	m.down = &migrateFunc{fn: down, inTx: false}
 }
 
@@ -83,8 +90,10 @@ func (r *Registry) Down(down MigrateFunc) {
 func (r *Registry) DownTx(down MigrateFuncTx) {
 	m := must.Must(r.goMigration())
 	if m.down != nil {
-		panic(DownExistsErr)
+		panic(ErrDownExists)
 	}
+
+	//nolint:exhaustruct
 	m.down = &migrateFunc{fnx: down, inTx: true}
 }
 
@@ -97,10 +106,11 @@ func (r *Registry) goMigration() (*Migration, error) {
 
 	info, err := version.ParseMigrationFilename(filename)
 	if err != nil {
+		//nolint:wrapcheck
 		return nil, err
 	}
 
-	if val, ok := r.migrations[info.Version]; ok {
+	if val, ok := r.migrations[info.Version.String()]; ok {
 		return val, nil
 	}
 
@@ -110,12 +120,12 @@ func (r *Registry) goMigration() (*Migration, error) {
 		up:      nil,
 		down:    nil,
 	}
-	r.migrations[migration.version] = migration
+	r.migrations[migration.version.String()] = migration
 
 	return migration, nil
 }
 
 // CloneMigrations returns a copy of the registered migrations map.
-func (r *Registry) CloneMigrations() map[int64]*Migration {
+func (r *Registry) CloneMigrations() map[string]*Migration {
 	return maps.Clone(r.migrations)
 }

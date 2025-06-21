@@ -1,6 +1,3 @@
-# Created by https://www.toptal.com/developers/gitignore/api/macos,go,vim,linux,node,direnv
-# Edit at https://www.toptal.com/developers/gitignore?templates=macos,go,vim,linux,node,direnv
-
 ### direnv ###
 .direnv
 .envrc
@@ -236,4 +233,5 @@ tags
 # Persistent undo
 [._]*.un~
 
-# End of https://www.toptal.com/developers/gitignore/api/macos,go,vim,linux,node,direnv
+### Task ###
+.task

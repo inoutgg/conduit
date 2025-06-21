@@ -14,6 +14,7 @@ const (
 	GlobalRegistryNamespace = "global"
 )
 
+//nolint:gochecknoglobals
 var globalRegistry = conduitregistry.New(GlobalRegistryNamespace)
 
 // Up registers an up migration function in the global registry.

@@ -1,31 +1,35 @@
 package common
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 )
 
 var (
-	databaseUrlFlagName   = "database-url"
-	migrationsDirFlagName = "migrations-dir"
+	databaseURLFlagName   = "database-url"   //nolint:gochecknoglobals
+	migrationsDirFlagName = "migrations-dir" //nolint:gochecknoglobals
 )
 
+//nolint:gochecknoglobals,exhaustruct
 var DatabaseURLFlag = &cli.StringFlag{
-	Name:     databaseUrlFlagName,
+	Name:     databaseURLFlagName,
 	Usage:    "database connection URL",
-	EnvVars:  []string{"CONDUIT_DATABASE_URL"},
+	Sources:  cli.EnvVars("CONDUIT_DATABASE_URL"),
 	Required: true,
 }
 
+//nolint:gochecknoglobals,exhaustruct
 var MigrationsDirFlag = &cli.StringFlag{
 	Name:    migrationsDirFlagName,
 	Usage:   "directory with migration files",
 	Value:   "migrations",
-	EnvVars: []string{"CONDUIT_MIGRATION_DIR"},
+	Sources: cli.EnvVars("CONDUIT_MIGRATION_DIR"),
 }
 
+//nolint:gochecknoglobals,exhaustruct
 var GlobalFlags = []cli.Flag{
 	MigrationsDirFlag,
 	&cli.BoolFlag{
@@ -37,11 +41,16 @@ var GlobalFlags = []cli.Flag{
 
 // Conn attempts to connect to the database available at provided
 // `--database-url` flag.
-func Conn(ctx *cli.Context) (*pgx.Conn, error) {
-	url := ctx.String(databaseUrlFlagName)
+func Conn(ctx context.Context, cmd *cli.Command) (*pgx.Conn, error) {
+	url := cmd.String(databaseURLFlagName)
 	if url == "" {
-		return nil, fmt.Errorf("conduit: missing `%s\" flag.", databaseUrlFlagName)
+		return nil, fmt.Errorf("conduit: missing `%s' flag", databaseURLFlagName)
 	}
 
-	return pgx.Connect(ctx.Context, url)
+	conn, err := pgx.Connect(ctx, url)
+	if err != nil {
+		return nil, fmt.Errorf("conduit: failed to connect to database: %w", err)
+	}
+
+	return conn, nil
 }

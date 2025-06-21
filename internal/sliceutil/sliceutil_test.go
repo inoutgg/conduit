@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
 	"go.inout.gg/conduit/internal/sliceutil"
 )
 
@@ -45,6 +46,7 @@ func TestKeyBy(t *testing.T) {
 			if i%2 == 0 {
 				return "even"
 			}
+
 			return "odd"
 		})
 
@@ -60,5 +62,21 @@ func TestKeyBy(t *testing.T) {
 		result := sliceutil.KeyBy(input, func(s string) int { return len(s) })
 
 		assert.Empty(t, result)
+	})
+}
+
+func TestSome(t *testing.T) {
+	t.Run("Some should work", func(t *testing.T) {
+		input := []int{2, 4}
+
+		assert.True(t, sliceutil.Some(input, func(i int) bool { return i%2 == 0 }))
+		assert.False(t, sliceutil.Some(input, func(i int) bool { return i%3 == 0 }))
+	})
+
+	t.Run("Some empty slice", func(t *testing.T) {
+		var input []int
+		result := sliceutil.Some(input, func(i int) bool { return i%2 == 0 })
+
+		assert.False(t, result)
 	})
 }

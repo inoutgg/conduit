@@ -8,4 +8,5 @@ import (
 	"go.inout.gg/foundations/debug"
 )
 
-var d = debug.Debuglog("conduit: conduit")
+//nolint:gochecknoglobals
+var d = debug.Debuglog("conduit")
