@@ -10,6 +10,7 @@ import (
 	"go.inout.gg/conduit/conduitmigrate"
 )
 
+//nolint:exhaustruct
 var m{{.Version}} = conduitmigrate.New(&conduitmigrate.Config{}) //nolint:gochecknoglobals
 
 //nolint:gochecknoinits

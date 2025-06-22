@@ -21,6 +21,7 @@ func NewCommand() *cli.Command {
 		Usage:   "initialise migration directory",
 		Flags: []cli.Flag{
 			common.MigrationsDirFlag,
+			common.PackageNameFlag,
 
 			//nolint:exhaustruct
 			&cli.StringFlag{
@@ -58,8 +59,10 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		}
 	}
 
+	packageName := cmd.String("package-name")
+
 	if !cmd.Bool("no-conduit-migrations") {
-		if _, err := createConduitMigrationFile(dir, ns); err != nil {
+		if _, err := createConduitMigrationFile(dir, ns, packageName); err != nil {
 			return err
 		}
 	}
@@ -79,7 +82,7 @@ func createMigrationDir(dir string) error {
 
 // createConduitMigrationFile creates a new migration file with conduit's own migration file
 // in the migrations directory.
-func createConduitMigrationFile(dirpath string, namespace string) (string, error) {
+func createConduitMigrationFile(dirpath string, namespace string, packageName string) (string, error) {
 	ver := version.NewVersion()
 	filename := version.MigrationFilename(ver, "conduit_migration", "go")
 	filepath := filepath.Join(dirpath, filename)
@@ -92,8 +95,9 @@ func createConduitMigrationFile(dirpath string, namespace string) (string, error
 
 	if err := internaltpl.ConduitMigrationTemplate.Execute(f, struct {
 		Version           *version.Version
+		Package           string
 		HasCustomRegistry bool
-	}{HasCustomRegistry: namespace != "", Version: ver}); err != nil {
+	}{HasCustomRegistry: namespace != "", Version: ver, Package: packageName}); err != nil {
 		return "", fmt.Errorf("conduit: failed to write a template: %w", err)
 	}
 

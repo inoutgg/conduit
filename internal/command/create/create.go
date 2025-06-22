@@ -28,6 +28,7 @@ func NewCommand() *cli.Command {
 				Usage: "migration file extension (values: \"go\", \"sql\")",
 				Value: "sql",
 			},
+			common.PackageNameFlag,
 		},
 		Action: create,
 	}
@@ -38,6 +39,8 @@ func create(ctx context.Context, cmd *cli.Command) error {
 	if err != nil {
 		return fmt.Errorf("conduit: failed to get migration directory: %w", err)
 	}
+
+	packageName := cmd.String("package-name")
 
 	// Ensure migration dir exists.
 	if !exists(dir) {
@@ -82,8 +85,9 @@ func create(ctx context.Context, cmd *cli.Command) error {
 		Version           *version.Version
 		Ext               string
 		Name              string
+		Package           string
 		HasCustomRegistry bool
-	}{ver, ext, name, hasCustomRegistry}); err != nil {
+	}{ver, ext, name, packageName, hasCustomRegistry}); err != nil {
 		return fmt.Errorf("conduit: failed to write template: %w", err)
 	}
 

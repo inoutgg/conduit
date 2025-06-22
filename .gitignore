@@ -233,5 +233,5 @@ tags
 # Persistent undo
 [._]*.un~
 
-### Task ###
-.task
+### Compiled Binaries ###
+bin

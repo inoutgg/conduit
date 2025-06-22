@@ -25,8 +25,16 @@ var DatabaseURLFlag = &cli.StringFlag{
 var MigrationsDirFlag = &cli.StringFlag{
 	Name:    migrationsDirFlagName,
 	Usage:   "directory with migration files",
-	Value:   "migrations",
+	Value:   "./migrations",
 	Sources: cli.EnvVars("CONDUIT_MIGRATION_DIR"),
+}
+
+//nolint:gochecknoglobals,exhaustruct
+var PackageNameFlag = &cli.StringFlag{
+	Name:    "package-name",
+	Usage:   "package name",
+	Value:   "migrations",
+	Sources: cli.EnvVars("CONDUIT_PACKAGE_NAME"),
 }
 
 //nolint:gochecknoglobals,exhaustruct

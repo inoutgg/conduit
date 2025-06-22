@@ -23,8 +23,12 @@ func OnBeforeHook(ctx context.Context, cmd *cli.Command) (context.Context, error
 		return ctx, fmt.Errorf("conduit: missing `%s' flag", migrationsDirFlagName)
 	}
 
-	resolvedMigrationDir := filepath.Clean(filepath.Join(must.Must(os.Getwd()), cmd.String("dir")))
-	ctx = context.WithValue(ctx, kCtx, resolvedMigrationDir)
+	migrationsDir = filepath.Clean(migrationsDir)
+	if !filepath.IsAbs(migrationsDir) {
+		migrationsDir = filepath.Clean(filepath.Join(must.Must(os.Getwd()), migrationsDir))
+	}
+
+	ctx = context.WithValue(ctx, kCtx, migrationsDir)
 
 	return ctx, nil
 }
