@@ -4,6 +4,8 @@ package sqlsplit
 import (
 	"testing"
 	"unicode/utf8"
+
+	_ "embed"
 )
 
 func TestPick(t *testing.T) {

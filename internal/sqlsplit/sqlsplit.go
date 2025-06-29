@@ -1,6 +1,7 @@
 package sqlsplit
 
 import (
+	"bytes"
 	"unicode"
 	"unicode/utf8"
 )
@@ -87,16 +88,14 @@ func (l *Lexer) next() rune {
 	return r
 }
 
-func (l *Lexer) skipWhitespace() bool {
-	skipped := false
+func (l *Lexer) skipWhitespace() rune {
+	for {
+		if !unicode.IsSpace(l.peek()) {
+			return l.peek()
+		}
 
-	for ch := l.peek(); unicode.IsSpace(ch); ch = l.peek() {
 		l.advance()
-
-		skipped = true
 	}
-
-	return skipped
 }
 
 func (l *Lexer) pos() Pos { return Pos{l.line, l.col} }
@@ -154,12 +153,15 @@ func (l *Lexer) lexCommentMultiline() (int, Pos) {
 }
 
 func (l *Lexer) lexQuery(start int, startPos Pos) (int, Pos) {
+	//nolint:exhaustruct
 	stmt := Stmt{
-		kind:    Query,
-		start:   startPos,
-		end:     l.pos(),
-		content: string(l.src[start:l.offset]),
+		kind:  Query,
+		start: startPos,
 	}
+
+	skipSize := l.advance()
+	stmt.content = string(bytes.TrimSpace(l.src[start : l.offset-skipSize]))
+	stmt.end = l.pos()
 
 	return l.add(&stmt)
 }
@@ -169,23 +171,23 @@ func (l *Lexer) Lex() []*Stmt {
 	pos := l.pos()
 
 	for ch := l.peek(); ch != utf8.RuneError; ch = l.peek() {
-		if l.skipWhitespace() {
-			offset = l.offset
-			pos = l.pos()
-		}
+		ch = l.skipWhitespace()
 
 		switch ch {
 		case '-':
 			if l.next() == '-' {
-				offset, pos = l.lexComment()
+				_, pos = l.lexComment()
 			}
 		case '/':
 			if l.next() == '*' {
-				offset, pos = l.lexCommentMultiline()
+				_, pos = l.lexCommentMultiline()
 			}
 
 		case ';':
 			offset, pos = l.lexQuery(offset, pos)
+
+		default:
+			l.advance()
 		}
 	}
 
