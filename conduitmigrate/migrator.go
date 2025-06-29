@@ -51,11 +51,19 @@ func New(config *Config) *Migrator {
 // Up applies conduit migration.
 func (m *Migrator) Up(ctx context.Context, conn *pgx.Conn) error {
 	_, err := m.migrator.Migrate(ctx, conduit.DirectionUp, conn, nil)
-	return fmt.Errorf("conduit: failed to apply migration: %w", err)
+	if err != nil {
+		return fmt.Errorf("conduit: failed to apply migration: %w", err)
+	}
+
+	return nil
 }
 
 // Down rolls back conduit migration.
 func (m *Migrator) Down(ctx context.Context, conn *pgx.Conn) error {
 	_, err := m.migrator.Migrate(ctx, conduit.DirectionDown, conn, nil)
-	return fmt.Errorf("conduit: failed to rollback migration: %w", err)
+	if err != nil {
+		return fmt.Errorf("conduit: failed to rollback migration: %w", err)
+	}
+
+	return nil
 }
