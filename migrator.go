@@ -18,6 +18,7 @@ import (
 	"go.inout.gg/conduit/conduitregistry"
 	"go.inout.gg/conduit/internal/dbsqlc"
 	"go.inout.gg/conduit/internal/direction"
+	internaldebug "go.inout.gg/conduit/internal/internaldebug"
 	"go.inout.gg/conduit/internal/sliceutil"
 	"go.inout.gg/conduit/internal/uuidv7"
 	"go.inout.gg/conduit/internal/version"
@@ -151,7 +152,7 @@ func (m *Migrator) existingMigrationVerions(ctx context.Context, conn *pgx.Conn)
 	}
 
 	if !ok {
-		d("conduitmigrations table is not found")
+		internaldebug.Log("conduitmigrations table is not found")
 		return []string{}, nil
 	}
 
@@ -189,7 +190,7 @@ func (m *Migrator) Migrate(
 			opts.Steps = DefaultDownStep
 		}
 
-		d("opts is omitted, using the default one: %v", opts)
+		internaldebug.Log("opts is omitted, using the default one: %v", opts)
 	}
 
 	if err := opts.validate(); err != nil {
@@ -396,7 +397,7 @@ func pgLockNum(s string) int64 {
 	h.Write([]byte(s))
 	n := h.Sum32()
 
-	d("generated advisory lock id: %d", n)
+	internaldebug.Log("generated advisory lock id: %d", n)
 
 	return int64(n)
 }

@@ -1,4 +1,4 @@
--- migration 1726004714907 initial_schema
+-- migration: 20250629171951_initial_schema.sql
 
 CREATE TABLE IF NOT EXISTS conduitmigrations (
   id UUID NOT NULL,
@@ -7,6 +7,5 @@ CREATE TABLE IF NOT EXISTS conduitmigrations (
   name VARCHAR(4095) NOT NULL,
   namespace VARCHAR(4095) NOT NULL,
   PRIMARY KEY (id),
-  UNIQUE (version, namespace),
-  CONSTRAINT version CHECK (version >= 1)
+  UNIQUE (version, namespace)
 );

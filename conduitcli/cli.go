@@ -17,6 +17,8 @@ import (
 func Execute(ctx context.Context, migrator *conduit.Migrator) error {
 	//nolint:exhaustruct
 	cmd := &cli.Command{
+		Name:  "conduit",
+		Usage: "An SQL migrator that is easy to embed.",
 		Flags: common.GlobalFlags,
 		Commands: []*cli.Command{
 			initialise.NewCommand(),
