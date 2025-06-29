@@ -7,6 +7,7 @@ mod:
 
 lint-fix:
   golangci-lint run --fix ./...
+  typos -w
 
 format-sql:
   npx prettier -w **/*.sql

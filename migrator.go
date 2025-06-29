@@ -145,7 +145,7 @@ type Migrator struct {
 }
 
 // existingMigrationVersions retrieves a list of already applied migration versions.
-func (m *Migrator) existingMigrationVerions(ctx context.Context, conn *pgx.Conn) ([]string, error) {
+func (m *Migrator) existingMigrationVersions(ctx context.Context, conn *pgx.Conn) ([]string, error) {
 	ok, err := dbsqlc.New().DoesTableExist(ctx, conn, "conduitmigrations")
 	if err != nil {
 		return nil, fmt.Errorf("conduit: failed to fetch from migrations table: %w", err)
@@ -231,7 +231,7 @@ func (m *Migrator) migrateUp(
 	conn *pgx.Conn,
 	opts *MigrateOptions,
 ) (*MigrateResult, error) {
-	existingMigrationVersions, err := m.existingMigrationVerions(ctx, conn)
+	existingMigrationVersions, err := m.existingMigrationVersions(ctx, conn)
 	if err != nil {
 		return nil, err
 	}
@@ -257,7 +257,7 @@ func (m *Migrator) migrateDown(
 	conn *pgx.Conn,
 	opts *MigrateOptions,
 ) (*MigrateResult, error) {
-	existingMigrations, err := m.existingMigrationVerions(ctx, conn)
+	existingMigrations, err := m.existingMigrationVersions(ctx, conn)
 	if err != nil {
 		return nil, err
 	}

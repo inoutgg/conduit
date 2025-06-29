@@ -11,8 +11,6 @@ import (
 	"go.inout.gg/foundations/must"
 
 	"go.inout.gg/conduit/internal/internaldebug"
-
-
 )
 
 type ctx struct{}
@@ -49,5 +47,6 @@ func MigrationDir(ctx context.Context) (string, error) {
 		internaldebug.Log("resolved migration directory: %s", v)
 		return v, nil
 	}
+
 	return "", errors.New("conduit: failed to resolve migration directory")
 }
