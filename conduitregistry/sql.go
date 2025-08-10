@@ -2,7 +2,6 @@ package conduitregistry
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io/fs"
 	"path/filepath"
@@ -16,8 +15,8 @@ import (
 )
 
 var (
-	UpDownSep        = "-- create above / drop below ----" //nolint:gochecknoglobals
-	DisableTxPattern = "-- disable-tx ----"                //nolint:gochecknoglobals
+	UpDownSep        = "---- create above / drop below ----" //nolint:gochecknoglobals
+	DisableTxPattern = "---- disable-tx ----"                //nolint:gochecknoglobals
 )
 
 // parseMigrationsFromFS scans the fsys for SQL migration scripts and returns
@@ -66,17 +65,13 @@ func parseSQLMigration(fsys fs.FS, path string) (*Migration, error) {
 		return nil, fmt.Errorf("conduit: failed to read migration file: %w", err)
 	}
 
-	stmts := sqlsplit.NewLexer(sql).Lex()
-	if len(stmts) == 0 {
-		return nil, errors.New("conduit: empty migration script")
+	stmts, err := sqlsplit.Split(string(sql))
+	if err != nil {
+		return nil, fmt.Errorf("conduit: failed to split SQL statements: %w", err)
 	}
 
-	splitIdx := sliceutil.Until(stmts, func(stmt *sqlsplit.Stmt) bool {
-		if stmt.Kind() != sqlsplit.Comment {
-			return false
-		}
-
-		return strings.TrimSpace(stmt.Content()) == UpDownSep
+	splitIdx := sliceutil.Until(stmts, func(stmt string) bool {
+		return strings.TrimSpace(stmt) == UpDownSep
 	})
 
 	migration := Migration{
@@ -96,24 +91,17 @@ func parseSQLMigration(fsys fs.FS, path string) (*Migration, error) {
 	return &migration, nil
 }
 
-func sqlMigrateFunc(stmts []*sqlsplit.Stmt) *migrateFunc {
-	inTx := sliceutil.Some(stmts, func(stmt *sqlsplit.Stmt) bool {
-		if stmt.Kind() != sqlsplit.Comment {
-			return false
-		}
-
-		return strings.TrimSpace(stmt.Content()) == DisableTxPattern
+func sqlMigrateFunc(stmts []string) *migrateFunc {
+	inTx := sliceutil.Some(stmts, func(stmt string) bool {
+		return strings.TrimSpace(stmt) == DisableTxPattern
 	})
 	up := &migrateFunc{inTx: inTx, fn: nil, fnx: nil}
 
 	if inTx {
 		up.fnx = func(ctx context.Context, tx pgx.Tx) error {
-			for _, s := range stmts {
-				if s.Kind() != sqlsplit.Query {
-					continue
-				}
+			for _, stmt := range stmts {
 
-				_, err := tx.Exec(ctx, s.Content())
+				_, err := tx.Exec(ctx, stmt)
 				if err != nil {
 					return fmt.Errorf("conduit: failed to execute migration script: %w", err)
 				}
@@ -123,12 +111,8 @@ func sqlMigrateFunc(stmts []*sqlsplit.Stmt) *migrateFunc {
 		}
 	} else {
 		up.fn = func(ctx context.Context, conn *pgx.Conn) error {
-			for _, s := range stmts {
-				if s.Kind() != sqlsplit.Query {
-					continue
-				}
-
-				_, err := conn.Exec(ctx, s.Content())
+			for _, stmt := range stmts {
+				_, err := conn.Exec(ctx, stmt)
 				if err != nil {
 					return fmt.Errorf("conduit: failed to execute migration script: %w", err)
 				}
