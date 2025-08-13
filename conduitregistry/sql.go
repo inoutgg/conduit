@@ -100,9 +100,7 @@ func sqlMigrateFunc(stmts []string) *migrateFunc {
 	if inTx {
 		up.fnx = func(ctx context.Context, tx pgx.Tx) error {
 			for _, stmt := range stmts {
-
-				_, err := tx.Exec(ctx, stmt)
-				if err != nil {
+				if _, err := tx.Exec(ctx, stmt); err != nil {
 					return fmt.Errorf("conduit: failed to execute migration script: %w", err)
 				}
 			}

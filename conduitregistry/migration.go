@@ -27,7 +27,7 @@ type migrateFunc struct {
 type Migration struct {
 	up      *migrateFunc
 	down    *migrateFunc
-	version *version.Version
+	version version.Version
 	name    string
 }
 
@@ -44,7 +44,7 @@ func (m *Migration) UseTx(dir direction.Direction) (bool, error) {
 }
 
 // Version returns the version of this migration.
-func (m *Migration) Version() *version.Version { return m.version }
+func (m *Migration) Version() version.Version { return m.version }
 
 // Name returns the name of this migration.
 func (m *Migration) Name() string { return m.name }

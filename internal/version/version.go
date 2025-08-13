@@ -1,7 +1,6 @@
 package version
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"path/filepath"
@@ -14,44 +13,24 @@ const format = "20060102150405" // YYYYMMDDHHMMSS
 type Version struct{ t time.Time }
 
 // String returns the version as a string.
-func (v *Version) String() string { return v.t.Format(format) }
+func (v Version) String() string { return v.t.Format(format) }
 
-func NewVersion() *Version             { return &Version{t: time.Now()} }
-func NewFromTime(t time.Time) *Version { return &Version{t: t} }
+func NewVersion() Version             { return Version{t: time.Now()} }
+func NewFromTime(t time.Time) Version { return Version{t: t} }
 
 // Compare compares current version and the other one,
 // returning -1 if current version is older, 0 if versions are equal,
 // and 1 if current version is newer.
-func (v *Version) Compare(other *Version) int { return v.t.Compare(other.t) }
-
-func (v *Version) MarshalJSON() ([]byte, error) {
-	return []byte(fmt.Sprintf(`"%s"`, v.String())), nil
-}
-
-func (v *Version) UnmarshalJSON(data []byte) error {
-	var s string
-	if err := json.Unmarshal(data, &s); err != nil {
-		return fmt.Errorf("conduit: failed to unmarshal version: %w", err)
-	}
-
-	t, err := time.Parse(format, s)
-	if err != nil {
-		return fmt.Errorf("conduit: failed to parse version: %w", err)
-	}
-
-	v.t = t
-
-	return nil
-}
+func (v Version) Compare(other Version) int { return v.t.Compare(other.t) }
 
 // MigrationFilename generates a filename for a migration file.
-func MigrationFilename(v *Version, name string, ext string) string {
+func MigrationFilename(v Version, name string, ext string) string {
 	return fmt.Sprintf("%s_%s.%s", v.String(), name, ext)
 }
 
 // ParsedMigrationFilename represents the components of a parsed migration filename.
 type ParsedMigrationFilename struct {
-	Version   *Version
+	Version   Version
 	Name      string
 	Extension string
 }
@@ -82,7 +61,7 @@ func ParseMigrationFilename(filename string) (*ParsedMigrationFilename, error) {
 	}
 
 	return &ParsedMigrationFilename{
-		Version:   &Version{ver},
+		Version:   Version{ver},
 		Name:      name,
 		Extension: ext[1:], // Drop leading dot from extension
 	}, nil

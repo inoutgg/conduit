@@ -82,7 +82,7 @@ func create(ctx context.Context, cmd *cli.Command) error {
 
 	hasCustomRegistry := exists(filepath.Join(dir, "registry.go"))
 	if err := tpl.Execute(f, struct {
-		Version           *version.Version
+		Version           version.Version
 		Ext               string
 		Name              string
 		Package           string

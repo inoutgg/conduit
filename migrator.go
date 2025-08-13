@@ -107,7 +107,7 @@ type MigrateResult struct {
 
 // MigrationResult represents the outcome of a single applied migration.
 type MigrationResult struct {
-	Version       *version.Version
+	Version       version.Version
 	Name          string
 	Namespace     string
 	DurationTotal time.Duration

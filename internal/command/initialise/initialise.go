@@ -94,7 +94,7 @@ func createConduitMigrationFile(dirpath string, namespace string, packageName st
 	defer f.Close()
 
 	if err := internaltpl.ConduitMigrationTemplate.Execute(f, struct {
-		Version           *version.Version
+		Version           version.Version
 		Package           string
 		HasCustomRegistry bool
 	}{HasCustomRegistry: namespace != "", Version: ver, Package: packageName}); err != nil {
