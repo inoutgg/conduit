@@ -8,7 +8,7 @@ import (
 
 	"github.com/urfave/cli/v3"
 
-	"go.inout.gg/conduit/internal/command/common"
+	"go.inout.gg/conduit/internal/command/cmdutil"
 	internaltpl "go.inout.gg/conduit/internal/template"
 	"go.inout.gg/conduit/internal/version"
 )
@@ -20,8 +20,8 @@ func NewCommand() *cli.Command {
 		Aliases: []string{"i"},
 		Usage:   "initialise migration directory",
 		Flags: []cli.Flag{
-			common.MigrationsDirFlag,
-			common.PackageNameFlag,
+			cmdutil.MigrationsDirFlag,
+			cmdutil.PackageNameFlag,
 
 			//nolint:exhaustruct
 			&cli.StringFlag{
@@ -42,7 +42,7 @@ func NewCommand() *cli.Command {
 }
 
 func action(ctx context.Context, cmd *cli.Command) error {
-	dir, err := common.MigrationDir(ctx)
+	dir, err := cmdutil.MigrationDir(ctx)
 	if err != nil {
 		//nolint:wrapcheck
 		return err
@@ -73,7 +73,8 @@ func action(ctx context.Context, cmd *cli.Command) error {
 // createMigrationDir creates a new migration file at the dir resolved from the current
 // working directory.
 func createMigrationDir(dir string) error {
-	if err := os.MkdirAll(dir, os.ModePerm); err != nil {
+	err := os.MkdirAll(dir, os.ModePerm)
+	if err != nil {
 		return fmt.Errorf("conduit: failed to create migrations directory at %s: %w", dir, err)
 	}
 

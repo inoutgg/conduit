@@ -97,6 +97,11 @@ func (r *Registry) DownTx(down MigrateFuncTx) {
 	m.down = &migrateFunc{fnx: down, inTx: true}
 }
 
+// CloneMigrations returns a copy of the registered migrations map.
+func (r *Registry) CloneMigrations() map[string]*Migration {
+	return maps.Clone(r.migrations)
+}
+
 // goMigration creates a new Migration from a Go registration function.
 func (r *Registry) goMigration() (*Migration, error) {
 	_, filename, _, ok := runtime.Caller(2)
@@ -123,9 +128,4 @@ func (r *Registry) goMigration() (*Migration, error) {
 	r.migrations[migration.version.String()] = migration
 
 	return migration, nil
-}
-
-// CloneMigrations returns a copy of the registered migrations map.
-func (r *Registry) CloneMigrations() map[string]*Migration {
-	return maps.Clone(r.migrations)
 }

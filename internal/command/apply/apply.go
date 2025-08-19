@@ -7,7 +7,7 @@ import (
 	"github.com/urfave/cli/v3"
 
 	"go.inout.gg/conduit"
-	"go.inout.gg/conduit/internal/command/common"
+	"go.inout.gg/conduit/internal/command/cmdutil"
 	"go.inout.gg/conduit/internal/direction"
 )
 
@@ -20,7 +20,7 @@ func NewCommand(migrator *conduit.Migrator) *cli.Command {
 		Name:  "apply",
 		Usage: "apply migrations in the given direction",
 		Flags: []cli.Flag{
-			common.DatabaseURLFlag,
+			cmdutil.DatabaseURLFlag,
 
 			//nolint:exhaustruct
 			&cli.IntFlag{
@@ -45,7 +45,7 @@ func apply(
 		return fmt.Errorf("conduit: failed to parse direction: %w", err)
 	}
 
-	conn, err := common.Conn(ctx, cmd)
+	conn, err := cmdutil.Conn(ctx, cmd)
 	if err != nil {
 		return fmt.Errorf("conduit: failed to get database connection: %w", err)
 	}

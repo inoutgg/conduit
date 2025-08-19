@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"maps"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -126,6 +127,13 @@ func (m *MigrateOptions) validate() error {
 	return nil
 }
 
+// Migrator is a database migration tool that can rolls up and down migrations
+// in order.
+type Migrator struct {
+	logger   *slog.Logger
+	registry *conduitregistry.Registry
+}
+
 // NewMigrator creates a new migrator with the given config.
 func NewMigrator(config *Config) *Migrator {
 	debug.Assert(config.Logger != nil, "config.Logger must be defined")
@@ -135,33 +143,6 @@ func NewMigrator(config *Config) *Migrator {
 		logger:   config.Logger,
 		registry: config.Registry,
 	}
-}
-
-// Migrator is a database migration tool that can rolls up and down migrations
-// in order.
-type Migrator struct {
-	logger   *slog.Logger
-	registry *conduitregistry.Registry
-}
-
-// existingMigrationVersions retrieves a list of already applied migration versions.
-func (m *Migrator) existingMigrationVersions(ctx context.Context, conn *pgx.Conn) ([]string, error) {
-	ok, err := dbsqlc.New().DoesTableExist(ctx, conn, "conduitmigrations")
-	if err != nil {
-		return nil, fmt.Errorf("conduit: failed to fetch from migrations table: %w", err)
-	}
-
-	if !ok {
-		internaldebug.Log("conduitmigrations table is not found")
-		return []string{}, nil
-	}
-
-	versions, err := dbsqlc.New().AllExistingMigrationVersions(ctx, conn, m.registry.Namespace)
-	if err != nil {
-		return nil, fmt.Errorf("conduit: failed to fetch existing versions: %w", err)
-	}
-
-	return versions, nil
 }
 
 // Migrate applies migrations in the specified direction (up or down).
@@ -221,6 +202,26 @@ func (m *Migrator) Migrate(
 	}
 
 	return result, nil
+}
+
+// existingMigrationVersions retrieves a list of already applied migration versions.
+func (m *Migrator) existingMigrationVersions(ctx context.Context, conn *pgx.Conn) ([]string, error) {
+	ok, err := dbsqlc.New().DoesTableExist(ctx, conn, "conduitmigrations")
+	if err != nil {
+		return nil, fmt.Errorf("conduit: failed to fetch from migrations table: %w", err)
+	}
+
+	if !ok {
+		internaldebug.Log("conduitmigrations table is not found")
+		return []string{}, nil
+	}
+
+	versions, err := dbsqlc.New().AllExistingMigrationVersions(ctx, conn, m.registry.Namespace)
+	if err != nil {
+		return nil, fmt.Errorf("conduit: failed to fetch existing versions: %w", err)
+	}
+
+	return versions, nil
 }
 
 // migrateUp applies pending migrations in the up direction.
@@ -300,7 +301,23 @@ func (m *Migrator) applyMigrations(
 
 	results := make([]MigrationResult, len(migrations))
 
+	internaldebug.Log(
+		"running migrations migrations=[%s] steps=%d total_migrations_count=%d",
+		strings.Join(sliceutil.Map(migrations, func(m *conduitregistry.Migration) string {
+			return fmt.Sprintf("name=%s version=%s", m.Name(), m.Version().String())
+		}), ", "),
+		opts.Steps,
+		len(migrations),
+	)
+
 	for i, migration := range migrations {
+		internaldebug.Log(
+			"running migration name=%s version=%s direction=%s",
+			migration.Name(),
+			migration.Version().String(),
+			dir,
+		)
+
 		var tx pgx.Tx
 
 		inTx := must.Must(migration.UseTx(dir))
@@ -331,7 +348,8 @@ func (m *Migrator) applyMigrations(
 
 		start := time.Now()
 
-		if err := migration.Apply(ctx, dir, conn, tx); err != nil {
+		err := migration.Apply(ctx, dir, conn, tx)
+		if err != nil {
 			return nil, fmt.Errorf(
 				"conduit: failed to apply migration %s: %w",
 				migration.Version().String(),
@@ -369,7 +387,8 @@ func (m *Migrator) applyMigrations(
 		}
 
 		if inTx {
-			if err := tx.Commit(ctx); err != nil {
+			err := tx.Commit(ctx)
+			if err != nil {
 				return nil, fmt.Errorf(
 					"conduit: failed to commit transaction for migration %s: %w",
 					migrationResult.Version.String(),

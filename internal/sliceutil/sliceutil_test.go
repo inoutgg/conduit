@@ -20,6 +20,7 @@ func TestMap(t *testing.T) {
 
 	t.Run("Map empty slice", func(t *testing.T) {
 		var input []int
+
 		result := sliceutil.Map(input, func(i int) bool { return i%2 == 0 })
 
 		assert.Empty(t, result)
@@ -59,6 +60,7 @@ func TestKeyBy(t *testing.T) {
 
 	t.Run("KeyBy empty slice", func(t *testing.T) {
 		var input []string
+
 		result := sliceutil.KeyBy(input, func(s string) int { return len(s) })
 
 		assert.Empty(t, result)
@@ -75,6 +77,7 @@ func TestSome(t *testing.T) {
 
 	t.Run("Some empty slice", func(t *testing.T) {
 		var input []int
+
 		result := sliceutil.Some(input, func(i int) bool { return i%2 == 0 })
 
 		assert.False(t, result)

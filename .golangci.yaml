@@ -46,6 +46,8 @@ linters:
     - nestif # detects nested if statements, stupid
     - nlreturn # blank lines after return statements, annoying
     - testpackage # requires to create tests in separate packages like package_test
+    - wsl # replaced by wsl_v5
+    - noinlineerr
 
   exclusions:
     generated: lax

@@ -11,7 +11,7 @@ import (
 
 	"github.com/urfave/cli/v3"
 
-	"go.inout.gg/conduit/internal/command/common"
+	"go.inout.gg/conduit/internal/command/cmdutil"
 	internaltpl "go.inout.gg/conduit/internal/template"
 	"go.inout.gg/conduit/internal/version"
 )
@@ -28,14 +28,14 @@ func NewCommand() *cli.Command {
 				Usage: "migration file extension (values: \"go\", \"sql\")",
 				Value: "sql",
 			},
-			common.PackageNameFlag,
+			cmdutil.PackageNameFlag,
 		},
 		Action: create,
 	}
 }
 
 func create(ctx context.Context, cmd *cli.Command) error {
-	dir, err := common.MigrationDir(ctx)
+	dir, err := cmdutil.MigrationDir(ctx)
 	if err != nil {
 		return fmt.Errorf("conduit: failed to get migration directory: %w", err)
 	}

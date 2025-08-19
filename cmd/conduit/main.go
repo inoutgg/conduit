@@ -18,7 +18,8 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM)
 	migrator := conduit.NewMigrator(conduit.NewConfig())
 
-	if err := conduitcli.Execute(ctx, migrator); err != nil {
+	err := conduitcli.Execute(ctx, migrator)
+	if err != nil {
 		cancel()
 		log.Fatal(err)
 	}

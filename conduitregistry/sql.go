@@ -14,10 +14,7 @@ import (
 	"go.inout.gg/conduit/internal/version"
 )
 
-var (
-	UpDownSep        = "---- create above / drop below ----" //nolint:gochecknoglobals
-	DisableTxPattern = "---- disable-tx ----"                //nolint:gochecknoglobals
-)
+var DisableTxPattern = "---- disable-tx ----" //nolint:gochecknoglobals
 
 // parseMigrationsFromFS scans the fsys for SQL migration scripts and returns
 // a list of migrations.
@@ -65,14 +62,10 @@ func parseSQLMigration(fsys fs.FS, path string) (*Migration, error) {
 		return nil, fmt.Errorf("conduit: failed to read migration file: %w", err)
 	}
 
-	stmts, err := sqlsplit.Split(string(sql))
+	up, down, err := sqlsplit.Split(string(sql))
 	if err != nil {
 		return nil, fmt.Errorf("conduit: failed to split SQL statements: %w", err)
 	}
-
-	splitIdx := sliceutil.Until(stmts, func(stmt string) bool {
-		return strings.TrimSpace(stmt) == UpDownSep
-	})
 
 	migration := Migration{
 		version: info.Version,
@@ -81,11 +74,11 @@ func parseSQLMigration(fsys fs.FS, path string) (*Migration, error) {
 		down:    emptyMigrateFunc,
 	}
 
-	migration.up = sqlMigrateFunc(stmts[:splitIdx])
+	migration.up = sqlMigrateFunc(up)
 
 	// Down migration can be empty.
-	if splitIdx < len(stmts)-1 {
-		migration.down = sqlMigrateFunc(stmts[splitIdx+1:])
+	if len(down) > 0 {
+		migration.down = sqlMigrateFunc(down)
 	}
 
 	return &migration, nil

@@ -8,7 +8,7 @@ import (
 
 	"go.inout.gg/conduit"
 	"go.inout.gg/conduit/internal/command/apply"
-	"go.inout.gg/conduit/internal/command/common"
+	"go.inout.gg/conduit/internal/command/cmdutil"
 	"go.inout.gg/conduit/internal/command/create"
 	"go.inout.gg/conduit/internal/command/initialise"
 )
@@ -19,13 +19,13 @@ func Execute(ctx context.Context, migrator *conduit.Migrator) error {
 	cmd := &cli.Command{
 		Name:  "conduit",
 		Usage: "An SQL migrator that is easy to embed.",
-		Flags: common.GlobalFlags,
+		Flags: cmdutil.GlobalFlags,
 		Commands: []*cli.Command{
 			initialise.NewCommand(),
 			create.NewCommand(),
 			apply.NewCommand(migrator),
 		},
-		Before: common.OnBeforeHook,
+		Before: cmdutil.OnBeforeHook,
 	}
 
 	//nolint:wrapcheck

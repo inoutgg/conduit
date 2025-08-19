@@ -12,11 +12,11 @@ const format = "20060102150405" // YYYYMMDDHHMMSS
 
 type Version struct{ t time.Time }
 
-// String returns the version as a string.
-func (v Version) String() string { return v.t.Format(format) }
-
 func NewVersion() Version             { return Version{t: time.Now()} }
 func NewFromTime(t time.Time) Version { return Version{t: t} }
+
+// String returns the version as a string.
+func (v Version) String() string { return v.t.Format(format) }
 
 // Compare compares current version and the other one,
 // returning -1 if current version is older, 0 if versions are equal,
