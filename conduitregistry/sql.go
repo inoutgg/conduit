@@ -88,7 +88,7 @@ func sqlMigrateFunc(stmts []string) *migrateFunc {
 	inTx := sliceutil.Some(stmts, func(stmt string) bool {
 		return strings.TrimSpace(stmt) == DisableTxPattern
 	})
-	up := &migrateFunc{inTx: inTx, fn: nil, fnx: nil}
+	up := &migrateFunc{useTx: inTx, fn: nil, fnx: nil}
 
 	if inTx {
 		up.fnx = func(ctx context.Context, tx pgx.Tx) error {

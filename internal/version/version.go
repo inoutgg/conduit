@@ -35,6 +35,8 @@ type ParsedMigrationFilename struct {
 	Extension string
 }
 
+// ParseMigrationFilename parses a migration filename into its components.
+//
 // Example: 1257894000000_create_user.sql -> 1257894000000, create_user, sql.
 func ParseMigrationFilename(filename string) (*ParsedMigrationFilename, error) {
 	basename := filepath.Base(filename)

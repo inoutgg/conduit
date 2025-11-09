@@ -13,7 +13,13 @@ sql:
         emit_methods_with_db_argument: true
         overrides:
           - db_type: "uuid"
-            go_type: "github.com/google/uuid.UUID"
+            go_type:
+              import: "github.com/gofrs/uuid/v5"
+              package: "uuid"
+              type: "UUID"
           - db_type: "uuid"
             nullable: true
-            go_type: "github.com/google/uuid.UUID"
+            go_type:
+              import: "github.com/gofrs/uuid/v5"
+              package: "uuid"
+              type: "UUID"

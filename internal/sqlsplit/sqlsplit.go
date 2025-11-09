@@ -39,8 +39,8 @@ func Split(sql string) ([]string, []string, error) {
 	return up, down, nil
 }
 
-func split(sql string) ([]string, error) {
-	stmts, err := pgquery.SplitWithParser(sql, true)
+func split(s string) ([]string, error) {
+	stmts, err := pgquery.SplitWithParser(s, true)
 	if err != nil {
 		return nil, fmt.Errorf("conduit: failed to split SQL: %w", err)
 	}

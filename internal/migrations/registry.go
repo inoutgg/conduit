@@ -8,7 +8,8 @@ import (
 
 const RegistryNamespace = "inout/conduit"
 
-// Conduit's own migrations scripts registry.
+// Registry is a global registry for migrations scripts that is used by
+// conduit by default.
 var Registry *conduitregistry.Registry = conduitregistry.New(RegistryNamespace) //nolint:gochecknoglobals
 
 //go:embed **.sql

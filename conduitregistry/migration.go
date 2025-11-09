@@ -12,15 +12,15 @@ import (
 
 //nolint:gochecknoglobals
 var emptyMigrateFunc = &migrateFunc{
-	fn:   func(_ context.Context, _ *pgx.Conn) error { return nil },
-	fnx:  func(_ context.Context, _ pgx.Tx) error { return nil },
-	inTx: false,
+	fn:    func(_ context.Context, _ *pgx.Conn) error { return nil },
+	fnx:   func(_ context.Context, _ pgx.Tx) error { return nil },
+	useTx: false,
 }
 
 type migrateFunc struct {
-	fn   MigrateFunc
-	fnx  MigrateFuncTx
-	inTx bool
+	fn    MigrateFunc
+	fnx   MigrateFuncTx
+	useTx bool
 }
 
 // Migration represents a single database migration.
@@ -31,13 +31,13 @@ type Migration struct {
 	name    string
 }
 
-// InTx tests whether migration should run in transition for given direction.
+// UseTx tests whether migration should run in transition for given direction.
 func (m *Migration) UseTx(dir direction.Direction) (bool, error) {
 	switch dir {
 	case direction.DirectionUp:
-		return m.up.inTx, nil
+		return m.up.useTx, nil
 	case direction.DirectionDown:
-		return m.down.inTx, nil
+		return m.down.useTx, nil
 	}
 
 	return false, direction.ErrUnknownDirection
@@ -64,7 +64,7 @@ func (m *Migration) Apply(ctx context.Context, dir direction.Direction, conn *pg
 }
 
 func (m *Migration) migrateDown(ctx context.Context, conn *pgx.Conn, tx pgx.Tx) error {
-	if m.down.inTx {
+	if m.down.useTx {
 		if tx == nil {
 			return ErrUndefinedTx
 		}
@@ -76,7 +76,7 @@ func (m *Migration) migrateDown(ctx context.Context, conn *pgx.Conn, tx pgx.Tx) 
 }
 
 func (m *Migration) migrateUp(ctx context.Context, conn *pgx.Conn, tx pgx.Tx) error {
-	if m.down.inTx {
+	if m.down.useTx {
 		if tx == nil {
 			return ErrUndefinedTx
 		}

@@ -61,7 +61,7 @@ func (r *Registry) Up(up MigrateFunc) {
 	}
 
 	//nolint:exhaustruct
-	m.up = &migrateFunc{fn: up, inTx: false}
+	m.up = &migrateFunc{fn: up, useTx: false}
 }
 
 // UpTx registers a Go function for up migration within a transaction.
@@ -72,7 +72,7 @@ func (r *Registry) UpTx(up MigrateFuncTx) {
 	}
 
 	//nolint:exhaustruct
-	m.up = &migrateFunc{fnx: up, inTx: true}
+	m.up = &migrateFunc{fnx: up, useTx: true}
 }
 
 // Down registers a Go function for down migration.
@@ -83,7 +83,7 @@ func (r *Registry) Down(down MigrateFunc) {
 	}
 
 	//nolint:exhaustruct
-	m.down = &migrateFunc{fn: down, inTx: false}
+	m.down = &migrateFunc{fn: down, useTx: false}
 }
 
 // DownTx registers a Go function for down migration within a transaction.
@@ -94,7 +94,7 @@ func (r *Registry) DownTx(down MigrateFuncTx) {
 	}
 
 	//nolint:exhaustruct
-	m.down = &migrateFunc{fnx: down, inTx: true}
+	m.down = &migrateFunc{fnx: down, useTx: true}
 }
 
 // CloneMigrations returns a copy of the registered migrations map.

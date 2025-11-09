@@ -69,6 +69,13 @@ func WithLogger(l *slog.Logger) func(*Config) {
 	return func(c *Config) { c.Logger = l }
 }
 
+// WithRegistry adds a registry to the Config.
+//
+// It's provided for convenience and intended to be used with NewConfig.
+func WithRegistry(r *conduitregistry.Registry) func(*Config) {
+	return func(c *Config) { c.Registry = r }
+}
+
 // NewConfig creates a new Config and applies the provided configurations.
 //
 // If Config.Registry is not provided, it falls back to the global registry.
