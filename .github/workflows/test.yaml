@@ -32,7 +32,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-go-
       - name: Run Tests
-        run: go test -v ./...
+        run: nix develop --no-pure-eval --command go-test
   lint:
     name: lint
     runs-on: ubuntu-latest
@@ -41,10 +41,5 @@ jobs:
       - uses: DeterminateSystems/nix-installer-action@v21
       - uses: DeterminateSystems/magic-nix-cache-action@v13
       - uses: DeterminateSystems/flake-checker-action@v12
-      - name: configure shell path
-        run: bash -c 'eval "$(nix print-dev-env)" && echo "PATH=$PATH" >> $GITHUB_ENV'
-      - name: golangci-lint
-        uses: golangci/golangci-lint-action@v9
-        with:
-          install-mode: "none"
-          working-directory: .
+      - name: lint
+        run: nix develop --no-pure-eval --command lint
