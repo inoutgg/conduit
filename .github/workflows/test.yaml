@@ -22,6 +22,10 @@ jobs:
       - uses: DeterminateSystems/nix-installer-action@v21
       - uses: DeterminateSystems/magic-nix-cache-action@v13
       - uses: DeterminateSystems/flake-checker-action@v12
+      - uses: cachix/cachix-action@v16
+        with:
+          name: devenv
+          skipPush: true
       - name: restore cache
         uses: actions/cache@v4
         with:
@@ -41,5 +45,14 @@ jobs:
       - uses: DeterminateSystems/nix-installer-action@v21
       - uses: DeterminateSystems/magic-nix-cache-action@v13
       - uses: DeterminateSystems/flake-checker-action@v12
-      - name: lint
-        run: nix develop --no-pure-eval --command lint
+      - uses: cachix/cachix-action@v16
+        with:
+          name: devenv
+          skipPush: true
+      - run: nix develop --no-pure-eval --command lint-ci
+      - run: bash -c 'eval "$(nix print-dev-env --no-pure-eval)" && echo "PATH=$PATH" >> $GITHUB_ENV'
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v8
+        with:
+          install-mode: "none"
+          working-directory: .

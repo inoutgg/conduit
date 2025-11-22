@@ -55,10 +55,16 @@
             containers = lib.mkForce { };
 
             scripts = {
-              lint = {
+              # golangci-lint is running by gh action.
+              lint-ci = {
                 exec = ''
                   modernize ./...
-                  govulncheck ./...
+                    govulncheck ./...
+                '';
+              };
+              lint-all = {
+                exec = ''
+                  lint-ci
                   golangci-lint run ./...
                 '';
               };
@@ -95,7 +101,7 @@
                   name = "lint";
                   description = "Lint";
                   entry = ''
-                    lint
+                    lint-all
                   '';
                   pass_filenames = false;
                 };
