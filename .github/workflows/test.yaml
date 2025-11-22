@@ -6,27 +6,23 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        go-version: ["1.22.x"]
     services:
       postgres:
         image: postgres
         env:
-          POSTGRES_PASSWORD: local
-          POSTGRES_USER: local
-          POSTGRES_DB: local
+          POSTGRES_PASSWORD: test
+          POSTGRES_USER: test
+          POSTGRES_DB: test
         options: >-
           --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
         ports:
           - 5432:5432
     steps:
       - uses: actions/checkout@v4
-      - name: Setup Go ${{ matrix.go-version }}
-        uses: actions/setup-go@v5
-        with:
-          go-version: ${{ matrix.go-version }}
-      - name: Restore Cache
+      - uses: DeterminateSystems/nix-installer-action@v21
+      - uses: DeterminateSystems/magic-nix-cache-action@v13
+      - uses: DeterminateSystems/flake-checker-action@v12
+      - name: restore cache
         uses: actions/cache@v4
         with:
           path: |
@@ -42,10 +38,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version: stable
+      - uses: DeterminateSystems/nix-installer-action@v21
+      - uses: DeterminateSystems/magic-nix-cache-action@v13
+      - uses: DeterminateSystems/flake-checker-action@v12
+      - name: configure shell path
+        run: bash -c 'eval "$(nix print-dev-env)" && echo "PATH=$PATH" >> $GITHUB_ENV'
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v6
+        uses: golangci/golangci-lint-action@v9
         with:
-          version: v1.58
+          install-mode: "none"
+          working-directory: .
