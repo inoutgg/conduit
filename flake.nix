@@ -14,6 +14,9 @@
       flake-parts,
       ...
     }@inputs:
+    let
+      isCI = builtins.getEnv "GITHUB_ACTIONS" != "";
+    in
     flake-parts.lib.mkFlake { inherit inputs; } {
       flake = { };
 
@@ -39,7 +42,6 @@
         }:
         {
           formatter = config.treefmt.build.wrapper;
-
           treefmt.config = {
             inherit (config.flake-root) projectRootFile;
             package = pkgs.treefmt;
@@ -51,94 +53,109 @@
             };
           };
 
-          devenv.shells.default = {
-            containers = lib.mkForce { };
+          devenv.shells.default =
+            let
+              default = {
+                containers = lib.mkForce { };
 
-            scripts = {
-              # golangci-lint is running by gh action.
-              lint-ci = {
-                exec = ''
-                  modernize ./...
-                    govulncheck ./...
-                '';
-              };
-              lint-all = {
-                exec = ''
-                  lint-ci
-                  golangci-lint run ./...
-                '';
-              };
-              lint-fix = {
-                exec = ''
-                  modernize --fix ./...
-                  golangci-lint run --fix ./...
-                '';
-              };
-              go-test =
-                let
-                  parallel = pkgs.stdenv.hostPlatform.parsed.cpu.cores or 4;
-                in
-                {
-                  exec = ''
-                    go test -parallel ${toString parallel} ./...
-                  '';
+                cachix.enable = true;
+                cachix.pull = [
+                  "devenv"
+                ];
+
+                scripts = {
+                  # golangci-lint is running by gh action.
+                  lint-ci = {
+                    exec = ''
+                      modernize ./...
+                        govulncheck ./...
+                    '';
+                  };
+                  lint-all = {
+                    exec = ''
+                      lint-ci
+                      golangci-lint run ./...
+                    '';
+                  };
+                  lint-fix = {
+                    exec = ''
+                      modernize --fix ./...
+                      golangci-lint run --fix ./...
+                    '';
+                  };
+                  go-test =
+                    let
+                      parallel = pkgs.stdenv.hostPlatform.parsed.cpu.cores or 4;
+                    in
+                    {
+                      exec = ''
+                        go test -parallel ${toString parallel} ./...
+                      '';
+                    };
                 };
-            };
 
-            git-hooks = {
+                packages = with pkgs; [
+                  sqlc
+                  typos
+
+                  gcc
+                  gotools
+                  govulncheck
+                  golangci-lint
+                ];
+
+                languages.go = {
+                  enable = true;
+                  package = pkgs.go_1_25;
+                };
+
+                env.GOTOOLCHAIN = lib.mkForce "local";
+                env.GOFUMPT_SPLIT_LONG_LINES = lib.mkForce "on";
+
+                env.TEST_DATABASE_URL = lib.mkForce "postgres://test:test@localhost:5432/test";
+              };
+
+              services = {
+                services.postgres = {
+                  enable = true;
+                  package = pkgs.postgresql_17;
+
+                  initialScript = ''
+                    CREATE USER test SUPERUSER PASSWORD 'test';
+                    CREATE DATABASE test OWNER test;
+                  '';
+                  listen_addresses = "localhost";
+                  port = 5432;
+                };
+              };
+
               hooks = {
-                nix-check = {
-                  enable = true;
-                  name = "nix-check";
-                  description = "Nix Check";
-                  entry = ''
-                    nix flake check --no-pure-eval
-                  '';
-                  pass_filenames = false;
-                };
-                lint = {
-                  enable = true;
-                  name = "lint";
-                  description = "Lint";
-                  entry = ''
-                    lint-all
-                  '';
-                  pass_filenames = false;
+                git-hooks = {
+                  hooks = {
+                    nix-check = {
+                      enable = true;
+                      name = "nix-check";
+                      description = "Nix Check";
+                      entry = ''
+                        nix flake check --no-pure-eval
+                      '';
+                      pass_filenames = false;
+                    };
+                    lint = {
+                      enable = true;
+                      name = "lint";
+                      description = "Lint";
+                      entry = ''
+                        lint-all
+                      '';
+                      pass_filenames = false;
+                    };
+                  };
                 };
               };
-            };
+            in
 
-            packages = with pkgs; [
-              sqlc
-              typos
-
-              gcc
-              gotools
-              govulncheck
-              golangci-lint
-            ];
-
-            languages.go = {
-              enable = true;
-              package = pkgs.go_1_25;
-            };
-
-            env.GOTOOLCHAIN = lib.mkForce "local";
-            env.GOFUMPT_SPLIT_LONG_LINES = lib.mkForce "on";
-
-            env.TEST_DATABASE_URL = lib.mkForce "postgres://test:test@localhost:5432/test";
-            services.postgres = {
-              enable = true;
-              package = pkgs.postgresql_17;
-
-              initialScript = ''
-                CREATE USER test SUPERUSER PASSWORD 'test';
-                CREATE DATABASE test OWNER test;
-              '';
-              listen_addresses = "localhost";
-              port = 5432;
-            };
-          };
+            default // (if isCI then { } else services // hooks);
         };
     };
 }
