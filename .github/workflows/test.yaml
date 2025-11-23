@@ -31,7 +31,7 @@ jobs:
         with:
           path: |
             ~/.cache/go-build
-            ~/go/pkg/mod
+            .devenv/state/go
           key: ${{ runner.os }}-v1-go-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-go-
