@@ -64,8 +64,6 @@ linters:
               desc: use "github.com/jackc/pgx/v5"
             - pkg: "github.com/pkg/errors"
               desc: use stdlib
-            - pkg: "database/sql"
-              desc: use "github.com/jackc/pgx/v5"
             - pkg: "github.com/google/uuid"
               desc: use "github.com/gofrs/uuid/v5"
     exhaustive:
