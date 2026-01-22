@@ -7,8 +7,6 @@ package dbsqlc
 
 import (
 	"context"
-
-	uuid "github.com/gofrs/uuid/v5"
 )
 
 const acquireLock = `-- name: AcquireLock :exec
@@ -48,24 +46,18 @@ func (q *Queries) AllExistingMigrationVersions(ctx context.Context, db DBTX, nam
 }
 
 const applyMigration = `-- name: ApplyMigration :exec
-INSERT INTO conduitmigrations (id, version, name, namespace)
-VALUES ($1, $2, $3, $4)
+INSERT INTO conduitmigrations (version, name, namespace)
+VALUES ($1, $2, $3)
 `
 
 type ApplyMigrationParams struct {
-	ID        uuid.UUID
 	Version   string
 	Name      string
 	Namespace string
 }
 
 func (q *Queries) ApplyMigration(ctx context.Context, db DBTX, arg ApplyMigrationParams) error {
-	_, err := db.Exec(ctx, applyMigration,
-		arg.ID,
-		arg.Version,
-		arg.Name,
-		arg.Namespace,
-	)
+	_, err := db.Exec(ctx, applyMigration, arg.Version, arg.Name, arg.Namespace)
 	return err
 }
 

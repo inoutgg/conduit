@@ -21,7 +21,6 @@ import (
 	"go.inout.gg/conduit/internal/direction"
 	internaldebug "go.inout.gg/conduit/internal/internaldebug"
 	"go.inout.gg/conduit/internal/sliceutil"
-	"go.inout.gg/conduit/internal/uuidv7"
 	"go.inout.gg/conduit/internal/version"
 )
 
@@ -382,7 +381,6 @@ func (m *Migrator) applyMigrations(
 
 		case DirectionUp:
 			err = dbsqlc.New().ApplyMigration(ctx, conn, dbsqlc.ApplyMigrationParams{
-				ID:        uuidv7.Must(),
 				Version:   migrationResult.Version.String(),
 				Namespace: migrationResult.Namespace,
 				Name:      migrationResult.Name,

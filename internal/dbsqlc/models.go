@@ -5,12 +5,11 @@
 package dbsqlc
 
 import (
-	uuid "github.com/gofrs/uuid/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type Conduitmigration struct {
-	ID        uuid.UUID
+	ID        int64
 	CreatedAt pgtype.Timestamp
 	Version   string
 	Name      string

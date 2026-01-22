@@ -11,15 +11,3 @@ sql:
         out: "internal/dbsqlc"
         emit_pointers_for_null_types: true
         emit_methods_with_db_argument: true
-        overrides:
-          - db_type: "uuid"
-            go_type:
-              import: "github.com/gofrs/uuid/v5"
-              package: "uuid"
-              type: "UUID"
-          - db_type: "uuid"
-            nullable: true
-            go_type:
-              import: "github.com/gofrs/uuid/v5"
-              package: "uuid"
-              type: "UUID"
