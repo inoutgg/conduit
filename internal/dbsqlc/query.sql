@@ -14,8 +14,8 @@ WHERE namespace = @namespace
 ORDER BY version;
 
 -- name: ApplyMigration :exec
-INSERT INTO conduitmigrations (id, version, name, namespace)
-VALUES (@id, @version, @name, @namespace);
+INSERT INTO conduitmigrations (version, name, namespace)
+VALUES (@version, @name, @namespace);
 
 -- name: RollbackMigration :exec
 DELETE FROM conduitmigrations

@@ -5,7 +5,6 @@ go 1.25
 tool go.inout.gg/conduit/cmd/conduit
 
 require (
-	github.com/gofrs/uuid/v5 v5.4.0
 	github.com/jackc/pgx/v5 v5.7.6
 	github.com/joho/godotenv v1.5.1
 	github.com/pganalyze/pg_query_go/v6 v6.1.0
