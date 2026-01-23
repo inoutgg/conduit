@@ -12,10 +12,8 @@ import (
 // testcontainers and returns a connection configuration.
 func startEphemeralPostgres(
 	ctx context.Context,
-	pgVersion string,
+	image string,
 ) (*pgxpool.Config, func(context.Context) error, error) {
-	image := fmt.Sprintf("postgres:%s-alpine", pgVersion)
-
 	container, err := postgres.Run(ctx, image,
 		postgres.WithDatabase("conduit"),
 		postgres.WithUsername("conduit"),

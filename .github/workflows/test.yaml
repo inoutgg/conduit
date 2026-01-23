@@ -37,7 +37,7 @@ jobs:
             .devenv/state/go
           key: ${{ runner.os }}-v1-go-${{ hashFiles('**/go.sum') }}
           restore-keys: |
-            ${{ runner.os }}-go-
+            ${{ runner.os }}-v1-go-
       - name: Run Tests
         run: nix develop --no-pure-eval --command go-test
   lint:

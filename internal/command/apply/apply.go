@@ -4,10 +4,11 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/urfave/cli/v3"
 
 	"go.inout.gg/conduit"
-	"go.inout.gg/conduit/internal/command/cmdutil"
+	"go.inout.gg/conduit/internal/command/flagname"
 	"go.inout.gg/conduit/internal/direction"
 )
 
@@ -20,7 +21,13 @@ func NewCommand(migrator *conduit.Migrator) *cli.Command {
 		Name:  "apply",
 		Usage: "apply migrations in the given direction",
 		Flags: []cli.Flag{
-			cmdutil.DatabaseURLFlag,
+			//nolint:exhaustruct
+			&cli.StringFlag{
+				Name:     flagname.DatabaseURL,
+				Usage:    "database connection URL",
+				Sources:  cli.EnvVars("CONDUIT_DATABASE_URL"),
+				Required: true,
+			},
 
 			//nolint:exhaustruct
 			&cli.IntFlag{
@@ -45,9 +52,14 @@ func apply(
 		return fmt.Errorf("conduit: failed to parse direction: %w", err)
 	}
 
-	conn, err := cmdutil.Conn(ctx, cmd)
+	url := cmd.String(flagname.DatabaseURL)
+	if url == "" {
+		return fmt.Errorf("conduit: missing `%s' flag", flagname.DatabaseURL)
+	}
+
+	conn, err := pgx.Connect(ctx, url)
 	if err != nil {
-		return fmt.Errorf("conduit: failed to get database connection: %w", err)
+		return fmt.Errorf("conduit: failed to connect to database: %w", err)
 	}
 
 	opts := &conduit.MigrateOptions{

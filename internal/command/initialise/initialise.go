@@ -8,7 +8,8 @@ import (
 
 	"github.com/urfave/cli/v3"
 
-	"go.inout.gg/conduit/internal/command/cmdutil"
+	"go.inout.gg/conduit/internal/command/flagname"
+	"go.inout.gg/conduit/internal/command/migrationctx"
 	internaltpl "go.inout.gg/conduit/internal/template"
 	"go.inout.gg/conduit/internal/version"
 )
@@ -20,8 +21,20 @@ func NewCommand() *cli.Command {
 		Aliases: []string{"i"},
 		Usage:   "initialise migration directory",
 		Flags: []cli.Flag{
-			cmdutil.MigrationsDirFlag,
-			cmdutil.PackageNameFlag,
+			//nolint:exhaustruct
+			&cli.StringFlag{
+				Name:    flagname.MigrationsDir,
+				Usage:   "directory with migration files",
+				Value:   "./migrations",
+				Sources: cli.EnvVars("CONDUIT_MIGRATION_DIR"),
+			},
+			//nolint:exhaustruct
+			&cli.StringFlag{
+				Name:    flagname.PackageName,
+				Usage:   "package name",
+				Value:   "migrations",
+				Sources: cli.EnvVars("CONDUIT_PACKAGE_NAME"),
+			},
 
 			//nolint:exhaustruct
 			&cli.StringFlag{
@@ -42,7 +55,7 @@ func NewCommand() *cli.Command {
 }
 
 func action(ctx context.Context, cmd *cli.Command) error {
-	dir, err := cmdutil.MigrationDir(ctx)
+	dir, err := migrationctx.Dir(ctx)
 	if err != nil {
 		//nolint:wrapcheck
 		return err
@@ -59,7 +72,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		}
 	}
 
-	packageName := cmd.String("package-name")
+	packageName := cmd.String(flagname.PackageName)
 
 	if !cmd.Bool("no-conduit-migrations") {
 		if _, err := createConduitMigrationFile(dir, ns, packageName); err != nil {

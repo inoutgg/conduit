@@ -15,14 +15,15 @@ import (
 	"github.com/stripe/pg-schema-diff/pkg/tempdb"
 	"github.com/urfave/cli/v3"
 
-	"go.inout.gg/conduit/internal/command/cmdutil"
+	"go.inout.gg/conduit/internal/command/flagname"
+	"go.inout.gg/conduit/internal/command/migrationctx"
 	"go.inout.gg/conduit/internal/sqlsplit"
 	internaltpl "go.inout.gg/conduit/internal/template"
 	"go.inout.gg/conduit/internal/version"
 )
 
 func diff(ctx context.Context, cmd *cli.Command) error {
-	migrationDir, err := cmdutil.MigrationDir(ctx)
+	migrationDir, err := migrationctx.Dir(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get migration directory: %w", err)
 	}
@@ -38,8 +39,8 @@ func diff(ctx context.Context, cmd *cli.Command) error {
 
 	schemaPath := cmd.String("schema")
 
-	connStr := cmd.String("database-url")
-	pgVersion := cmd.String("pg-version")
+	connStr := cmd.String(flagname.DatabaseURL)
+	image := cmd.String("image")
 
 	var poolConfig *pgxpool.Config
 
@@ -51,7 +52,7 @@ func diff(ctx context.Context, cmd *cli.Command) error {
 	} else {
 		var cleanup func(context.Context) error
 
-		poolConfig, cleanup, err = startEphemeralPostgres(ctx, pgVersion)
+		poolConfig, cleanup, err = startEphemeralPostgres(ctx, image)
 		if err != nil {
 			return fmt.Errorf("failed to start postgres container: %w", err)
 		}
