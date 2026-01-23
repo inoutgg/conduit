@@ -11,18 +11,19 @@ import (
 
 	"github.com/urfave/cli/v3"
 
-	"go.inout.gg/conduit/internal/command/cmdutil"
+	"go.inout.gg/conduit/internal/command/flagname"
+	"go.inout.gg/conduit/internal/command/migrationctx"
 	internaltpl "go.inout.gg/conduit/internal/template"
 	"go.inout.gg/conduit/internal/version"
 )
 
 func empty(ctx context.Context, cmd *cli.Command) error {
-	dir, err := cmdutil.MigrationDir(ctx)
+	dir, err := migrationctx.Dir(ctx)
 	if err != nil {
 		return fmt.Errorf("conduit: failed to get migration directory: %w", err)
 	}
 
-	packageName := cmd.String("package-name")
+	packageName := cmd.String(flagname.PackageName)
 
 	// Ensure migration dir exists.
 	if !exists(dir) {

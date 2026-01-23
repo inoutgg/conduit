@@ -3,7 +3,7 @@ package create
 import (
 	"github.com/urfave/cli/v3"
 
-	"go.inout.gg/conduit/internal/command/cmdutil"
+	"go.inout.gg/conduit/internal/command/flagname"
 )
 
 func NewCommand() *cli.Command {
@@ -23,7 +23,13 @@ func NewCommand() *cli.Command {
 						Usage: "migration file extension (values: \"go\", \"sql\")",
 						Value: "sql",
 					},
-					cmdutil.PackageNameFlag,
+					//nolint:exhaustruct
+					&cli.StringFlag{
+						Name:    flagname.PackageName,
+						Usage:   "package name",
+						Value:   "migrations",
+						Sources: cli.EnvVars("CONDUIT_PACKAGE_NAME"),
+					},
 				},
 				Action: empty,
 			},
@@ -40,14 +46,15 @@ func NewCommand() *cli.Command {
 					},
 					//nolint:exhaustruct
 					&cli.StringFlag{
-						Name:  "database-url",
-						Usage: "database URL for temp db factory (if not provided, uses testcontainers)",
+						Name:    flagname.DatabaseURL,
+						Usage:   "database connection URL",
+						Sources: cli.EnvVars("CONDUIT_DATABASE_URL"),
 					},
 					//nolint:exhaustruct
 					&cli.StringFlag{
-						Name:  "pg-version",
-						Usage: "PostgreSQL version for testcontainers (e.g., \"16\", \"15\")",
-						Value: "16",
+						Name:  "image",
+						Usage: "PostgreSQL Docker image for testcontainers (e.g., \"postgres:16-alpine\")",
+						Value: "postgres:16-alpine",
 					},
 				},
 				Action: diff,
