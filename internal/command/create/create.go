@@ -1,12 +1,15 @@
 package create
 
 import (
+	"context"
+
+	"github.com/spf13/afero"
 	"github.com/urfave/cli/v3"
 
 	"go.inout.gg/conduit/internal/command/flagname"
 )
 
-func NewCommand() *cli.Command {
+func NewCommand(fs afero.Fs) *cli.Command {
 	//nolint:exhaustruct
 	return &cli.Command{
 		Name:  "create",
@@ -31,7 +34,9 @@ func NewCommand() *cli.Command {
 						Sources: cli.EnvVars("CONDUIT_PACKAGE_NAME"),
 					},
 				},
-				Action: empty,
+				Action: func(ctx context.Context, cmd *cli.Command) error {
+					return empty(ctx, cmd, fs)
+				},
 			},
 			//nolint:exhaustruct
 			{
@@ -57,7 +62,9 @@ func NewCommand() *cli.Command {
 						Value: "postgres:16-alpine",
 					},
 				},
-				Action: diff,
+				Action: func(ctx context.Context, cmd *cli.Command) error {
+					return diff(ctx, cmd, fs)
+				},
 			},
 		},
 	}
