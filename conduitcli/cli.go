@@ -2,8 +2,10 @@ package conduitcli
 
 import (
 	"context"
+	"fmt"
 	"os"
 
+	"github.com/spf13/afero"
 	"github.com/urfave/cli/v3"
 
 	"go.inout.gg/conduit"
@@ -16,6 +18,13 @@ import (
 
 // Execute evaluates given os.Args and executes a matched command.
 func Execute(ctx context.Context, migrator *conduit.Migrator) error {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("failed to get current working directory: %w", err)
+	}
+
+	fs := afero.NewBasePathFs(afero.NewOsFs(), cwd)
+
 	//nolint:exhaustruct
 	cmd := &cli.Command{
 		Name:  "conduit",
@@ -36,8 +45,8 @@ func Execute(ctx context.Context, migrator *conduit.Migrator) error {
 			},
 		},
 		Commands: []*cli.Command{
-			initialise.NewCommand(),
-			create.NewCommand(),
+			initialise.NewCommand(fs),
+			create.NewCommand(fs),
 			apply.NewCommand(migrator),
 		},
 		Before: migrationctx.OnBeforeHook,

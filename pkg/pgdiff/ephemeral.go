@@ -1,4 +1,4 @@
-package create
+package pgdiff
 
 import (
 	"context"
@@ -8,13 +8,15 @@ import (
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
 )
 
-// startEphemeralPostgres starts an ephemeral PostgreSQL container using
+// StartPostgresContainer starts an ephemeral PostgreSQL container using
 // testcontainers and returns a connection configuration.
-func startEphemeralPostgres(
+func StartPostgresContainer(
 	ctx context.Context,
 	image string,
 ) (*pgxpool.Config, func(context.Context) error, error) {
-	container, err := postgres.Run(ctx, image,
+	container, err := postgres.Run(
+		ctx,
+		image,
 		postgres.WithDatabase("conduit"),
 		postgres.WithUsername("conduit"),
 		postgres.WithPassword("conduit"),

@@ -3,9 +3,9 @@ package initialise
 import (
 	"context"
 	"fmt"
-	"os"
 	"path/filepath"
 
+	"github.com/spf13/afero"
 	"github.com/urfave/cli/v3"
 
 	"go.inout.gg/conduit/internal/command/flagname"
@@ -14,7 +14,7 @@ import (
 	"go.inout.gg/conduit/internal/version"
 )
 
-func NewCommand() *cli.Command {
+func NewCommand(fs afero.Fs) *cli.Command {
 	//nolint:exhaustruct
 	return &cli.Command{
 		Name:    "init",
@@ -50,24 +50,26 @@ func NewCommand() *cli.Command {
 			},
 		},
 
-		Action: action,
+		Action: func(ctx context.Context, cmd *cli.Command) error {
+			return action(ctx, cmd, fs)
+		},
 	}
 }
 
-func action(ctx context.Context, cmd *cli.Command) error {
+func action(ctx context.Context, cmd *cli.Command, fs afero.Fs) error {
 	dir, err := migrationctx.Dir(ctx)
 	if err != nil {
 		//nolint:wrapcheck
 		return err
 	}
 
-	if err := createMigrationDir(dir); err != nil {
+	if err := createMigrationDir(fs, dir); err != nil {
 		return err
 	}
 
 	ns := cmd.String("namespace")
 	if ns != "" {
-		if _, err := createRegistryFile(dir, ns); err != nil {
+		if _, err := createRegistryFile(fs, dir, ns); err != nil {
 			return err
 		}
 	}
@@ -75,7 +77,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	packageName := cmd.String(flagname.PackageName)
 
 	if !cmd.Bool("no-conduit-migrations") {
-		if _, err := createConduitMigrationFile(dir, ns, packageName); err != nil {
+		if _, err := createConduitMigrationFile(fs, dir, ns, packageName); err != nil {
 			return err
 		}
 	}
@@ -85,8 +87,8 @@ func action(ctx context.Context, cmd *cli.Command) error {
 
 // createMigrationDir creates a new migration file at the dir resolved from the current
 // working directory.
-func createMigrationDir(dir string) error {
-	err := os.MkdirAll(dir, os.ModePerm)
+func createMigrationDir(fs afero.Fs, dir string) error {
+	err := fs.MkdirAll(dir, 0o755)
 	if err != nil {
 		return fmt.Errorf("conduit: failed to create migrations directory at %s: %w", dir, err)
 	}
@@ -96,12 +98,12 @@ func createMigrationDir(dir string) error {
 
 // createConduitMigrationFile creates a new migration file with conduit's own migration file
 // in the migrations directory.
-func createConduitMigrationFile(dirpath string, namespace string, packageName string) (string, error) {
+func createConduitMigrationFile(fs afero.Fs, dirpath string, namespace string, packageName string) (string, error) {
 	ver := version.NewVersion()
 	filename := version.MigrationFilename(ver, "conduit_migration", "go")
-	filepath := filepath.Join(dirpath, filename)
+	fpath := filepath.Join(dirpath, filename)
 
-	f, err := os.Create(filepath)
+	f, err := fs.Create(fpath)
 	if err != nil {
 		return "", fmt.Errorf("conduit: failed to create migrations file: %w", err)
 	}
@@ -127,10 +129,10 @@ func createConduitMigrationFile(dirpath string, namespace string, packageName st
 }
 
 // createRegistryFile creates a custom migration registry in the migrations directory.
-func createRegistryFile(dir string, ns string) (string, error) {
-	filepath := filepath.Join(dir, "registry.go")
+func createRegistryFile(fs afero.Fs, dir string, ns string) (string, error) {
+	fpath := filepath.Join(dir, "registry.go")
 
-	f, err := os.Create(filepath)
+	f, err := fs.Create(fpath)
 	if err != nil {
 		return "", fmt.Errorf("conduit: failed to create registry file: %w", err)
 	}
@@ -144,10 +146,10 @@ func createRegistryFile(dir string, ns string) (string, error) {
 	if err := f.Sync(); err != nil {
 		return "", fmt.Errorf(
 			"conduit: failed to write migrations registry file %s: %w",
-			filepath,
+			fpath,
 			err,
 		)
 	}
 
-	return filepath, nil
+	return fpath, nil
 }

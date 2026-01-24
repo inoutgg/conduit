@@ -2,33 +2,29 @@ package create
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/jackc/pgx/v5/stdlib"
-	schemadiff "github.com/stripe/pg-schema-diff/pkg/diff"
-	"github.com/stripe/pg-schema-diff/pkg/tempdb"
+	"github.com/spf13/afero"
 	"github.com/urfave/cli/v3"
 
 	"go.inout.gg/conduit/internal/command/flagname"
 	"go.inout.gg/conduit/internal/command/migrationctx"
-	"go.inout.gg/conduit/internal/sqlsplit"
 	internaltpl "go.inout.gg/conduit/internal/template"
 	"go.inout.gg/conduit/internal/version"
+	"go.inout.gg/conduit/pkg/pgdiff"
 )
 
-func diff(ctx context.Context, cmd *cli.Command) error {
+func diff(ctx context.Context, cmd *cli.Command, fs afero.Fs) error {
 	migrationDir, err := migrationctx.Dir(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get migration directory: %w", err)
 	}
 
-	if !exists(migrationDir) {
+	if !exists(fs, migrationDir) {
 		return errors.New("migrations directory does not exist, try to initialise it first")
 	}
 
@@ -52,7 +48,7 @@ func diff(ctx context.Context, cmd *cli.Command) error {
 	} else {
 		var cleanup func(context.Context) error
 
-		poolConfig, cleanup, err = startEphemeralPostgres(ctx, image)
+		poolConfig, cleanup, err = pgdiff.StartPostgresContainer(ctx, image)
 		if err != nil {
 			return fmt.Errorf("failed to start postgres container: %w", err)
 		}
@@ -62,7 +58,7 @@ func diff(ctx context.Context, cmd *cli.Command) error {
 		}()
 	}
 
-	plan, err := generateDiffPlan(ctx, poolConfig, migrationDir, schemaPath)
+	plan, err := pgdiff.GeneratePlan(ctx, fs, poolConfig, migrationDir, schemaPath)
 	if err != nil {
 		return fmt.Errorf("failed to generate diff plan: %w", err)
 	}
@@ -77,7 +73,7 @@ func diff(ctx context.Context, cmd *cli.Command) error {
 	filename := version.MigrationFilename(ver, name, "sql")
 	path := filepath.Join(migrationDir, filename)
 
-	f, err := os.Create(path)
+	f, err := fs.Create(path)
 	if err != nil {
 		return fmt.Errorf("failed to create migration file %s: %w", path, err)
 	}
@@ -126,98 +122,4 @@ func diff(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	return nil
-}
-
-// generateDiffPlan generates a migration plan by comparing the source schema
-// from sourceMigrationDir against the target schema in targetSchemaFile.
-//
-//nolint:nonamedreturns
-func generateDiffPlan(
-	ctx context.Context,
-	poolConfig *pgxpool.Config,
-	sourceMigrationDir, targetSchemaFile string,
-) (plan schemadiff.Plan, err error) {
-	sourceStmts, err := extractStmtsFromMigrationsDir(sourceMigrationDir)
-	if err != nil {
-		return plan, fmt.Errorf("failed to extract statements from migrations: %w", err)
-	}
-
-	targetSchema, err := os.ReadFile(targetSchemaFile)
-	if err != nil {
-		return plan, fmt.Errorf("failed to read schema file %s: %w", targetSchemaFile, err)
-	}
-
-	targetStmts, _, err := sqlsplit.Split(string(targetSchema))
-	if err != nil {
-		return plan, fmt.Errorf("failed to parse target schema: %w", err)
-	}
-
-	tempDbFactory, err := tempdb.NewOnInstanceFactory(
-		ctx,
-		func(ctx context.Context, dbName string) (*sql.DB, error) {
-			config := poolConfig.Copy()
-			config.ConnConfig.Database = dbName
-
-			p, err := pgxpool.NewWithConfig(ctx, config)
-			if err != nil {
-				return nil, fmt.Errorf("failed to create connection pool for %s: %w", dbName, err)
-			}
-
-			return stdlib.OpenDBFromPool(p), nil
-		},
-		tempdb.WithDbPrefix("conduit"),
-	)
-	if err != nil {
-		return plan, fmt.Errorf("failed to create temp db factory: %w", err)
-	}
-	defer tempDbFactory.Close()
-
-	plan, err = schemadiff.Generate(
-		ctx,
-		schemadiff.DDLSchemaSource(sourceStmts),
-		schemadiff.DDLSchemaSource(targetStmts),
-		schemadiff.WithTempDbFactory(tempDbFactory),
-	)
-	if err != nil {
-		return plan, fmt.Errorf("failed to generate plan: %w", err)
-	}
-
-	return plan, nil
-}
-
-// extractStmtsFromMigrationsDir reads all SQL migration files from the directory
-// and extracts the "up" statements.
-func extractStmtsFromMigrationsDir(dir string) ([]string, error) {
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read directory: %w", err)
-	}
-
-	var allStmts []string
-
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
-
-		name := entry.Name()
-
-		if !strings.HasSuffix(name, ".sql") {
-			continue
-		}
-
-		content, err := os.ReadFile(filepath.Join(dir, name))
-		if err != nil {
-			return nil, fmt.Errorf("failed to read file %s: %w", name, err)
-		}
-
-		stmts, _, err := sqlsplit.Split(string(content))
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse SQL in %s: %w", name, err)
-		}
-
-		allStmts = append(allStmts, stmts...)
-	}
-
-	return allStmts, nil
 }

@@ -4,11 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/fs"
-	"os"
 	"path/filepath"
 	"text/template"
 
+	"github.com/spf13/afero"
 	"github.com/urfave/cli/v3"
 
 	"go.inout.gg/conduit/internal/command/flagname"
@@ -17,7 +16,7 @@ import (
 	"go.inout.gg/conduit/internal/version"
 )
 
-func empty(ctx context.Context, cmd *cli.Command) error {
+func empty(ctx context.Context, cmd *cli.Command, fs afero.Fs) error {
 	dir, err := migrationctx.Dir(ctx)
 	if err != nil {
 		return fmt.Errorf("conduit: failed to get migration directory: %w", err)
@@ -26,7 +25,7 @@ func empty(ctx context.Context, cmd *cli.Command) error {
 	packageName := cmd.String(flagname.PackageName)
 
 	// Ensure migration dir exists.
-	if !exists(dir) {
+	if !exists(fs, dir) {
 		return errors.New("conduit: migrations directory does not exist, try to initialise it first")
 	}
 
@@ -44,7 +43,7 @@ func empty(ctx context.Context, cmd *cli.Command) error {
 	filename := version.MigrationFilename(ver, name, ext)
 	path := filepath.Join(dir, filename)
 
-	f, err := os.Create(path)
+	f, err := fs.Create(path)
 	if err != nil {
 		return fmt.Errorf(
 			"conduit: failed to create migration file %s: %w",
@@ -63,7 +62,7 @@ func empty(ctx context.Context, cmd *cli.Command) error {
 		tpl = internaltpl.SQLMigrationTemplate
 	}
 
-	hasCustomRegistry := exists(filepath.Join(dir, "registry.go"))
+	hasCustomRegistry := exists(fs, filepath.Join(dir, "registry.go"))
 	if err := tpl.Execute(f, struct {
 		Version           version.Version
 		Ext               string
@@ -86,7 +85,7 @@ func empty(ctx context.Context, cmd *cli.Command) error {
 }
 
 // exists check if a FS entry exists at path.
-func exists(path string) bool {
-	_, err := os.Stat(path)
-	return !errors.Is(err, fs.ErrNotExist)
+func exists(afs afero.Fs, path string) bool {
+	_, err := afs.Stat(path)
+	return !errors.Is(err, afero.ErrFileNotFound)
 }
