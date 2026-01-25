@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -14,6 +15,7 @@ import (
 	"github.com/stripe/pg-schema-diff/pkg/tempdb"
 
 	"go.inout.gg/conduit/internal/sqlsplit"
+	"go.inout.gg/conduit/pkg/version"
 )
 
 // GeneratePlan generates a migration plan by comparing the source schema
@@ -81,27 +83,35 @@ func readStmtsFromMigrationsDir(fs afero.Fs, dir string) ([]string, error) {
 		return nil, fmt.Errorf("failed to read directory: %w", err)
 	}
 
+	// Filter and parse migration files
+	migrations := make([]version.ParsedMigrationFilename, 0, len(entries))
+	for _, entry := range entries {
+		name := entry.Name()
+		if entry.IsDir() || !strings.HasSuffix(name, ".sql") {
+			continue
+		}
+
+		m, err := version.ParseMigrationFilename(name)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse migration filename %s: %w", name, err)
+		}
+
+		migrations = append(migrations, m)
+	}
+
+	slices.SortFunc(migrations, func(a, b version.ParsedMigrationFilename) int {
+		return a.Compare(b)
+	})
+
 	var allStmts []string
 
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
+	for _, m := range migrations {
+		filename := m.Filename()
+		path := filepath.Join(dir, filename)
 
-		name := entry.Name()
-
-		if !strings.HasSuffix(name, ".sql") {
-			continue
-		}
-
-		content, err := afero.ReadFile(fs, filepath.Join(dir, name))
+		stmts, err := readStmtsFromFile(fs, path)
 		if err != nil {
-			return nil, fmt.Errorf("failed to read file %s: %w", name, err)
-		}
-
-		stmts, _, err := sqlsplit.Split(string(content))
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse SQL in %s: %w", name, err)
+			return nil, fmt.Errorf("failed to read migration file %s: %w", path, err)
 		}
 
 		allStmts = append(allStmts, stmts...)

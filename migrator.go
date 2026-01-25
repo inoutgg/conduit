@@ -21,7 +21,7 @@ import (
 	"go.inout.gg/conduit/internal/direction"
 	internaldebug "go.inout.gg/conduit/internal/internaldebug"
 	"go.inout.gg/conduit/internal/sliceutil"
-	"go.inout.gg/conduit/internal/version"
+	"go.inout.gg/conduit/pkg/version"
 )
 
 // AllSteps tells migrator to run all available migrations either up or down.

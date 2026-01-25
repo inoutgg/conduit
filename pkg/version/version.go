@@ -1,3 +1,4 @@
+// Package version provides utilities for working with migration file versions.
 package version
 
 import (
@@ -35,23 +36,38 @@ type ParsedMigrationFilename struct {
 	Extension string
 }
 
+// Compare compares current ParsedMigrationFilename and the other one.
+//
+// It ignore the names part and compares only Versions.
+func (f ParsedMigrationFilename) Compare(other ParsedMigrationFilename) int {
+	return f.Version.Compare(other.Version)
+}
+
+// Filename returns the migration filename as a string.
+func (f ParsedMigrationFilename) Filename() string {
+	return MigrationFilename(f.Version, f.Name, f.Extension)
+}
+
 // ParseMigrationFilename parses a migration filename into its components.
 //
 // Example: 1257894000000_create_user.sql -> 1257894000000, create_user, sql.
-func ParseMigrationFilename(filename string) (*ParsedMigrationFilename, error) {
+func ParseMigrationFilename(filename string) (ParsedMigrationFilename, error) {
+	var m ParsedMigrationFilename
+
 	basename := filepath.Base(filename)
 	if basename == "." {
-		return nil, errors.New("conduit: filename cannot be empty")
+		return m, errors.New("conduit: filename cannot be empty")
 	}
 
 	ext := filepath.Ext(basename)
 	if ext != ".go" && ext != ".sql" {
-		return nil, fmt.Errorf("conduit: unknown migration file extension %q, expected: .sql or .go", ext)
+		return m, fmt.Errorf(
+			"conduit: unknown migration file extension %q, expected: .sql or .go", ext)
 	}
 
 	version, name, ok := strings.Cut(basename[:len(basename)-len(ext)], "_")
 	if !ok {
-		return nil, fmt.Errorf(
+		return m, fmt.Errorf(
 			"conduit: malformed migration filename, expected: <version>_<name>.[go|sql], got: %s",
 			basename,
 		)
@@ -59,12 +75,15 @@ func ParseMigrationFilename(filename string) (*ParsedMigrationFilename, error) {
 
 	ver, err := time.Parse(format, version)
 	if err != nil {
-		return nil, fmt.Errorf("conduit: invalid version format %q, expected: YYYYMMDDHHMMSS: %w", version, err)
+		return m, fmt.Errorf(
+			"conduit: invalid version format %q, expected: YYYYMMDDHHMMSS: %w", version, err)
 	}
 
-	return &ParsedMigrationFilename{
+	m = ParsedMigrationFilename{
 		Version:   Version{ver},
 		Name:      name,
 		Extension: ext[1:], // Drop leading dot from extension
-	}, nil
+	}
+
+	return m, nil
 }

@@ -1,0 +1,24 @@
+
+[TestReadStmtsFromMigrationsDir/skips_non-sql_files - 1]
+[]string{"CREATE TABLE first (id int)"}
+---
+
+[TestReadStmtsFromMigrationsDir/skips_subdirectories - 1]
+[]string{"CREATE TABLE first (id int)"}
+---
+
+[TestReadStmtsFromMigrationsDir/only_uses_up_statements_ignoring_down_section - 1]
+[]string{"CREATE TABLE users (id int)"}
+---
+
+[TestReadStmtsFromMigrationsDir/handles_multiple_statements_per_file - 1]
+[]string{"CREATE TABLE users (id int)", "CREATE TABLE posts (id int)", "CREATE INDEX idx_posts ON posts (id)"}
+---
+
+[TestReadStmtsFromMigrationsDir/aggregates_statements_from_multiple_files_in_order - 1]
+[]string{"CREATE TABLE a (id int)", "CREATE TABLE b (id int)", "CREATE TABLE c (id int)"}
+---
+
+[TestReadStmtsFromMigrationsDir/sorts_files_by_version_timestamp - 1]
+[]string{"CREATE TABLE first (id int)", "CREATE TABLE second (id int)", "CREATE TABLE third (id int)"}
+---

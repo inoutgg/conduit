@@ -11,7 +11,7 @@ import (
 
 	"go.inout.gg/conduit/internal/sliceutil"
 	"go.inout.gg/conduit/internal/sqlsplit"
-	"go.inout.gg/conduit/internal/version"
+	"go.inout.gg/conduit/pkg/version"
 )
 
 var DisableTxPattern = "---- disable-tx ----" //nolint:gochecknoglobals
