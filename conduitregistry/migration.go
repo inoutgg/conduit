@@ -7,7 +7,7 @@ import (
 	"go.inout.gg/foundations/debug"
 
 	"go.inout.gg/conduit/internal/direction"
-	"go.inout.gg/conduit/internal/version"
+	"go.inout.gg/conduit/pkg/version"
 )
 
 //nolint:gochecknoglobals

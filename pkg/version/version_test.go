@@ -7,10 +7,39 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"go.inout.gg/conduit/internal/version"
+	"go.inout.gg/conduit/pkg/version"
 )
 
+func TestVersion_Compare(t *testing.T) {
+	t.Parallel()
+
+	t.Run("earlier version is less than later version", func(t *testing.T) {
+		t.Parallel()
+
+		// Arrange
+		earlier := version.NewFromTime(parseTime("20230601120000"))
+		later := version.NewFromTime(parseTime("20230601130000"))
+
+		// Act & Assert
+		assert.Equal(t, -1, earlier.Compare(later))
+		assert.Equal(t, 1, later.Compare(earlier))
+	})
+
+	t.Run("equal versions compare as zero", func(t *testing.T) {
+		t.Parallel()
+
+		// Arrange
+		v1 := version.NewFromTime(parseTime("20230601120000"))
+		v2 := version.NewFromTime(parseTime("20230601120000"))
+
+		// Act & Assert
+		assert.Equal(t, 0, v1.Compare(v2))
+	})
+}
+
 func TestParseMigrationFilename(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		expectedTime   time.Time
 		name           string
@@ -74,6 +103,8 @@ func TestParseMigrationFilename(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			parsed, err := version.ParseMigrationFilename(tt.filename)
 
 			if tt.expectedErrMsg != "" {
@@ -89,7 +120,56 @@ func TestParseMigrationFilename(t *testing.T) {
 	}
 }
 
-// Helper function to parse time in the expected format.
+func TestParsedMigrationFilename_Filename(t *testing.T) {
+	t.Parallel()
+
+	t.Run("returns original filename for parsed SQL migration", func(t *testing.T) {
+		t.Parallel()
+
+		// Arrange
+		original := "20230601120000_create_user.sql"
+		parsed, err := version.ParseMigrationFilename(original)
+		require.NoError(t, err)
+
+		// Act
+		result := parsed.Filename()
+
+		// Assert
+		assert.Equal(t, original, result)
+	})
+
+	t.Run("returns original filename for parsed Go migration", func(t *testing.T) {
+		t.Parallel()
+
+		// Arrange
+		original := "20230601130000_update_schema.go"
+		parsed, err := version.ParseMigrationFilename(original)
+		require.NoError(t, err)
+
+		// Act
+		result := parsed.Filename()
+
+		// Assert
+		assert.Equal(t, original, result)
+	})
+
+	t.Run("strips path and returns only filename", func(t *testing.T) {
+		t.Parallel()
+
+		// Arrange
+		parsed, err := version.ParseMigrationFilename(
+			"/path/to/migrations/20230601140000_add_index.sql")
+		require.NoError(t, err)
+
+		// Act
+		result := parsed.Filename()
+
+		// Assert
+		assert.Equal(t, "20230601140000_add_index.sql", result)
+	})
+}
+
+// parseTime is helper function to parse time in the expected format.
 func parseTime(timeStr string) time.Time {
 	t, err := time.Parse("20060102150405", timeStr)
 	if err != nil {

@@ -10,7 +10,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"go.inout.gg/foundations/must"
 
-	"go.inout.gg/conduit/internal/version"
+	"go.inout.gg/conduit/pkg/version"
 )
 
 var (

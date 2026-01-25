@@ -49,17 +49,17 @@ func apply(
 ) error {
 	dir, err := direction.FromString(cmd.Args().First())
 	if err != nil {
-		return fmt.Errorf("conduit: failed to parse direction: %w", err)
+		return fmt.Errorf("failed to parse direction: %w", err)
 	}
 
 	url := cmd.String(flagname.DatabaseURL)
 	if url == "" {
-		return fmt.Errorf("conduit: missing `%s' flag", flagname.DatabaseURL)
+		return fmt.Errorf("missing `%s' flag", flagname.DatabaseURL)
 	}
 
 	conn, err := pgx.Connect(ctx, url)
 	if err != nil {
-		return fmt.Errorf("conduit: failed to connect to database: %w", err)
+		return fmt.Errorf("failed to connect to database: %w", err)
 	}
 
 	opts := &conduit.MigrateOptions{
@@ -68,7 +68,7 @@ func apply(
 
 	_, err = migrator.Migrate(ctx, dir, conn, opts)
 	if err != nil {
-		return fmt.Errorf("conduit: failed to apply migrations: %w", err)
+		return fmt.Errorf("failed to apply migrations: %w", err)
 	}
 
 	return nil

@@ -13,7 +13,7 @@ import (
 	"go.inout.gg/conduit/internal/command/flagname"
 	"go.inout.gg/conduit/internal/command/migrationctx"
 	internaltpl "go.inout.gg/conduit/internal/template"
-	"go.inout.gg/conduit/internal/version"
+	"go.inout.gg/conduit/pkg/version"
 )
 
 func empty(ctx context.Context, cmd *cli.Command, fs afero.Fs) error {
