@@ -49,40 +49,58 @@ func (m *Migration) Version() version.Version { return m.version }
 // Name returns the name of this migration.
 func (m *Migration) Name() string { return m.name }
 
-// Apply executes the transaction in given dir direction.
-func (m *Migration) Apply(ctx context.Context, dir direction.Direction, conn *pgx.Conn, tx pgx.Tx) error {
+// Apply executes the migration in a given dir direction.
+func (m *Migration) Apply(ctx context.Context, dir direction.Direction, conn *pgx.Conn) error {
 	debug.Assert(conn != nil, "conduit: expected conn to be defined")
 
 	switch dir {
 	case direction.DirectionUp:
-		return m.migrateUp(ctx, conn, tx)
+		return m.migrateUp(ctx, conn, nil)
 	case direction.DirectionDown:
-		return m.migrateDown(ctx, conn, tx)
+		return m.migrateDown(ctx, conn, nil)
+	}
+
+	return direction.ErrUnknownDirection
+}
+
+// ApplyTx executes the migration in a given dir direction in transaction.
+func (m *Migration) ApplyTx(ctx context.Context, dir direction.Direction, tx pgx.Tx) error {
+	debug.Assert(tx != nil, "conduit: expected tx to be defined")
+
+	switch dir {
+	case direction.DirectionUp:
+		return m.migrateUp(ctx, nil, tx)
+	case direction.DirectionDown:
+		return m.migrateDown(ctx, nil, tx)
 	}
 
 	return direction.ErrUnknownDirection
 }
 
 func (m *Migration) migrateDown(ctx context.Context, conn *pgx.Conn, tx pgx.Tx) error {
+	debug.Assert(conn != nil && tx != nil, "conduit: expected either tx or conn, both defined")
+
 	if m.down.useTx {
-		if tx == nil {
-			return ErrUndefinedTx
-		}
+		debug.Assert(tx != nil, "conduit: expected tx to be defined")
 
 		return m.down.fnx(ctx, tx)
 	}
+
+	debug.Assert(conn != nil, "conduit: expected conn to be defined")
 
 	return m.down.fn(ctx, conn)
 }
 
 func (m *Migration) migrateUp(ctx context.Context, conn *pgx.Conn, tx pgx.Tx) error {
+	debug.Assert(conn != nil && tx != nil, "conduit: expected either tx or conn, both defined")
+
 	if m.down.useTx {
-		if tx == nil {
-			return ErrUndefinedTx
-		}
+		debug.Assert(tx != nil, "conduit: expected tx to be defined")
 
 		return m.up.fnx(ctx, tx)
 	}
+
+	debug.Assert(conn != nil, "conduit: expected conn to be defined")
 
 	return m.up.fn(ctx, conn)
 }

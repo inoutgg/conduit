@@ -22,3 +22,15 @@
 [TestReadStmtsFromMigrationsDir/sorts_files_by_version_timestamp - 1]
 []string{"CREATE TABLE first (id int)", "CREATE TABLE second (id int)", "CREATE TABLE third (id int)"}
 ---
+
+[TestReadStmtsFromFile/reads_and_parses_single_statement - 1]
+[]string{"CREATE TABLE users (id int)"}
+---
+
+[TestReadStmtsFromFile/only_uses_up_statements_ignoring_down_section - 1]
+[]string{"CREATE TABLE users (id int)"}
+---
+
+[TestReadStmtsFromFile/reads_and_parses_multiple_statements - 1]
+[]string{"CREATE TABLE users (id int)", "CREATE TABLE posts (id int)", "CREATE INDEX idx_posts ON posts (id)"}
+---

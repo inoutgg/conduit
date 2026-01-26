@@ -9,16 +9,21 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/spf13/afero"
-	"github.com/urfave/cli/v3"
 
-	"go.inout.gg/conduit/internal/command/flagname"
 	"go.inout.gg/conduit/internal/command/migrationctx"
 	internaltpl "go.inout.gg/conduit/internal/template"
 	"go.inout.gg/conduit/pkg/pgdiff"
 	"go.inout.gg/conduit/pkg/version"
 )
 
-func diff(ctx context.Context, cmd *cli.Command, fs afero.Fs) error {
+type DiffArgs struct {
+	Name        string
+	SchemaPath  string
+	DatabaseURL string
+	Image       string
+}
+
+func diff(ctx context.Context, fs afero.Fs, args DiffArgs) error {
 	migrationDir, err := migrationctx.Dir(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get migration directory: %w", err)
@@ -28,27 +33,17 @@ func diff(ctx context.Context, cmd *cli.Command, fs afero.Fs) error {
 		return errors.New("migrations directory does not exist, try to initialise it first")
 	}
 
-	name := cmd.Args().First()
-	if name == "" {
-		return errors.New("missing `name` argument")
-	}
-
-	schemaPath := cmd.String("schema")
-
-	connStr := cmd.String(flagname.DatabaseURL)
-	image := cmd.String("image")
-
 	var poolConfig *pgxpool.Config
 
-	if connStr != "" {
-		poolConfig, err = pgxpool.ParseConfig(connStr)
+	if args.DatabaseURL != "" {
+		poolConfig, err = pgxpool.ParseConfig(args.DatabaseURL)
 		if err != nil {
 			return fmt.Errorf("failed to connect to database: %w", err)
 		}
 	} else {
 		var cleanup func(context.Context) error
 
-		poolConfig, cleanup, err = pgdiff.StartPostgresContainer(ctx, image)
+		poolConfig, cleanup, err = pgdiff.StartPostgresContainer(ctx, args.Image)
 		if err != nil {
 			return fmt.Errorf("failed to start postgres container: %w", err)
 		}
@@ -58,7 +53,7 @@ func diff(ctx context.Context, cmd *cli.Command, fs afero.Fs) error {
 		}()
 	}
 
-	plan, err := pgdiff.GeneratePlan(ctx, fs, poolConfig, migrationDir, schemaPath)
+	plan, err := pgdiff.GeneratePlan(ctx, fs, poolConfig, migrationDir, args.SchemaPath)
 	if err != nil {
 		return fmt.Errorf("failed to generate diff plan: %w", err)
 	}
@@ -70,7 +65,7 @@ func diff(ctx context.Context, cmd *cli.Command, fs afero.Fs) error {
 	}
 
 	ver := version.NewVersion()
-	filename := version.MigrationFilename(ver, name, "sql")
+	filename := version.MigrationFilename(ver, args.Name, "sql")
 	path := filepath.Join(migrationDir, filename)
 
 	f, err := fs.Create(path)
@@ -99,8 +94,8 @@ func diff(ctx context.Context, cmd *cli.Command, fs afero.Fs) error {
 		UpStatements string
 	}{
 		Version:      ver,
-		Name:         name,
-		SchemaFile:   schemaPath,
+		Name:         args.Name,
+		SchemaFile:   args.SchemaPath,
 		UpStatements: upStmts.String(),
 	}); err != nil {
 		return fmt.Errorf("failed to write template: %w", err)

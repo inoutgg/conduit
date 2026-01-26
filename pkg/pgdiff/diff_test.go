@@ -1,7 +1,9 @@
 package pgdiff
 
 import (
+	"context"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/gkampitakis/go-snaps/snaps"
@@ -9,6 +11,123 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestReadStmtsFromFile(t *testing.T) {
+	t.Parallel()
+
+	t.Run("reads and parses multiple statements", func(t *testing.T) {
+		t.Parallel()
+
+		// Arrange
+		fs, dir := newMigrationsDirBuilder(t).
+			WithFile("schema.sql", `CREATE TABLE users (id int);
+CREATE TABLE posts (id int);
+CREATE INDEX idx_posts ON posts (id);`).
+			Build()
+
+		// Act
+		stmts, err := readStmtsFromFile(fs, filepath.Join(dir, "schema.sql"))
+
+		// Assert
+		require.NoError(t, err)
+		snaps.MatchSnapshot(t, stmts)
+	})
+
+	t.Run("returns error when file does not exist", func(t *testing.T) {
+		t.Parallel()
+
+		// Arrange
+		fs, dir := newMigrationsDirBuilder(t).Build()
+
+		// Act
+		_, err := readStmtsFromFile(fs, filepath.Join(dir, "nonexistent.sql"))
+
+		// Assert
+		require.Error(t, err)
+		assert.ErrorContains(t, err, "failed to read file")
+	})
+
+	t.Run("returns error on invalid SQL", func(t *testing.T) {
+		t.Parallel()
+
+		// Arrange
+		fs, dir := newMigrationsDirBuilder(t).
+			WithFile("bad.sql", "NOT VALID SQL {{{{").
+			Build()
+
+		// Act
+		_, err := readStmtsFromFile(fs, filepath.Join(dir, "bad.sql"))
+
+		// Assert
+		require.Error(t, err)
+		assert.ErrorContains(t, err, "failed to parse SQL")
+	})
+
+	t.Run("returns empty slice for empty file", func(t *testing.T) {
+		t.Parallel()
+
+		// Arrange
+		fs, dir := newMigrationsDirBuilder(t).
+			WithFile("empty.sql", "").
+			Build()
+
+		// Act
+		stmts, err := readStmtsFromFile(fs, filepath.Join(dir, "empty.sql"))
+
+		// Assert
+		require.NoError(t, err)
+		assert.Empty(t, stmts)
+	})
+
+	t.Run("only uses up statements ignoring down section", func(t *testing.T) {
+		t.Parallel()
+
+		// Arrange
+		fs, dir := newMigrationsDirBuilder(t).
+			WithFile("schema.sql", `CREATE TABLE users (id int);
+---- create above / drop below ----
+DROP TABLE users;`).
+			Build()
+
+		// Act
+		stmts, err := readStmtsFromFile(fs, filepath.Join(dir, "schema.sql"))
+
+		// Assert
+		require.NoError(t, err)
+		snaps.MatchSnapshot(t, stmts)
+	})
+}
+
+func TestGeneratePlan(t *testing.T) {
+	t.Parallel()
+
+	t.Run("generates plan with new table", func(t *testing.T) {
+		t.Parallel()
+
+		// Arrange
+		poolConfig, terminate, err := StartPostgresContainer(t.Context(), "postgres-alpine:17")
+		require.NoError(t, err)
+		t.Cleanup(func() {
+			ctx, cancel := context.WithTimeout(t.Context(), 15)
+			defer cancel()
+
+			_ = terminate(ctx)
+		})
+
+		fs, dir := newMigrationsDirBuilder(t).
+			WithFile("20230601120000_init.sql", "CREATE TABLE users (id int);").
+			WithFile("schema.sql", `CREATE TABLE users (id int);
+CREATE TABLE posts (id int, user_id int);`).
+			Build()
+
+		// Act
+		plan, err := GeneratePlan(t.Context(), fs, poolConfig, dir, filepath.Join(dir, "schema.sql"))
+
+		// Assert
+		require.NoError(t, err)
+		snaps.MatchSnapshot(t, plan.CurrentSchemaHash, plan.Statements)
+	})
+}
 
 func TestReadStmtsFromMigrationsDir(t *testing.T) {
 	t.Parallel()
@@ -19,7 +138,7 @@ func TestReadStmtsFromMigrationsDir(t *testing.T) {
 		// Arrange
 		// Migration filenames use YYYYMMDDHHMMSS format
 		// Files added out of order to verify sorting
-		fs, dir := newMigrationsBuilder(t).
+		fs, dir := newMigrationsDirBuilder(t).
 			WithFile("20230601140000_third.sql", "CREATE TABLE third (id int);").
 			WithFile("20230601120000_first.sql", "CREATE TABLE first (id int);").
 			WithFile("20230601130000_second.sql", "CREATE TABLE second (id int);").
@@ -37,7 +156,7 @@ func TestReadStmtsFromMigrationsDir(t *testing.T) {
 		t.Parallel()
 
 		// Arrange
-		fs, dir := newMigrationsBuilder(t).
+		fs, dir := newMigrationsDirBuilder(t).
 			WithFile("20230601120000_first.sql", "CREATE TABLE first (id int);").
 			WithFile("README.md", "# Migrations").
 			WithFile("config.json", "{}").
@@ -56,7 +175,7 @@ func TestReadStmtsFromMigrationsDir(t *testing.T) {
 		t.Parallel()
 
 		// Arrange
-		fs, dir := newMigrationsBuilder(t).
+		fs, dir := newMigrationsDirBuilder(t).
 			WithSubdir("subdir.sql"). // tricky: dir ending in .sql
 			WithFile("20230601120000_first.sql", "CREATE TABLE first (id int);").
 			Build()
@@ -87,7 +206,7 @@ func TestReadStmtsFromMigrationsDir(t *testing.T) {
 		t.Parallel()
 
 		// Arrange
-		fs, dir := newMigrationsBuilder(t).
+		fs, dir := newMigrationsDirBuilder(t).
 			WithFile("20230601120000_first.sql", "CREATE TABLE first (id int);").
 			WithReadError("20230601120000_first.sql", os.ErrPermission).
 			Build()
@@ -104,7 +223,7 @@ func TestReadStmtsFromMigrationsDir(t *testing.T) {
 		t.Parallel()
 
 		// Arrange
-		fs, dir := newMigrationsBuilder(t).
+		fs, dir := newMigrationsDirBuilder(t).
 			WithFile("20230601120000_bad.sql", "NOT VALID SQL {{{{").
 			Build()
 
@@ -120,7 +239,7 @@ func TestReadStmtsFromMigrationsDir(t *testing.T) {
 		t.Parallel()
 
 		// Arrange
-		fs, dir := newMigrationsBuilder(t).
+		fs, dir := newMigrationsDirBuilder(t).
 			WithFile("invalid_filename.sql", "CREATE TABLE test (id int);").
 			Build()
 
@@ -136,7 +255,7 @@ func TestReadStmtsFromMigrationsDir(t *testing.T) {
 		t.Parallel()
 
 		// Arrange
-		fs, dir := newMigrationsBuilder(t).Build()
+		fs, dir := newMigrationsDirBuilder(t).Build()
 
 		// Act
 		stmts, err := readStmtsFromMigrationsDir(fs, dir)
@@ -150,7 +269,7 @@ func TestReadStmtsFromMigrationsDir(t *testing.T) {
 		t.Parallel()
 
 		// Arrange
-		fs, dir := newMigrationsBuilder(t).
+		fs, dir := newMigrationsDirBuilder(t).
 			WithFile("README.md", "# Migrations").
 			Build()
 
@@ -166,7 +285,7 @@ func TestReadStmtsFromMigrationsDir(t *testing.T) {
 		t.Parallel()
 
 		// Arrange
-		fs, dir := newMigrationsBuilder(t).
+		fs, dir := newMigrationsDirBuilder(t).
 			WithFile("20230601120000_users.sql", `CREATE TABLE users (id int);
 ---- create above / drop below ----
 DROP TABLE users;`).
@@ -184,7 +303,7 @@ DROP TABLE users;`).
 		t.Parallel()
 
 		// Arrange
-		fs, dir := newMigrationsBuilder(t).
+		fs, dir := newMigrationsDirBuilder(t).
 			WithFile("20230601120000_init.sql", `CREATE TABLE users (id int);
 CREATE TABLE posts (id int);
 CREATE INDEX idx_posts ON posts (id);`).
@@ -202,7 +321,7 @@ CREATE INDEX idx_posts ON posts (id);`).
 		t.Parallel()
 
 		// Arrange
-		fs, dir := newMigrationsBuilder(t).
+		fs, dir := newMigrationsDirBuilder(t).
 			WithFile("20230601120000_first.sql", "CREATE TABLE a (id int); CREATE TABLE b (id int);").
 			WithFile("20230601130000_second.sql", "CREATE TABLE c (id int);").
 			Build()

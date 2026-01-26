@@ -13,7 +13,14 @@ import (
 )
 
 //nolint:gochecknoglobals
-var stepsFlagName = "steps"
+var stepsFlag = "steps"
+
+//nolint:revive // ignore naming convention.
+type ApplyArgs struct {
+	DatabaseURL string
+	Direction   direction.Direction
+	Steps       int
+}
 
 func NewCommand(migrator *conduit.Migrator) *cli.Command {
 	//nolint:exhaustruct
@@ -31,12 +38,28 @@ func NewCommand(migrator *conduit.Migrator) *cli.Command {
 
 			//nolint:exhaustruct
 			&cli.IntFlag{
-				Name:  stepsFlagName,
+				Name:  stepsFlag,
 				Usage: "maximum migrations steps",
 			},
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
-			return apply(ctx, cmd, migrator)
+			dir, err := direction.FromString(cmd.Args().First())
+			if err != nil {
+				return fmt.Errorf("failed to parse direction: %w", err)
+			}
+
+			url := cmd.String(flagname.DatabaseURL)
+			if url == "" {
+				return fmt.Errorf("missing `%s' flag", flagname.DatabaseURL)
+			}
+
+			args := ApplyArgs{
+				DatabaseURL: url,
+				Direction:   dir,
+				Steps:       cmd.Int(stepsFlag),
+			}
+
+			return apply(ctx, migrator, args)
 		},
 	}
 }
@@ -44,29 +67,17 @@ func NewCommand(migrator *conduit.Migrator) *cli.Command {
 // apply applies a migration in the defined direction.
 func apply(
 	ctx context.Context,
-	cmd *cli.Command,
 	migrator *conduit.Migrator,
+	args ApplyArgs,
 ) error {
-	dir, err := direction.FromString(cmd.Args().First())
-	if err != nil {
-		return fmt.Errorf("failed to parse direction: %w", err)
-	}
-
-	url := cmd.String(flagname.DatabaseURL)
-	if url == "" {
-		return fmt.Errorf("missing `%s' flag", flagname.DatabaseURL)
-	}
-
-	conn, err := pgx.Connect(ctx, url)
+	conn, err := pgx.Connect(ctx, args.DatabaseURL)
 	if err != nil {
 		return fmt.Errorf("failed to connect to database: %w", err)
 	}
 
-	opts := &conduit.MigrateOptions{
-		Steps: cmd.Int(stepsFlagName),
-	}
-
-	_, err = migrator.Migrate(ctx, dir, conn, opts)
+	_, err = migrator.Migrate(ctx, args.Direction, conn, &conduit.MigrateOptions{
+		Steps: args.Steps,
+	})
 	if err != nil {
 		return fmt.Errorf("failed to apply migrations: %w", err)
 	}

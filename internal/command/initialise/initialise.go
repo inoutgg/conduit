@@ -14,6 +14,13 @@ import (
 	"go.inout.gg/conduit/pkg/version"
 )
 
+//nolint:revive // ignore naming convention.
+type InitialiseArgs struct {
+	Namespace           string
+	PackageName         string
+	NoConduitMigrations bool
+}
+
 func NewCommand(fs afero.Fs) *cli.Command {
 	//nolint:exhaustruct
 	return &cli.Command{
@@ -51,12 +58,18 @@ func NewCommand(fs afero.Fs) *cli.Command {
 		},
 
 		Action: func(ctx context.Context, cmd *cli.Command) error {
-			return action(ctx, cmd, fs)
+			args := InitialiseArgs{
+				Namespace:           cmd.String("namespace"),
+				PackageName:         cmd.String(flagname.PackageName),
+				NoConduitMigrations: cmd.Bool("no-conduit-migrations"),
+			}
+
+			return initialise(ctx, fs, args)
 		},
 	}
 }
 
-func action(ctx context.Context, cmd *cli.Command, fs afero.Fs) error {
+func initialise(ctx context.Context, fs afero.Fs, args InitialiseArgs) error {
 	dir, err := migrationctx.Dir(ctx)
 	if err != nil {
 		//nolint:wrapcheck
@@ -67,17 +80,14 @@ func action(ctx context.Context, cmd *cli.Command, fs afero.Fs) error {
 		return err
 	}
 
-	ns := cmd.String("namespace")
-	if ns != "" {
-		if _, err := createRegistryFile(fs, dir, ns); err != nil {
+	if args.Namespace != "" {
+		if _, err := createRegistryFile(fs, dir, args.Namespace); err != nil {
 			return err
 		}
 	}
 
-	packageName := cmd.String(flagname.PackageName)
-
-	if !cmd.Bool("no-conduit-migrations") {
-		if _, err := createConduitMigrationFile(fs, dir, ns, packageName); err != nil {
+	if !args.NoConduitMigrations {
+		if _, err := createConduitMigrationFile(fs, dir, args.Namespace, args.PackageName); err != nil {
 			return err
 		}
 	}
