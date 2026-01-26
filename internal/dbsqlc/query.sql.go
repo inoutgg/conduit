@@ -20,7 +20,7 @@ func (q *Queries) AcquireLock(ctx context.Context, db DBTX, lockNum int64) error
 
 const allExistingMigrationVersions = `-- name: AllExistingMigrationVersions :many
 SELECT version
-FROM conduitmigrations
+FROM conduit_migrations
 WHERE namespace = $1
 ORDER BY version
 `
@@ -46,7 +46,7 @@ func (q *Queries) AllExistingMigrationVersions(ctx context.Context, db DBTX, nam
 }
 
 const applyMigration = `-- name: ApplyMigration :exec
-INSERT INTO conduitmigrations (version, name, namespace)
+INSERT INTO  conduit_migrations (version, name, namespace)
 VALUES ($1, $2, $3)
 `
 
@@ -95,7 +95,7 @@ func (q *Queries) ResetConn(ctx context.Context, db DBTX) error {
 }
 
 const rollbackMigration = `-- name: RollbackMigration :exec
-DELETE FROM conduitmigrations
+DELETE FROM conduit_migrations
 WHERE version = $1 AND namespace = $2
 `
 

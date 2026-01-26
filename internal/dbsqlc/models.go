@@ -8,7 +8,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-type Conduitmigration struct {
+type ConduitMigration struct {
 	ID        int64
 	CreatedAt pgtype.Timestamp
 	Version   string

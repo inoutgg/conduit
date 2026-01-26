@@ -108,12 +108,13 @@ type MigrateResult struct {
 	// Direction of the applied migrations.
 	Direction direction.Direction
 
-	// MigrationResults is a
+	// MigrationResults is the result of applied migrations.
 	MigrationResults []MigrationResult
 }
 
 // MigrationResult represents the outcome of a single applied migration.
 type MigrationResult struct {
+	// Version is the version of the applied migration.
 	Version       version.Version
 	Name          string
 	Namespace     string
@@ -212,7 +213,7 @@ func (m *Migrator) Migrate(
 
 // existingMigrationVersions retrieves a list of already applied migration versions.
 func (m *Migrator) existingMigrationVersions(ctx context.Context, conn *pgx.Conn) ([]string, error) {
-	ok, err := dbsqlc.New().DoesTableExist(ctx, conn, "conduitmigrations")
+	ok, err := dbsqlc.New().DoesTableExist(ctx, conn, "conduit_migrations")
 	if err != nil {
 		return nil, fmt.Errorf("conduit: failed to fetch from migrations table: %w", err)
 	}
@@ -324,8 +325,6 @@ func (m *Migrator) applyMigrations(
 			dir,
 		)
 
-		var tx pgx.Tx
-
 		inTx := must.Must(migration.UseTx(dir))
 
 		m.logger.DebugContext(
@@ -341,20 +340,11 @@ func (m *Migrator) applyMigrations(
 		)
 
 		if inTx {
-			tx, err = conn.Begin(ctx)
-			if err != nil {
-				return nil, fmt.Errorf(
-					"conduit: failed to open transaction: %w",
-					err,
-				)
-			}
-
-			defer func() { _ = tx.Rollback(ctx) }()
+			err = m.applyMigrationTx(ctx, migration, dir, conn)
+		} else {
+			err = migration.Apply(ctx, dir, conn)
 		}
 
-		start := time.Now()
-
-		err := migration.Apply(ctx, dir, conn, tx)
 		if err != nil {
 			return nil, fmt.Errorf(
 				"conduit: failed to apply migration %s: %w",
@@ -363,7 +353,7 @@ func (m *Migrator) applyMigrations(
 			)
 		}
 
-		duration := time.Since(start)
+		duration := time.Since(time.Now())
 		migrationResult := MigrationResult{
 			DurationTotal: duration,
 			Version:       migration.Version(),
@@ -391,17 +381,6 @@ func (m *Migrator) applyMigrations(
 			return nil, fmt.Errorf("conduit: failed to update migrations table %v: %w", dir, err)
 		}
 
-		if inTx {
-			err := tx.Commit(ctx)
-			if err != nil {
-				return nil, fmt.Errorf(
-					"conduit: failed to commit transaction for migration %s: %w",
-					migrationResult.Version.String(),
-					err,
-				)
-			}
-		}
-
 		_ = dbsqlc.New().ResetConn(ctx, conn)
 	}
 
@@ -411,6 +390,32 @@ func (m *Migrator) applyMigrations(
 	}
 
 	return result, nil
+}
+
+// applyMigrationTx applies a single migration within a transaction.
+func (m *Migrator) applyMigrationTx(
+	ctx context.Context,
+	migration *conduitregistry.Migration,
+	dir Direction,
+	conn *pgx.Conn,
+) error {
+	tx, err := conn.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("conduit: failed to open transaction: %w", err)
+	}
+
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	if err := migration.ApplyTx(ctx, dir, tx); err != nil {
+		//nolint:wrapcheck
+		return err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("conduit: failed to commit transaction: %w", err)
+	}
+
+	return nil
 }
 
 // pgLockNum computes a lock number for a PostgreSQL advisory lock.

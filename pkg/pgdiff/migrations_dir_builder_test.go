@@ -8,9 +8,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// migrationsBuilder provides a builder for setting up
+// migrationsDirBuilder provides a builder for setting up
 // an in-memory filesystem with a migrations directory.
-type migrationsBuilder struct {
+type migrationsDirBuilder struct {
 	fs            afero.Fs
 	failOnFileErr error
 	t             *testing.T
@@ -18,31 +18,31 @@ type migrationsBuilder struct {
 	failOnFile    string
 }
 
-func newMigrationsBuilder(t *testing.T) *migrationsBuilder {
+func newMigrationsDirBuilder(t *testing.T) *migrationsDirBuilder {
 	t.Helper()
 
 	fs := afero.NewMemMapFs()
 	dir := "/migrations"
 	require.NoError(t, fs.MkdirAll(dir, 0o755))
 
-	return &migrationsBuilder{t: t, fs: fs, dir: dir}
+	return &migrationsDirBuilder{t: t, fs: fs, dir: dir}
 }
 
-func (b *migrationsBuilder) WithFile(name, content string) *migrationsBuilder {
+func (b *migrationsDirBuilder) WithFile(name, content string) *migrationsDirBuilder {
 	b.t.Helper()
 	require.NoError(b.t, afero.WriteFile(b.fs, filepath.Join(b.dir, name), []byte(content), 0o644))
 
 	return b
 }
 
-func (b *migrationsBuilder) WithSubdir(name string) *migrationsBuilder {
+func (b *migrationsDirBuilder) WithSubdir(name string) *migrationsDirBuilder {
 	b.t.Helper()
 	require.NoError(b.t, b.fs.MkdirAll(filepath.Join(b.dir, name), 0o755))
 
 	return b
 }
 
-func (b *migrationsBuilder) WithReadError(file string, err error) *migrationsBuilder {
+func (b *migrationsDirBuilder) WithReadError(file string, err error) *migrationsDirBuilder {
 	b.t.Helper()
 	b.failOnFile = filepath.Join(b.dir, file)
 	b.failOnFileErr = err
@@ -50,7 +50,7 @@ func (b *migrationsBuilder) WithReadError(file string, err error) *migrationsBui
 	return b
 }
 
-func (b *migrationsBuilder) Build() (afero.Fs, string) {
+func (b *migrationsDirBuilder) Build() (afero.Fs, string) {
 	b.t.Helper()
 
 	fs := b.fs

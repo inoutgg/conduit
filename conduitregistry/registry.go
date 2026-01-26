@@ -14,7 +14,6 @@ import (
 )
 
 var (
-	ErrUndefinedTx    = errors.New("conduit: tx must be defined")
 	ErrEmptyMigration = errors.New("conduit: migration is empty")
 	ErrUpExists       = errors.New("conduit: up migration already registered")
 	ErrDownExists     = errors.New("conduit: down migration already registered")

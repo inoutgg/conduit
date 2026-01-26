@@ -2,6 +2,8 @@ package create
 
 import (
 	"context"
+	"errors"
+	"fmt"
 
 	"github.com/spf13/afero"
 	"github.com/urfave/cli/v3"
@@ -35,7 +37,26 @@ func NewCommand(fs afero.Fs) *cli.Command {
 					},
 				},
 				Action: func(ctx context.Context, cmd *cli.Command) error {
-					return empty(ctx, cmd, fs)
+					name := cmd.Args().First()
+					if name == "" {
+						return errors.New("conduit: missing `name` argument")
+					}
+
+					ext := cmd.String("ext")
+					if ext != "sql" && ext != "go" {
+						return fmt.Errorf(
+							"conduit: unsupported extension %q, expected \"sql\" or \"go\"",
+							ext,
+						)
+					}
+
+					args := EmptyArgs{
+						Name:        name,
+						Ext:         ext,
+						PackageName: cmd.String(flagname.PackageName),
+					}
+
+					return empty(ctx, fs, args)
 				},
 			},
 			//nolint:exhaustruct
@@ -63,7 +84,19 @@ func NewCommand(fs afero.Fs) *cli.Command {
 					},
 				},
 				Action: func(ctx context.Context, cmd *cli.Command) error {
-					return diff(ctx, cmd, fs)
+					name := cmd.Args().First()
+					if name == "" {
+						return errors.New("missing `name` argument")
+					}
+
+					args := DiffArgs{
+						Name:        name,
+						SchemaPath:  cmd.String("schema"),
+						DatabaseURL: cmd.String(flagname.DatabaseURL),
+						Image:       cmd.String("image"),
+					}
+
+					return diff(ctx, fs, args)
 				},
 			},
 		},
