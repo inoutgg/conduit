@@ -39,7 +39,7 @@ func Execute(ctx context.Context, migrator *conduit.Migrator) error {
 			},
 			//nolint:exhaustruct
 			&cli.BoolFlag{
-				Name:  "verbose",
+				Name:  flagname.Verbose,
 				Usage: "verbose mode",
 				Value: false,
 			},
