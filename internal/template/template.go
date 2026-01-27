@@ -20,9 +20,6 @@ var (
 
 	//go:embed migration.go.tmpl
 	goMigrationTemplate string
-
-	//go:embed diff_migration.sql.tmpl
-	diffMigrationTemplate string
 )
 
 var (
@@ -30,7 +27,6 @@ var (
 	RegistryTemplate         *template.Template //nolint:gochecknoglobals
 	SQLMigrationTemplate     *template.Template //nolint:gochecknoglobals
 	GoMigrationTemplate      *template.Template //nolint:gochecknoglobals
-	DiffMigrationTemplate    *template.Template //nolint:gochecknoglobals
 )
 
 //nolint:gochecknoinits
@@ -41,5 +37,4 @@ func init() {
 	RegistryTemplate = must.Must(template.New("conduit: Registry Template").Parse(registryTemplate))
 	SQLMigrationTemplate = must.Must(template.New("conduit: SQL Migration Template").Parse(sqlMigrationTemplate))
 	GoMigrationTemplate = must.Must(template.New("conduit: Go Migration Template").Parse(goMigrationTemplate))
-	DiffMigrationTemplate = must.Must(template.New("conduit: Diff Migration Template").Parse(diffMigrationTemplate))
 }

@@ -87,16 +87,16 @@ func diff(ctx context.Context, fs afero.Fs, args DiffArgs) error {
 		}
 	}
 
-	if err := internaltpl.DiffMigrationTemplate.Execute(f, struct {
-		Version      version.Version
-		Name         string
-		SchemaFile   string
-		UpStatements string
+	if err := internaltpl.SQLMigrationTemplate.Execute(f, struct {
+		Version    version.Version
+		Name       string
+		SchemaPath string
+		UpStmts    string
 	}{
-		Version:      ver,
-		Name:         args.Name,
-		SchemaFile:   args.SchemaPath,
-		UpStatements: upStmts.String(),
+		Version:    ver,
+		Name:       args.Name,
+		SchemaPath: args.SchemaPath,
+		UpStmts:    upStmts.String(),
 	}); err != nil {
 		return fmt.Errorf("failed to write template: %w", err)
 	}
