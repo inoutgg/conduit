@@ -14,7 +14,8 @@ import (
 	schemadiff "github.com/stripe/pg-schema-diff/pkg/diff"
 	"github.com/stripe/pg-schema-diff/pkg/tempdb"
 
-	"go.inout.gg/conduit/internal/sqlsplit"
+	"go.inout.gg/conduit/internal/sliceutil"
+	"go.inout.gg/conduit/pkg/sqlsplit"
 	"go.inout.gg/conduit/pkg/version"
 )
 
@@ -42,7 +43,7 @@ func GeneratePlan(
 func generatePlan(
 	ctx context.Context,
 	poolConfig *pgxpool.Config,
-	sourceStmts, targetStmts []string,
+	sourceStmts, targetStmts []sqlsplit.Stmt,
 ) (schemadiff.Plan, error) {
 	tempDbFactory, err := tempdb.NewOnInstanceFactory(
 		ctx,
@@ -66,8 +67,12 @@ func generatePlan(
 
 	plan, err := schemadiff.Generate(
 		ctx,
-		schemadiff.DDLSchemaSource(sourceStmts),
-		schemadiff.DDLSchemaSource(targetStmts),
+		schemadiff.DDLSchemaSource(
+			sliceutil.Map(sourceStmts, func(stmt sqlsplit.Stmt) string { return stmt.Content }),
+		),
+		schemadiff.DDLSchemaSource(
+			sliceutil.Map(targetStmts, func(stmt sqlsplit.Stmt) string { return stmt.Content }),
+		),
 		schemadiff.WithTempDbFactory(tempDbFactory),
 	)
 	if err != nil {
@@ -77,7 +82,7 @@ func generatePlan(
 	return plan, nil
 }
 
-func readStmtsFromMigrationsDir(fs afero.Fs, dir string) ([]string, error) {
+func readStmtsFromMigrationsDir(fs afero.Fs, dir string) ([]sqlsplit.Stmt, error) {
 	entries, err := afero.ReadDir(fs, dir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read directory: %w", err)
@@ -103,7 +108,7 @@ func readStmtsFromMigrationsDir(fs afero.Fs, dir string) ([]string, error) {
 		return a.Compare(b)
 	})
 
-	var allStmts []string
+	var allStmts []sqlsplit.Stmt
 
 	for _, m := range migrations {
 		filename := m.Filename()
@@ -120,13 +125,13 @@ func readStmtsFromMigrationsDir(fs afero.Fs, dir string) ([]string, error) {
 	return allStmts, nil
 }
 
-func readStmtsFromFile(fs afero.Fs, path string) ([]string, error) {
+func readStmtsFromFile(fs afero.Fs, path string) ([]sqlsplit.Stmt, error) {
 	content, err := afero.ReadFile(fs, path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read file %s: %w", path, err)
 	}
 
-	stmts, _, err := sqlsplit.Split(string(content))
+	stmts, _, err := sqlsplit.SplitMigration(string(content))
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse SQL: %w", err)
 	}

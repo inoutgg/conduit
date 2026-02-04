@@ -10,7 +10,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"go.inout.gg/conduit/internal/sliceutil"
-	"go.inout.gg/conduit/internal/sqlsplit"
+	"go.inout.gg/conduit/pkg/sqlsplit"
 	"go.inout.gg/conduit/pkg/version"
 )
 
@@ -62,7 +62,7 @@ func parseSQLMigration(fsys fs.FS, path string) (*Migration, error) {
 		return nil, fmt.Errorf("conduit: failed to read migration file: %w", err)
 	}
 
-	up, down, err := sqlsplit.Split(string(sql))
+	up, down, err := sqlsplit.SplitMigration(string(sql))
 	if err != nil {
 		return nil, fmt.Errorf("conduit: failed to split SQL statements: %w", err)
 	}
@@ -84,16 +84,16 @@ func parseSQLMigration(fsys fs.FS, path string) (*Migration, error) {
 	return &migration, nil
 }
 
-func sqlMigrateFunc(stmts []string) *migrateFunc {
-	inTx := sliceutil.Some(stmts, func(stmt string) bool {
-		return strings.TrimSpace(stmt) == DisableTxPattern
+func sqlMigrateFunc(stmts []sqlsplit.Stmt) *migrateFunc {
+	inTx := sliceutil.Some(stmts, func(stmt sqlsplit.Stmt) bool {
+		return strings.Contains(stmt.Content, DisableTxPattern)
 	})
 	up := &migrateFunc{useTx: inTx, fn: nil, fnx: nil}
 
 	if inTx {
 		up.fnx = func(ctx context.Context, tx pgx.Tx) error {
 			for _, stmt := range stmts {
-				if _, err := tx.Exec(ctx, stmt); err != nil {
+				if _, err := tx.Exec(ctx, stmt.Content); err != nil {
 					return fmt.Errorf("conduit: failed to execute migration script: %w", err)
 				}
 			}
@@ -103,7 +103,7 @@ func sqlMigrateFunc(stmts []string) *migrateFunc {
 	} else {
 		up.fn = func(ctx context.Context, conn *pgx.Conn) error {
 			for _, stmt := range stmts {
-				_, err := conn.Exec(ctx, stmt)
+				_, err := conn.Exec(ctx, stmt.Content)
 				if err != nil {
 					return fmt.Errorf("conduit: failed to execute migration script: %w", err)
 				}

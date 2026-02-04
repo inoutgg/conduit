@@ -8,7 +8,6 @@ require (
 	github.com/gkampitakis/go-snaps v0.5.19
 	github.com/jackc/pgx/v5 v5.7.6
 	github.com/joho/godotenv v1.5.1
-	github.com/pganalyze/pg_query_go/v6 v6.1.0
 	github.com/spf13/afero v1.15.0
 	github.com/stretchr/testify v1.11.1
 	github.com/stripe/pg-schema-diff v0.9.3

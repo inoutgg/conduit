@@ -1,0 +1,330 @@
+
+[TestStatementMetadata/line_numbers_across_multiple_lines - 1]
+[]sqlsplit.Stmt{
+    {
+        Content: "SELECT 1;",
+        Start:   sqlsplit.Location{Pos:0, Line:1, Col:1},
+        End:     sqlsplit.Location{Pos:9, Line:1, Col:10},
+    },
+    {
+        Content: "SELECT 2;",
+        Start:   sqlsplit.Location{Pos:10, Line:2, Col:1},
+        End:     sqlsplit.Location{Pos:19, Line:2, Col:10},
+    },
+    {
+        Content: "SELECT 3;",
+        Start:   sqlsplit.Location{Pos:20, Line:3, Col:1},
+        End:     sqlsplit.Location{Pos:29, Line:3, Col:10},
+    },
+}
+---
+
+[TestColumnTracking/single_line_multiple_statements - 1]
+[]sqlsplit.Stmt{
+    {
+        Content: "SELECT 1;",
+        Start:   sqlsplit.Location{Pos:0, Line:1, Col:1},
+        End:     sqlsplit.Location{Pos:9, Line:1, Col:10},
+    },
+    {
+        Content: "SELECT 2;",
+        Start:   sqlsplit.Location{Pos:10, Line:1, Col:11},
+        End:     sqlsplit.Location{Pos:19, Line:1, Col:20},
+    },
+}
+---
+
+[TestColumnTracking/statement_after_multiline_comment - 1]
+[]sqlsplit.Stmt{
+    {
+        Content: "/* comment\n   */ SELECT 1;",
+        Start:   sqlsplit.Location{Pos:0, Line:1, Col:1},
+        End:     sqlsplit.Location{Pos:26, Line:2, Col:16},
+    },
+}
+---
+
+[TestColumnTracking/indented_statements - 1]
+[]sqlsplit.Stmt{
+    {
+        Content: "SELECT 1;",
+        Start:   sqlsplit.Location{Pos:2, Line:1, Col:3},
+        End:     sqlsplit.Location{Pos:11, Line:1, Col:12},
+    },
+    {
+        Content: "SELECT 2;",
+        Start:   sqlsplit.Location{Pos:16, Line:2, Col:5},
+        End:     sqlsplit.Location{Pos:25, Line:2, Col:14},
+    },
+}
+---
+
+[TestColumnTracking/statements_on_separate_lines - 1]
+[]sqlsplit.Stmt{
+    {
+        Content: "SELECT 1;",
+        Start:   sqlsplit.Location{Pos:0, Line:1, Col:1},
+        End:     sqlsplit.Location{Pos:9, Line:1, Col:10},
+    },
+    {
+        Content: "SELECT 2;",
+        Start:   sqlsplit.Location{Pos:10, Line:2, Col:1},
+        End:     sqlsplit.Location{Pos:19, Line:2, Col:10},
+    },
+}
+---
+
+[TestColumnTracking/multiline_statement - 1]
+[]sqlsplit.Stmt{
+    {
+        Content: "SELECT\n  1;",
+        Start:   sqlsplit.Location{Pos:0, Line:1, Col:1},
+        End:     sqlsplit.Location{Pos:11, Line:2, Col:5},
+    },
+}
+---
+
+[TestSplit/dollar-quoted_with_semicolon - 1]
+[]sqlsplit.Stmt{
+    {
+        Content: "SELECT $$test; value$$;",
+        Start:   sqlsplit.Location{Pos:0, Line:1, Col:1},
+        End:     sqlsplit.Location{Pos:23, Line:1, Col:24},
+    },
+    {
+        Content: "SELECT 2;",
+        Start:   sqlsplit.Location{Pos:24, Line:1, Col:25},
+        End:     sqlsplit.Location{Pos:33, Line:1, Col:34},
+    },
+}
+---
+
+[TestSplit/dollar-quoted_strings - 1]
+[]sqlsplit.Stmt{
+    {
+        Content: "SELECT $$test$$;",
+        Start:   sqlsplit.Location{Pos:0, Line:1, Col:1},
+        End:     sqlsplit.Location{Pos:16, Line:1, Col:17},
+    },
+    {
+        Content: "SELECT $$it's$$;",
+        Start:   sqlsplit.Location{Pos:17, Line:1, Col:18},
+        End:     sqlsplit.Location{Pos:33, Line:1, Col:34},
+    },
+}
+---
+
+[TestSplit/semicolon_in_string - 1]
+[]sqlsplit.Stmt{
+    {
+        Content: "SELECT 'test; value';",
+        Start:   sqlsplit.Location{Pos:0, Line:1, Col:1},
+        End:     sqlsplit.Location{Pos:21, Line:1, Col:22},
+    },
+    {
+        Content: "SELECT 2;",
+        Start:   sqlsplit.Location{Pos:22, Line:1, Col:23},
+        End:     sqlsplit.Location{Pos:31, Line:1, Col:32},
+    },
+}
+---
+
+[TestSplit/simple_statements - 1]
+[]sqlsplit.Stmt{
+    {
+        Content: "SELECT 1;",
+        Start:   sqlsplit.Location{Pos:0, Line:1, Col:1},
+        End:     sqlsplit.Location{Pos:9, Line:1, Col:10},
+    },
+    {
+        Content: "SELECT 2;",
+        Start:   sqlsplit.Location{Pos:10, Line:1, Col:11},
+        End:     sqlsplit.Location{Pos:19, Line:1, Col:20},
+    },
+}
+---
+
+[TestSplit/trailing_statement_without_semicolon - 1]
+[]sqlsplit.Stmt{
+    {
+        Content: "SELECT 1;",
+        Start:   sqlsplit.Location{Pos:0, Line:1, Col:1},
+        End:     sqlsplit.Location{Pos:9, Line:1, Col:10},
+    },
+    {
+        Content: "SELECT 2",
+        Start:   sqlsplit.Location{Pos:10, Line:1, Col:11},
+        End:     sqlsplit.Location{Pos:18, Line:1, Col:19},
+    },
+}
+---
+
+[TestSplit/multi-line_comments - 1]
+[]sqlsplit.Stmt{
+    {
+        Content: "SELECT 1;",
+        Start:   sqlsplit.Location{Pos:0, Line:1, Col:1},
+        End:     sqlsplit.Location{Pos:9, Line:1, Col:10},
+    },
+    {
+        Content: "/* comment\nspanning lines */ SELECT 2;",
+        Start:   sqlsplit.Location{Pos:10, Line:1, Col:11},
+        End:     sqlsplit.Location{Pos:48, Line:2, Col:28},
+    },
+}
+---
+
+[TestSplit/nested_multi-line_comments - 1]
+[]sqlsplit.Stmt{
+    {
+        Content: "SELECT 1;",
+        Start:   sqlsplit.Location{Pos:0, Line:1, Col:1},
+        End:     sqlsplit.Location{Pos:9, Line:1, Col:10},
+    },
+    {
+        Content: "/* outer /* inner */ still outer */ SELECT 2;",
+        Start:   sqlsplit.Location{Pos:10, Line:1, Col:11},
+        End:     sqlsplit.Location{Pos:55, Line:1, Col:56},
+    },
+}
+---
+
+[TestSplit/single-line_comments - 1]
+[]sqlsplit.Stmt{
+    {
+        Content: "SELECT 1;",
+        Start:   sqlsplit.Location{Pos:0, Line:1, Col:1},
+        End:     sqlsplit.Location{Pos:9, Line:1, Col:10},
+    },
+    {
+        Content: "-- comment\nSELECT 2;",
+        Start:   sqlsplit.Location{Pos:10, Line:1, Col:11},
+        End:     sqlsplit.Location{Pos:30, Line:2, Col:10},
+    },
+}
+---
+
+[TestSplit/empty_statements - 1]
+[]sqlsplit.Stmt{
+    {
+        Content: "SELECT 1;",
+        Start:   sqlsplit.Location{Pos:4, Line:1, Col:5},
+        End:     sqlsplit.Location{Pos:13, Line:1, Col:14},
+    },
+}
+---
+
+[TestSplit/escape_string_syntax - 1]
+[]sqlsplit.Stmt{
+    {
+        Content: "SELECT E'test\\nvalue';",
+        Start:   sqlsplit.Location{Pos:0, Line:1, Col:1},
+        End:     sqlsplit.Location{Pos:22, Line:1, Col:23},
+    },
+    {
+        Content: "SELECT 'normal';",
+        Start:   sqlsplit.Location{Pos:23, Line:1, Col:24},
+        End:     sqlsplit.Location{Pos:39, Line:1, Col:40},
+    },
+}
+---
+
+[TestSplit/complex_nested_quoting - 1]
+[]sqlsplit.Stmt{
+    {
+        Content: "CREATE FUNCTION test() RETURNS text AS $func$\nBEGIN\n    RETURN $inner$It's a \"test\"; value$inner$;\nEND;\n$func$ LANGUAGE plpgsql;",
+        Start:   sqlsplit.Location{Pos:0, Line:1, Col:1},
+        End:     sqlsplit.Location{Pos:128, Line:5, Col:25},
+    },
+}
+---
+
+[TestSplit/CREATE_FUNCTION_with_dollar_quoting - 1]
+[]sqlsplit.Stmt{
+    {
+        Content: "CREATE FUNCTION test() RETURNS integer AS $$\nBEGIN\n    RETURN 1;\nEND;\n$$ LANGUAGE plpgsql;",
+        Start:   sqlsplit.Location{Pos:0, Line:1, Col:1},
+        End:     sqlsplit.Location{Pos:90, Line:5, Col:21},
+    },
+    {
+        Content: "SELECT 2;",
+        Start:   sqlsplit.Location{Pos:91, Line:6, Col:1},
+        End:     sqlsplit.Location{Pos:100, Line:6, Col:10},
+    },
+}
+---
+
+[TestSplit/escaped_quote_in_identifier - 1]
+[]sqlsplit.Stmt{
+    {
+        Content: "SELECT \"test\"\"name\";",
+        Start:   sqlsplit.Location{Pos:0, Line:1, Col:1},
+        End:     sqlsplit.Location{Pos:20, Line:1, Col:21},
+    },
+    {
+        Content: "SELECT 2;",
+        Start:   sqlsplit.Location{Pos:21, Line:1, Col:22},
+        End:     sqlsplit.Location{Pos:30, Line:1, Col:31},
+    },
+}
+---
+
+[TestSplit/quoted_identifiers - 1]
+[]sqlsplit.Stmt{
+    {
+        Content: "SELECT \"table\";",
+        Start:   sqlsplit.Location{Pos:0, Line:1, Col:1},
+        End:     sqlsplit.Location{Pos:15, Line:1, Col:16},
+    },
+    {
+        Content: "SELECT \"col;umn\";",
+        Start:   sqlsplit.Location{Pos:16, Line:1, Col:17},
+        End:     sqlsplit.Location{Pos:33, Line:1, Col:34},
+    },
+}
+---
+
+[TestSplit/dollar-quoted_with_nested_dollars - 1]
+[]sqlsplit.Stmt{
+    {
+        Content: "SELECT $outer$test $$ value$outer$;",
+        Start:   sqlsplit.Location{Pos:0, Line:1, Col:1},
+        End:     sqlsplit.Location{Pos:35, Line:1, Col:36},
+    },
+    {
+        Content: "SELECT 2;",
+        Start:   sqlsplit.Location{Pos:36, Line:1, Col:37},
+        End:     sqlsplit.Location{Pos:45, Line:1, Col:46},
+    },
+}
+---
+
+[TestSplit/single-quoted_strings - 1]
+[]sqlsplit.Stmt{
+    {
+        Content: "SELECT 'test';",
+        Start:   sqlsplit.Location{Pos:0, Line:1, Col:1},
+        End:     sqlsplit.Location{Pos:14, Line:1, Col:15},
+    },
+    {
+        Content: "SELECT 'it''s';",
+        Start:   sqlsplit.Location{Pos:15, Line:1, Col:16},
+        End:     sqlsplit.Location{Pos:30, Line:1, Col:31},
+    },
+}
+---
+
+[TestSplit/dollar-quoted_with_tag - 1]
+[]sqlsplit.Stmt{
+    {
+        Content: "SELECT $tag$test$tag$;",
+        Start:   sqlsplit.Location{Pos:0, Line:1, Col:1},
+        End:     sqlsplit.Location{Pos:22, Line:1, Col:23},
+    },
+    {
+        Content: "SELECT $foo$it's$foo$;",
+        Start:   sqlsplit.Location{Pos:23, Line:1, Col:24},
+        End:     sqlsplit.Location{Pos:45, Line:1, Col:46},
+    },
+}
+---

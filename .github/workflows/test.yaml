@@ -53,7 +53,7 @@ jobs:
           name: devenv
           skipPush: true
       - run: nix develop --no-pure-eval --command lint-ci
-      - run: bash -c 'eval "$(nix print-dev-env --no-pure-eval)" && echo "PATH=$PATH" >> $GITHUB_ENV'
+      - run: bash -c 'eval "$(devenv print-dev-env --no-pure-eval)" && echo "PATH=$PATH" >> $GITHUB_ENV'
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v8
         with:
