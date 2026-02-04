@@ -1,8 +1,6 @@
 // Package sliceutil provides utility functions for working with slices.
 package sliceutil
 
-import "slices"
-
 // Map applies function f to each element of slice s and
 // returns the results as a new slice.
 func Map[S ~[]E, E, V any](s S, f func(E) V) []V {
@@ -27,16 +25,14 @@ func KeyBy[S ~[]E, E any, V comparable](s S, f func(E) V) map[V]E {
 	return m
 }
 
-func Some[S ~[]E, E any](s S, f func(E) bool) bool {
-	return slices.ContainsFunc(s, f)
-}
-
-func Until[S ~[]E, E any](s S, f func(E) bool) int {
-	for i, e := range s {
+// Filter returns a new slice containing only elements for which f returns true.
+func Filter[S ~[]E, E any](s S, f func(E) bool) S {
+	result := make(S, 0, len(s))
+	for _, e := range s {
 		if f(e) {
-			return i
+			result = append(result, e)
 		}
 	}
 
-	return len(s)
+	return result
 }

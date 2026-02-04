@@ -6,6 +6,21 @@ import (
 	"unicode"
 )
 
+// StmtType represents the type of a statement.
+type StmtType string
+
+const (
+	StmtTypeQuery     StmtType = "query"
+	StmtTypeUpDownSep StmtType = "up-down-sep"
+	StmtTypeDisableTx StmtType = "disable-tx"
+)
+
+//nolint:gochecknoglobals
+var directivePatterns = map[string]StmtType{
+	"---- create above / drop below ----": StmtTypeUpDownSep,
+	"---- disable-tx ----":                StmtTypeDisableTx,
+}
+
 type state int
 
 const (
@@ -17,9 +32,20 @@ const (
 	stateIdent
 )
 
+// Split splits a SQL file into individual statements.
+func Split(sql string) ([]Stmt, error) {
+	s := newScanner(sql)
+	if err := s.scan(); err != nil {
+		return nil, err
+	}
+
+	return s.stmts, nil
+}
+
 // Stmt represents a single SQL statement with its position in the original file.
 type Stmt struct {
 	Content string
+	Type    StmtType
 	Start   Location
 	End     Location
 }
@@ -86,7 +112,14 @@ func (s *scanner) consume(n int) {
 }
 
 func (s *scanner) emitStmt() {
-	if stmt := newStmt(s.buf.String(), s.startLoc, s.currentLoc); stmt != nil {
+	content := s.buf.String()
+
+	typ := StmtTypeQuery
+	if t, ok := directivePatterns[strings.TrimSpace(content)]; ok {
+		typ = t
+	}
+
+	if stmt := newStmt(content, s.startLoc, s.currentLoc, typ); stmt != nil {
 		s.stmts = append(s.stmts, *stmt)
 	}
 
@@ -200,6 +233,18 @@ func (s *scanner) scanStmt() {
 
 func (s *scanner) scanLineComment() {
 	if s.peek(0) == '\n' {
+		// Check if this line comment is a directive that should be a separate statement
+		content := s.buf.String()
+
+		trimmed := strings.TrimSpace(content)
+		if _, ok := directivePatterns[trimmed]; ok {
+			s.emitStmt()
+			s.advance() // consume the newline
+			s.state = stateStmt
+
+			return
+		}
+
 		s.state = stateStmt
 	}
 
@@ -274,17 +319,7 @@ func (s *scanner) scanIdent() {
 	}
 }
 
-// Split splits a SQL file into individual statements.
-func Split(sql string) ([]Stmt, error) {
-	s := newScanner(sql)
-	if err := s.scan(); err != nil {
-		return nil, err
-	}
-
-	return s.stmts, nil
-}
-
-func newStmt(content string, start, end Location) *Stmt {
+func newStmt(content string, start, end Location, typ StmtType) *Stmt {
 	content = strings.TrimSpace(content)
 	if content == "" || content == ";" {
 		return nil
@@ -294,6 +329,7 @@ func newStmt(content string, start, end Location) *Stmt {
 		Content: content,
 		Start:   start,
 		End:     end,
+		Type:    typ,
 	}
 }
 

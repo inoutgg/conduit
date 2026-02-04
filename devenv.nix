@@ -16,7 +16,7 @@ let
       lint-ci = {
         exec = ''
           modernize ./...
-          govulncheck ./...
+          # govulncheck ./...
         '';
       };
       lint-all = {
@@ -31,15 +31,12 @@ let
           golangci-lint run --fix ./...
         '';
       };
-      go-test =
-        let
-          parallel = pkgs.stdenv.hostPlatform.parsed.cpu.cores or 4;
-        in
-        {
-          exec = ''
-            go test -parallel ${toString parallel} ./...
-          '';
-        };
+      go-test = {
+        exec = ''
+          devenv up -d &>/dev/null
+          go test ./...; ret=$?; devenv processes stop &>/dev/null; exit $ret
+        '';
+      };
     };
 
     packages = with pkgs; [

@@ -251,6 +251,68 @@ CREATE TABLE "user-data" (
 			name:  "unicode in strings and identifiers",
 			input: `SELECT 'émoji 🎉 café'; SELECT "tëst_tàble" FROM "schëma"."tãble";`,
 		},
+
+		// Directives inside strings/comments should not be parsed as directives
+		{
+			name:  "up-down separator in single-quoted string",
+			input: `SELECT '---- create above / drop below ----';`,
+		},
+		{
+			name:  "up-down separator in double-quoted identifier",
+			input: `SELECT "---- create above / drop below ----";`,
+		},
+		{
+			name:  "up-down separator in dollar-quoted string",
+			input: `SELECT $$---- create above / drop below ----$$;`,
+		},
+		{
+			name:  "up-down separator in block comment",
+			input: `SELECT /* ---- create above / drop below ---- */ 1;`,
+		},
+		{
+			name:  "disable-tx in single-quoted string",
+			input: `SELECT '---- disable-tx ----';`,
+		},
+		{
+			name:  "disable-tx in dollar-quoted string",
+			input: `SELECT $$---- disable-tx ----$$;`,
+		},
+		{
+			name:  "disable-tx in block comment",
+			input: `SELECT /* ---- disable-tx ---- */ 1;`,
+		},
+
+		// Top-level directives
+		{
+			name:  "up-down separator as standalone",
+			input: "---- create above / drop below ----",
+		},
+		{
+			name: "up-down separator with newline",
+			input: `---- create above / drop below ----
+SELECT 1;`,
+		},
+		{
+			name:  "disable-tx as standalone",
+			input: "---- disable-tx ----",
+		},
+		{
+			name: "disable-tx with newline",
+			input: `---- disable-tx ----
+SELECT 1;`,
+		},
+		{
+			name: "disable-tx before statement",
+			input: `---- disable-tx ----
+CREATE TABLE users (id int);`,
+		},
+		{
+			name: "both directives",
+			input: `---- disable-tx ----
+CREATE TABLE users (id int);
+---- create above / drop below ----
+DROP TABLE users;`,
+		},
 	}
 
 	for _, tt := range tests {

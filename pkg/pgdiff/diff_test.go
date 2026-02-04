@@ -52,7 +52,7 @@ CREATE INDEX idx_posts ON posts (id);`).
 
 		// Arrange
 		fs, dir := newMigrationsDirBuilder(t).
-			WithFile("bad.sql", "NOT VALID SQL {{{{").
+			WithFile("bad.sql", "SELECT 'unclosed string").
 			Build()
 
 		// Act
@@ -60,7 +60,7 @@ CREATE INDEX idx_posts ON posts (id);`).
 
 		// Assert
 		require.Error(t, err)
-		assert.ErrorContains(t, err, "failed to parse SQL")
+		assert.ErrorContains(t, err, "unclosed string")
 	})
 
 	t.Run("returns empty slice for empty file", func(t *testing.T) {
@@ -105,7 +105,7 @@ func TestGeneratePlan(t *testing.T) {
 		t.Parallel()
 
 		// Arrange
-		poolConfig, terminate, err := StartPostgresContainer(t.Context(), "postgres-alpine:17")
+		poolConfig, terminate, err := StartPostgresContainer(t.Context(), "postgres:17-alpine")
 		require.NoError(t, err)
 		t.Cleanup(func() {
 			ctx, cancel := context.WithTimeout(t.Context(), 15)
@@ -224,7 +224,7 @@ func TestReadStmtsFromMigrationsDir(t *testing.T) {
 
 		// Arrange
 		fs, dir := newMigrationsDirBuilder(t).
-			WithFile("20230601120000_bad.sql", "NOT VALID SQL {{{{").
+			WithFile("20230601120000_bad.sql", "SELECT 'unclosed string").
 			Build()
 
 		// Act
@@ -232,7 +232,7 @@ func TestReadStmtsFromMigrationsDir(t *testing.T) {
 
 		// Assert
 		require.Error(t, err)
-		assert.ErrorContains(t, err, "failed to parse SQL")
+		assert.ErrorContains(t, err, "unclosed string")
 	})
 
 	t.Run("returns error on invalid migration filename", func(t *testing.T) {

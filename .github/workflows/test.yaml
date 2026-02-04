@@ -9,26 +9,15 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres
-        env:
-          POSTGRES_PASSWORD: test
-          POSTGRES_USER: test
-          POSTGRES_DB: test
-        options: >-
-          --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
-        ports:
-          - 5432:5432
     steps:
       - uses: actions/checkout@v4
       - uses: DeterminateSystems/nix-installer-action@v21
-      - uses: DeterminateSystems/magic-nix-cache-action@v13
       - uses: DeterminateSystems/flake-checker-action@v12
       - uses: cachix/cachix-action@v16
         with:
           name: devenv
           skipPush: true
+      - run: nix profile add nixpkgs#devenv
       - name: restore cache
         uses: actions/cache@v4
         with:
@@ -39,23 +28,24 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-v1-go-
       - name: Run Tests
-        run: nix develop --no-pure-eval --command go-test
+        run: go-test
+        shell: devenv shell bash -- -e {0}
   lint:
     name: lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: DeterminateSystems/nix-installer-action@v21
-      - uses: DeterminateSystems/magic-nix-cache-action@v13
       - uses: DeterminateSystems/flake-checker-action@v12
       - uses: cachix/cachix-action@v16
         with:
           name: devenv
           skipPush: true
-      - run: nix develop --no-pure-eval --command lint-ci
-      - run: bash -c 'eval "$(devenv print-dev-env --no-pure-eval)" && echo "PATH=$PATH" >> $GITHUB_ENV'
+      - run: nix profile add nixpkgs#devenv
+      - run: bash -c 'eval "$(devenv print-dev-env)" && echo "PATH=$PATH" >> $GITHUB_ENV'
+        shell: devenv shell bash -- -e {0}
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v8
+        uses: golangci/golangci-lint-action@v9
         with:
           install-mode: "none"
           working-directory: .

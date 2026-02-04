@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"io/fs"
 	"path/filepath"
-	"strings"
+	"slices"
 
 	"github.com/jackc/pgx/v5"
 
@@ -14,10 +14,7 @@ import (
 	"go.inout.gg/conduit/pkg/version"
 )
 
-var DisableTxPattern = "---- disable-tx ----" //nolint:gochecknoglobals
-
-// parseMigrationsFromFS scans the fsys for SQL migration scripts and returns
-// a list of migrations.
+// parseMigrationsFromFS scans the fsys for SQL migration scripts and returns.
 func parseSQLMigrationsFromFS(fsys fs.FS, root string) ([]*Migration, error) {
 	migrations := make([]*Migration, 0)
 
@@ -85,14 +82,20 @@ func parseSQLMigration(fsys fs.FS, path string) (*Migration, error) {
 }
 
 func sqlMigrateFunc(stmts []sqlsplit.Stmt) *migrateFunc {
-	inTx := sliceutil.Some(stmts, func(stmt sqlsplit.Stmt) bool {
-		return strings.Contains(stmt.Content, DisableTxPattern)
+	disableTx := slices.ContainsFunc(stmts, func(stmt sqlsplit.Stmt) bool {
+		return stmt.Type == sqlsplit.StmtTypeDisableTx
 	})
-	up := &migrateFunc{useTx: inTx, fn: nil, fnx: nil}
 
-	if inTx {
-		up.fnx = func(ctx context.Context, tx pgx.Tx) error {
-			for _, stmt := range stmts {
+	sqlStmts := sliceutil.Filter(stmts, func(stmt sqlsplit.Stmt) bool {
+		return stmt.Type == sqlsplit.StmtTypeQuery
+	})
+
+	useTx := !disableTx
+	migration := &migrateFunc{useTx: useTx, fn: nil, fnx: nil}
+
+	if useTx {
+		migration.fnx = func(ctx context.Context, tx pgx.Tx) error {
+			for _, stmt := range sqlStmts {
 				if _, err := tx.Exec(ctx, stmt.Content); err != nil {
 					return fmt.Errorf("conduit: failed to execute migration script: %w", err)
 				}
@@ -101,8 +104,8 @@ func sqlMigrateFunc(stmts []sqlsplit.Stmt) *migrateFunc {
 			return nil
 		}
 	} else {
-		up.fn = func(ctx context.Context, conn *pgx.Conn) error {
-			for _, stmt := range stmts {
+		migration.fn = func(ctx context.Context, conn *pgx.Conn) error {
+			for _, stmt := range sqlStmts {
 				_, err := conn.Exec(ctx, stmt.Content)
 				if err != nil {
 					return fmt.Errorf("conduit: failed to execute migration script: %w", err)
@@ -113,5 +116,5 @@ func sqlMigrateFunc(stmts []sqlsplit.Stmt) *migrateFunc {
 		}
 	}
 
-	return up
+	return migration
 }

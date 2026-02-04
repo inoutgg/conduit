@@ -10,7 +10,11 @@ import (
 )
 
 func TestMap(t *testing.T) {
+	t.Parallel()
+
 	t.Run("Map should work", func(t *testing.T) {
+		t.Parallel()
+
 		input := []int{1, 2, 3, 4, 5}
 		result := sliceutil.Map(input, strconv.Itoa)
 
@@ -19,6 +23,8 @@ func TestMap(t *testing.T) {
 	})
 
 	t.Run("Map empty slice", func(t *testing.T) {
+		t.Parallel()
+
 		var input []int
 
 		result := sliceutil.Map(input, func(i int) bool { return i%2 == 0 })
@@ -28,7 +34,11 @@ func TestMap(t *testing.T) {
 }
 
 func TestKeyBy(t *testing.T) {
+	t.Parallel()
+
 	t.Run("KeyBy should work", func(t *testing.T) {
+		t.Parallel()
+
 		input := []string{"a", "ab", "abc", "abcd"}
 		result := sliceutil.KeyBy(input, func(s string) int { return len(s) })
 
@@ -42,6 +52,8 @@ func TestKeyBy(t *testing.T) {
 	})
 
 	t.Run("KeyBy overlapping keys", func(t *testing.T) {
+		t.Parallel()
+
 		input := []int{1, 2, 3, 4, 5}
 		result := sliceutil.KeyBy(input, func(i int) string {
 			if i%2 == 0 {
@@ -59,6 +71,8 @@ func TestKeyBy(t *testing.T) {
 	})
 
 	t.Run("KeyBy empty slice", func(t *testing.T) {
+		t.Parallel()
+
 		var input []string
 
 		result := sliceutil.KeyBy(input, func(s string) int { return len(s) })
@@ -67,19 +81,45 @@ func TestKeyBy(t *testing.T) {
 	})
 }
 
-func TestSome(t *testing.T) {
-	t.Run("Some should work", func(t *testing.T) {
-		input := []int{2, 4}
+func TestFilter(t *testing.T) {
+	t.Parallel()
 
-		assert.True(t, sliceutil.Some(input, func(i int) bool { return i%2 == 0 }))
-		assert.False(t, sliceutil.Some(input, func(i int) bool { return i%3 == 0 }))
+	t.Run("Filter should work", func(t *testing.T) {
+		t.Parallel()
+
+		input := []int{1, 2, 3, 4, 5}
+		result := sliceutil.Filter(input, func(i int) bool { return i%2 == 0 })
+
+		expected := []int{2, 4}
+		assert.Equal(t, expected, result)
 	})
 
-	t.Run("Some empty slice", func(t *testing.T) {
+	t.Run("Filter all match", func(t *testing.T) {
+		t.Parallel()
+
+		input := []int{2, 4, 6}
+		result := sliceutil.Filter(input, func(i int) bool { return i%2 == 0 })
+
+		expected := []int{2, 4, 6}
+		assert.Equal(t, expected, result)
+	})
+
+	t.Run("Filter none match", func(t *testing.T) {
+		t.Parallel()
+
+		input := []int{1, 3, 5}
+		result := sliceutil.Filter(input, func(i int) bool { return i%2 == 0 })
+
+		assert.Empty(t, result)
+	})
+
+	t.Run("Filter empty slice", func(t *testing.T) {
+		t.Parallel()
+
 		var input []int
 
-		result := sliceutil.Some(input, func(i int) bool { return i%2 == 0 })
+		result := sliceutil.Filter(input, func(i int) bool { return i%2 == 0 })
 
-		assert.False(t, result)
+		assert.Empty(t, result)
 	})
 }
