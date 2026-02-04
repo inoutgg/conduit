@@ -14,6 +14,7 @@ type migrationsDirBuilder struct {
 	fs            afero.Fs
 	failOnFileErr error
 	t             *testing.T
+	baseDir       string
 	dir           string
 	failOnFile    string
 }
@@ -22,15 +23,24 @@ func newMigrationsDirBuilder(t *testing.T) *migrationsDirBuilder {
 	t.Helper()
 
 	fs := afero.NewMemMapFs()
-	dir := "/migrations"
+	baseDir := "/testdir"
+	dir := filepath.Join(baseDir, "migrations")
+	require.NoError(t, fs.MkdirAll(baseDir, 0o755))
 	require.NoError(t, fs.MkdirAll(dir, 0o755))
 
-	return &migrationsDirBuilder{t: t, fs: fs, dir: dir}
+	return &migrationsDirBuilder{t: t, fs: fs, baseDir: baseDir, dir: dir}
 }
 
 func (b *migrationsDirBuilder) WithFile(name, content string) *migrationsDirBuilder {
 	b.t.Helper()
 	require.NoError(b.t, afero.WriteFile(b.fs, filepath.Join(b.dir, name), []byte(content), 0o644))
+
+	return b
+}
+
+func (b *migrationsDirBuilder) WithBaseFile(name, content string) *migrationsDirBuilder {
+	b.t.Helper()
+	require.NoError(b.t, afero.WriteFile(b.fs, filepath.Join(b.baseDir, name), []byte(content), 0o644))
 
 	return b
 }
@@ -50,7 +60,7 @@ func (b *migrationsDirBuilder) WithReadError(file string, err error) *migrations
 	return b
 }
 
-func (b *migrationsDirBuilder) Build() (afero.Fs, string) {
+func (b *migrationsDirBuilder) Build() (afero.Fs, string, string) {
 	b.t.Helper()
 
 	fs := b.fs
@@ -62,7 +72,7 @@ func (b *migrationsDirBuilder) Build() (afero.Fs, string) {
 		}
 	}
 
-	return fs, b.dir
+	return fs, b.baseDir, b.dir
 }
 
 // readErrorFs wraps an afero.Fs and returns an error when reading a specific file.
