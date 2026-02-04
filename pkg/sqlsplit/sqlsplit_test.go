@@ -92,6 +92,165 @@ $func$ LANGUAGE plpgsql;`,
 			name:  "trailing statement without semicolon",
 			input: "SELECT 1; SELECT 2",
 		},
+
+		// Realistic PL/pgSQL functions
+		{
+			name: "plpgsql function with exception handling",
+			input: `CREATE FUNCTION safe_divide(a int, b int) RETURNS int AS $$
+BEGIN
+    RETURN a / b;
+EXCEPTION
+    WHEN division_by_zero THEN
+        RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;`,
+		},
+		{
+			name: "plpgsql function with dynamic SQL",
+			input: `CREATE FUNCTION dynamic_query(tbl text) RETURNS SETOF record AS $$
+BEGIN
+    RETURN QUERY EXECUTE 'SELECT * FROM ' || quote_ident(tbl) || ' WHERE id > $1' USING 10;
+END;
+$$ LANGUAGE plpgsql;`,
+		},
+		{
+			name: "plpgsql function with nested dollar quotes and comments",
+			input: `CREATE FUNCTION complex_func() RETURNS text AS $body$
+BEGIN
+    -- This is a line comment inside the function
+    /* This is a block comment
+       spanning multiple lines */
+    RETURN $inner$It's a nested "string" with; semicolons$inner$;
+END;
+$body$ LANGUAGE plpgsql;`,
+		},
+
+		// Complex comment scenarios
+		{
+			name:  "block comment containing string-like content",
+			input: `SELECT /* it's got 'quotes' and "identifiers" */ 1;`,
+		},
+		{
+			name:  "block comment containing dollar signs",
+			input: `SELECT /* $$ not a string $$ */ 1; SELECT /* $tag$ also not $tag$ */ 2;`,
+		},
+		{
+			name:  "deeply nested block comments",
+			input: `SELECT /* level1 /* level2 /* level3 */ back to 2 */ back to 1 */ 1;`,
+		},
+		{
+			name: "mixed line and block comments",
+			input: `SELECT 1; -- line comment /* not a block
+SELECT /* block comment -- not a line */ 2;`,
+		},
+
+		// Complex string scenarios
+		{
+			name:  "string containing comment-like content",
+			input: `SELECT '/* not a comment */'; SELECT '-- also not a comment';`,
+		},
+		{
+			name:  "string containing dollar signs",
+			input: `SELECT 'price is $5 or $$10';`,
+		},
+		{
+			name:  "multiple escape sequences",
+			input: `SELECT E'line1\nline2\ttab\\backslash\'quote';`,
+		},
+		{
+			name:  "adjacent strings",
+			input: `SELECT 'first' 'second'; SELECT 'it''s escaped';`,
+		},
+
+		// Complex dollar quoting
+		{
+			name:  "dollar tag resembling keyword",
+			input: `SELECT $SELECT$content with; semicolon$SELECT$;`,
+		},
+		{
+			name:  "dollar string containing its own fake closer",
+			input: `SELECT $a$text $a not closed yet$a$;`,
+		},
+		{
+			name:  "empty dollar string",
+			input: `SELECT $$$$; SELECT $tag$$tag$;`,
+		},
+		{
+			name:  "multiple different dollar tags in sequence",
+			input: `SELECT $a$one$a$, $b$two$b$, $$three$$;`,
+		},
+
+		// Complex identifier scenarios
+		{
+			name:  "identifier containing all special chars",
+			input: `SELECT "table;name--with/*special*/chars" FROM "test";`,
+		},
+		{
+			name:  "identifier resembling keyword",
+			input: `SELECT "SELECT", "FROM", "WHERE" FROM "table";`,
+		},
+
+		// Real-world migration patterns
+		{
+			name: "CREATE TYPE with multiline",
+			input: `CREATE TYPE mood AS ENUM (
+    'sad',
+    'ok',
+    'happy'
+);
+CREATE TYPE address AS (
+    street text,
+    city text,
+    zip text
+);`,
+		},
+		{
+			name: "CREATE TRIGGER with function reference",
+			input: `CREATE FUNCTION update_timestamp() RETURNS trigger AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+CREATE TRIGGER set_timestamp
+    BEFORE UPDATE ON users
+    FOR EACH ROW
+    EXECUTE FUNCTION update_timestamp();`,
+		},
+		{
+			name:  "ALTER TABLE with multiple operations",
+			input: `ALTER TABLE users ADD COLUMN email text, ADD COLUMN created_at timestamp DEFAULT NOW(), DROP COLUMN old_field;`,
+		},
+		{
+			name: "DO block with anonymous function",
+			input: `DO $$
+DECLARE
+    r record;
+BEGIN
+    FOR r IN SELECT * FROM users WHERE active = false
+    LOOP
+        RAISE NOTICE 'Inactive user: %', r.name;
+    END LOOP;
+END;
+$$;`,
+		},
+
+		{
+			name: "CREATE TABLE with comments and quoted identifier",
+			input: `-- Create a table for user data
+/* This table contains all user-related data
+   for the application */
+CREATE TABLE "user-data" (
+    id serial PRIMARY KEY,
+    "full-name" text NOT NULL
+);`,
+		},
+
+		// Edge cases
+		{
+			name:  "unicode in strings and identifiers",
+			input: `SELECT 'émoji 🎉 café'; SELECT "tëst_tàble" FROM "schëma"."tãble";`,
+		},
 	}
 
 	for _, tt := range tests {
