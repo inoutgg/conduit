@@ -33,7 +33,7 @@ const (
 )
 
 // Split splits a SQL file into individual statements.
-func Split(sql string) ([]Stmt, error) {
+func Split(sql []byte) ([]Stmt, error) {
 	s := newScanner(sql)
 	if err := s.scan(); err != nil {
 		return nil, err
@@ -77,10 +77,10 @@ type scanner struct {
 	commentDepth int
 }
 
-func newScanner(sql string) *scanner {
+func newScanner(sql []byte) *scanner {
 	//nolint:exhaustruct
 	return &scanner{
-		runes:      []rune(sql),
+		runes:      []rune(string(sql)),
 		currentLoc: Location{Pos: 0, Line: 1, Col: 1},
 	}
 }

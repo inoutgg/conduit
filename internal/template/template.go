@@ -15,8 +15,11 @@ var (
 	//go:embed registry.go.tmpl
 	registryTemplate string
 
-	//go:embed migration.sql.tmpl
-	sqlMigrationTemplate string
+	//go:embed migration.up.sql.tmpl
+	sqlUpMigrationTemplate string
+
+	//go:embed migration.down.sql.tmpl
+	sqlDownMigrationTemplate string
 
 	//go:embed migration.go.tmpl
 	goMigrationTemplate string
@@ -25,7 +28,8 @@ var (
 var (
 	ConduitMigrationTemplate *template.Template //nolint:gochecknoglobals
 	RegistryTemplate         *template.Template //nolint:gochecknoglobals
-	SQLMigrationTemplate     *template.Template //nolint:gochecknoglobals
+	SQLUpMigrationTemplate   *template.Template //nolint:gochecknoglobals
+	SQLDownMigrationTemplate *template.Template //nolint:gochecknoglobals
 	GoMigrationTemplate      *template.Template //nolint:gochecknoglobals
 )
 
@@ -35,6 +39,11 @@ func init() {
 		template.New("conduit: Conduit Migration Template").Parse(conduitMigrationTemplate),
 	)
 	RegistryTemplate = must.Must(template.New("conduit: Registry Template").Parse(registryTemplate))
-	SQLMigrationTemplate = must.Must(template.New("conduit: SQL Migration Template").Parse(sqlMigrationTemplate))
+	SQLUpMigrationTemplate = must.Must(
+		template.New("conduit: SQL Up Migration Template").Parse(sqlUpMigrationTemplate),
+	)
+	SQLDownMigrationTemplate = must.Must(
+		template.New("conduit: SQL Down Migration Template").Parse(sqlDownMigrationTemplate),
+	)
 	GoMigrationTemplate = must.Must(template.New("conduit: Go Migration Template").Parse(goMigrationTemplate))
 }

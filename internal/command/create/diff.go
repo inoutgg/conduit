@@ -65,14 +65,6 @@ func diff(ctx context.Context, fs afero.Fs, args DiffArgs) error {
 	}
 
 	ver := version.NewVersion()
-	filename := version.MigrationFilename(ver, args.Name, "sql")
-	path := filepath.Join(migrationDir, filename)
-
-	f, err := fs.Create(path)
-	if err != nil {
-		return fmt.Errorf("failed to create migration file %s: %w", path, err)
-	}
-	defer f.Close()
 
 	var upStmts strings.Builder
 	for i, stmt := range plan.Statements {
@@ -87,7 +79,7 @@ func diff(ctx context.Context, fs afero.Fs, args DiffArgs) error {
 		}
 	}
 
-	if err := internaltpl.SQLMigrationTemplate.Execute(f, struct {
+	tplData := struct {
 		Version    version.Version
 		Name       string
 		SchemaPath string
@@ -97,16 +89,32 @@ func diff(ctx context.Context, fs afero.Fs, args DiffArgs) error {
 		Name:       args.Name,
 		SchemaPath: args.SchemaPath,
 		UpStmts:    upStmts.String(),
-	}); err != nil {
-		return fmt.Errorf("failed to write template: %w", err)
 	}
 
-	if err := f.Sync(); err != nil {
-		return fmt.Errorf("failed to write migration file %s: %w", path, err)
+	// Create up migration.
+	upFilename, err := version.MigrationFilename(ver, args.Name, version.MigrationDirectionUp, "sql")
+	if err != nil {
+		return fmt.Errorf("failed to generate migration filename: %w", err)
+	}
+
+	upPath := filepath.Join(migrationDir, upFilename)
+	if err := writeTemplate(fs, upPath, internaltpl.SQLUpMigrationTemplate, tplData); err != nil {
+		return err
+	}
+
+	// Create down migration.
+	downFilename, err := version.MigrationFilename(ver, args.Name, version.MigrationDirectionDown, "sql")
+	if err != nil {
+		return fmt.Errorf("failed to generate migration filename: %w", err)
+	}
+
+	downPath := filepath.Join(migrationDir, downFilename)
+	if err := writeTemplate(fs, downPath, internaltpl.SQLDownMigrationTemplate, tplData); err != nil {
+		return err
 	}
 
 	//nolint:forbidigo
-	fmt.Printf("Created migration: %s\n", path)
+	fmt.Printf("Created migration: %s\n", upPath)
 
 	// Print hazards if any
 	for _, stmt := range plan.Statements {

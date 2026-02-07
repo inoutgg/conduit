@@ -3,6 +3,8 @@ package migrations
 import (
 	"embed"
 
+	"github.com/spf13/afero"
+
 	"go.inout.gg/conduit/conduitregistry"
 )
 
@@ -17,5 +19,5 @@ var migrations embed.FS
 
 //nolint:gochecknoinits
 func init() {
-	Registry.FromFS(migrations)
+	Registry.FromFS(afero.FromIOFS{FS: migrations}, ".")
 }

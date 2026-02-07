@@ -3,37 +3,82 @@ package conduitregistry
 import (
 	"context"
 	"fmt"
-	"io/fs"
+	"os"
 	"path/filepath"
 	"slices"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/spf13/afero"
 
 	"go.inout.gg/conduit/internal/sliceutil"
 	"go.inout.gg/conduit/pkg/sqlsplit"
 	"go.inout.gg/conduit/pkg/version"
 )
 
-// parseMigrationsFromFS scans the fsys for SQL migration scripts and returns.
-func parseSQLMigrationsFromFS(fsys fs.FS, root string) ([]*Migration, error) {
-	migrations := make([]*Migration, 0)
+// parseSQLMigrationsFromFS scans the fsys for SQL migration scripts and returns.
+func parseSQLMigrationsFromFS(fs afero.Fs, root string) ([]*Migration, error) {
+	migrations := make(map[string]*Migration)
 
-	err := fs.WalkDir(fsys, root, func(path string, _ fs.DirEntry, err error) error {
+	err := afero.Walk(fs, root, func(path string, fileInfo os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
 
-		// Matching the root directory, skip it.
-		if path == root {
+		if fileInfo.IsDir() {
 			return nil
 		}
 
-		migration, err := parseSQLMigration(fsys, path)
+		info, err := version.ParseMigrationFilename(filepath.Base(path))
 		if err != nil {
-			return err
+			return fmt.Errorf("conduit: failed to parse migration filename: %w", err)
 		}
 
-		migrations = append(migrations, migration)
+		content, err := afero.ReadFile(fs, path)
+		if err != nil {
+			return fmt.Errorf("conduit: failed to read migration file: %w", err)
+		}
+
+		stmts, err := sqlsplit.Split(content)
+		if err != nil {
+			return fmt.Errorf("conduit: failed to split migration SQL: %w", err)
+		}
+
+		key := info.Version.String()
+
+		m, ok := migrations[key]
+		if !ok {
+			m = &Migration{
+				version: info.Version,
+				name:    info.Name,
+				up:      nil,
+				down:    emptyMigrateFunc,
+			}
+			migrations[key] = m
+		}
+
+		switch info.Direction {
+		case version.MigrationDirectionUp:
+			if m.up != nil {
+				return fmt.Errorf(
+					"conduit: duplicate up migration for version %s: %w",
+					key,
+					ErrUpExists,
+				)
+			}
+
+			m.up = sqlMigrateFunc(stmts)
+
+		case version.MigrationDirectionDown:
+			if m.down != emptyMigrateFunc {
+				return fmt.Errorf(
+					"conduit: duplicate down migration for version %s: %w",
+					key,
+					ErrDownExists,
+				)
+			}
+
+			m.down = sqlMigrateFunc(stmts)
+		}
 
 		return nil
 	})
@@ -41,44 +86,16 @@ func parseSQLMigrationsFromFS(fsys fs.FS, root string) ([]*Migration, error) {
 		return nil, fmt.Errorf("conduit: error occurred while parsing migrations directory: %w", err)
 	}
 
-	return migrations, nil
-}
+	result := make([]*Migration, 0, len(migrations))
+	for key, m := range migrations {
+		if m.up == nil {
+			return nil, fmt.Errorf("conduit: migration version %s has a down file but no up file", key)
+		}
 
-// parseSQLMigration reads an SQL file from fsys by path and parses it
-// into a migration.
-func parseSQLMigration(fsys fs.FS, path string) (*Migration, error) {
-	filename := filepath.Base(path)
-
-	info, err := version.ParseMigrationFilename(filename)
-	if err != nil {
-		return nil, fmt.Errorf("conduit: failed to parse migration filename: %w", err)
+		result = append(result, m)
 	}
 
-	sql, err := fs.ReadFile(fsys, path)
-	if err != nil {
-		return nil, fmt.Errorf("conduit: failed to read migration file: %w", err)
-	}
-
-	up, down, err := sqlsplit.SplitMigration(string(sql))
-	if err != nil {
-		return nil, fmt.Errorf("conduit: failed to split SQL statements: %w", err)
-	}
-
-	migration := Migration{
-		version: info.Version,
-		name:    info.Name,
-		up:      emptyMigrateFunc,
-		down:    emptyMigrateFunc,
-	}
-
-	migration.up = sqlMigrateFunc(up)
-
-	// Down migration can be empty.
-	if len(down) > 0 {
-		migration.down = sqlMigrateFunc(down)
-	}
-
-	return &migration, nil
+	return result, nil
 }
 
 func sqlMigrateFunc(stmts []sqlsplit.Stmt) *migrateFunc {

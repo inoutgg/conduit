@@ -1,4 +1,4 @@
-package pgdiff
+package testutil
 
 import (
 	"path/filepath"
@@ -8,9 +8,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// migrationsDirBuilder provides a builder for setting up
+// MigrationsDirBuilder provides a builder for setting up
 // an in-memory filesystem with a migrations directory.
-type migrationsDirBuilder struct {
+type MigrationsDirBuilder struct {
 	fs            afero.Fs
 	failOnFileErr error
 	t             *testing.T
@@ -19,7 +19,8 @@ type migrationsDirBuilder struct {
 	failOnFile    string
 }
 
-func newMigrationsDirBuilder(t *testing.T) *migrationsDirBuilder {
+// NewMigrationsDirBuilder creates a new builder with a base directory and migrations subdirectory.
+func NewMigrationsDirBuilder(t *testing.T) *MigrationsDirBuilder {
 	t.Helper()
 
 	fs := afero.NewMemMapFs()
@@ -28,31 +29,36 @@ func newMigrationsDirBuilder(t *testing.T) *migrationsDirBuilder {
 	require.NoError(t, fs.MkdirAll(baseDir, 0o755))
 	require.NoError(t, fs.MkdirAll(dir, 0o755))
 
-	return &migrationsDirBuilder{t: t, fs: fs, baseDir: baseDir, dir: dir}
+	//nolint:exhaustruct
+	return &MigrationsDirBuilder{t: t, fs: fs, baseDir: baseDir, dir: dir}
 }
 
-func (b *migrationsDirBuilder) WithFile(name, content string) *migrationsDirBuilder {
+// WithFile adds a file to the migrations directory.
+func (b *MigrationsDirBuilder) WithFile(name, content string) *MigrationsDirBuilder {
 	b.t.Helper()
 	require.NoError(b.t, afero.WriteFile(b.fs, filepath.Join(b.dir, name), []byte(content), 0o644))
 
 	return b
 }
 
-func (b *migrationsDirBuilder) WithBaseFile(name, content string) *migrationsDirBuilder {
+// WithBaseFile adds a file to the base directory.
+func (b *MigrationsDirBuilder) WithBaseFile(name, content string) *MigrationsDirBuilder {
 	b.t.Helper()
 	require.NoError(b.t, afero.WriteFile(b.fs, filepath.Join(b.baseDir, name), []byte(content), 0o644))
 
 	return b
 }
 
-func (b *migrationsDirBuilder) WithSubdir(name string) *migrationsDirBuilder {
+// WithSubdir adds a subdirectory inside the migrations directory.
+func (b *MigrationsDirBuilder) WithSubdir(name string) *MigrationsDirBuilder {
 	b.t.Helper()
 	require.NoError(b.t, b.fs.MkdirAll(filepath.Join(b.dir, name), 0o755))
 
 	return b
 }
 
-func (b *migrationsDirBuilder) WithReadError(file string, err error) *migrationsDirBuilder {
+// WithReadError configures the builder to return an error when reading a specific file.
+func (b *MigrationsDirBuilder) WithReadError(file string, err error) *MigrationsDirBuilder {
 	b.t.Helper()
 	b.failOnFile = filepath.Join(b.dir, file)
 	b.failOnFileErr = err
@@ -60,7 +66,8 @@ func (b *migrationsDirBuilder) WithReadError(file string, err error) *migrations
 	return b
 }
 
-func (b *migrationsDirBuilder) Build() (afero.Fs, string, string) {
+// Build returns the filesystem, base directory, and migrations directory.
+func (b *MigrationsDirBuilder) Build() (afero.Fs, string, string) {
 	b.t.Helper()
 
 	fs := b.fs

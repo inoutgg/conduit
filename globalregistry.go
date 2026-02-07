@@ -3,6 +3,8 @@ package conduit
 import (
 	"io/fs"
 
+	"github.com/spf13/afero"
+
 	"go.inout.gg/conduit/conduitregistry"
 )
 
@@ -30,6 +32,6 @@ func Down(down MigrateFunc) { globalRegistry.Down(down) }
 func DownTx(down MigrateFuncTx) { globalRegistry.DownTx(down) }
 
 // FromFS registers SQL migrations from the provided filesystem in the global registry.
-func FromFS(fsys fs.FS) {
-	globalRegistry.FromFS(fsys)
+func FromFS(fs fs.FS, root string) {
+	globalRegistry.FromFS(afero.FromIOFS{FS: fs}, root)
 }

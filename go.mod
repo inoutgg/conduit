@@ -14,6 +14,7 @@ require (
 	github.com/testcontainers/testcontainers-go/modules/postgres v0.40.0
 	github.com/urfave/cli/v3 v3.6.1
 	go.inout.gg/foundations v0.0.0-20251108094430-2c59a9842cd4
+	go.segfaultmedaddy.com/pgxephemeraltest v1.2.0
 )
 
 require (
@@ -28,7 +29,7 @@ require (
 	github.com/cpuguy83/dockercfg v0.3.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/distribution/reference v0.6.0 // indirect
-	github.com/docker/docker v28.5.1+incompatible // indirect
+	github.com/docker/docker v28.5.2+incompatible // indirect
 	github.com/docker/go-connections v0.6.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/ebitengine/purego v0.8.4 // indirect
@@ -89,6 +90,7 @@ require (
 	go.opentelemetry.io/otel/metric v1.38.0 // indirect
 	go.opentelemetry.io/otel/sdk v1.38.0 // indirect
 	go.opentelemetry.io/otel/trace v1.38.0 // indirect
+	go.uber.org/mock v0.6.0 // indirect
 	golang.org/x/crypto v0.45.0 // indirect
 	golang.org/x/sync v0.19.0 // indirect
 	golang.org/x/sys v0.38.0 // indirect

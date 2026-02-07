@@ -319,7 +319,7 @@ DROP TABLE users;`,
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			stmts, err := Split(tt.input)
+			stmts, err := Split([]byte(tt.input))
 			require.NoError(t, err)
 			snaps.MatchSnapshot(t, stmts)
 		})
@@ -378,7 +378,7 @@ func TestLocationTracking(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			stmts, err := Split(tt.input)
+			stmts, err := Split([]byte(tt.input))
 			require.NoError(t, err)
 			require.Len(t, stmts, len(tt.expected))
 
@@ -440,7 +440,7 @@ func TestUnclosedErrors(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			_, err := Split(tt.input)
+			_, err := Split([]byte(tt.input))
 			require.Error(t, err)
 			require.Contains(t, err.Error(), tt.errContains,
 				"expected error containing %q, got %q", tt.errContains, err.Error())

@@ -110,7 +110,12 @@ func createMigrationDir(fs afero.Fs, dir string) error {
 // in the migrations directory.
 func createConduitMigrationFile(fs afero.Fs, dirpath string, namespace string, packageName string) (string, error) {
 	ver := version.NewVersion()
-	filename := version.MigrationFilename(ver, "conduit_migration", "go")
+
+	filename, err := version.MigrationFilename(ver, "conduit_migration", "", "go")
+	if err != nil {
+		return "", fmt.Errorf("conduit: failed to generate migration filename: %w", err)
+	}
+
 	fpath := filepath.Join(dirpath, filename)
 
 	f, err := fs.Create(fpath)
