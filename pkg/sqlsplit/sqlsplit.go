@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 	"unicode"
+	"unicode/utf8"
 )
 
 // StmtType represents the type of a statement.
@@ -62,10 +63,14 @@ func (l Location) String() string {
 }
 
 type scanner struct {
-	dollarTag  string
-	buf        strings.Builder
-	runes      []rune
-	stmts      []Stmt
+	dollarTag string
+	buf       strings.Builder
+	data      []byte
+	stmts     []Stmt
+
+	// pos is the current byte offset into data.
+	pos int
+
 	currentLoc Location
 
 	// startLoc is current statement start location
@@ -79,22 +84,36 @@ type scanner struct {
 
 func newScanner(sql []byte) *scanner {
 	//nolint:exhaustruct
+	//
 	return &scanner{
-		runes:      []rune(string(sql)),
+		data:       sql,
 		currentLoc: Location{Pos: 0, Line: 1, Col: 1},
 	}
 }
 
-func (s *scanner) peek(offset int) rune {
-	if s.currentLoc.Pos+offset < len(s.runes) {
-		return s.runes[s.currentLoc.Pos+offset]
+// peek0 decodes the current rune and its byte size.
+func (s *scanner) peek0() (rune, int) {
+	if s.pos >= len(s.data) {
+		return 0, 0
 	}
 
-	return 0
+	return utf8.DecodeRune(s.data[s.pos:])
 }
 
-func (s *scanner) advance() {
-	if s.runes[s.currentLoc.Pos] == '\n' {
+// peek1 decodes the next rune after the current one, given the current rune's byte size.
+func (s *scanner) peek1(size0 int) rune {
+	next := s.pos + size0
+	if next >= len(s.data) {
+		return 0
+	}
+
+	r, _ := utf8.DecodeRune(s.data[next:])
+
+	return r
+}
+
+func (s *scanner) advance(r rune, size int) {
+	if r == '\n' {
 		s.currentLoc.Line++
 		s.currentLoc.Col = 1
 	} else {
@@ -102,13 +121,18 @@ func (s *scanner) advance() {
 	}
 
 	s.currentLoc.Pos++
+	s.pos += size
 }
 
-func (s *scanner) consume(n int) {
-	for range n {
-		s.buf.WriteRune(s.peek(0))
-		s.advance()
-	}
+func (s *scanner) consume1() {
+	r, size := s.peek0()
+	s.buf.Write(s.data[s.pos : s.pos+size])
+	s.advance(r, size)
+}
+
+func (s *scanner) consume2() {
+	s.consume1()
+	s.consume1()
 }
 
 func (s *scanner) emitStmt() {
@@ -127,7 +151,7 @@ func (s *scanner) emitStmt() {
 }
 
 func (s *scanner) scan() error {
-	for s.currentLoc.Pos < len(s.runes) {
+	for s.pos < len(s.data) {
 		switch s.state {
 		case stateStmt:
 			s.scanStmt()
@@ -178,11 +202,11 @@ func (s *scanner) reportUnclosed() error {
 }
 
 func (s *scanner) scanStmt() {
-	r := s.peek(0)
+	r, size := s.peek0()
 
 	// Skip leading whitespace between statements
 	if s.buf.Len() == 0 && unicode.IsSpace(r) {
-		s.advance()
+		s.advance(r, size)
 		return
 	}
 
@@ -192,54 +216,56 @@ func (s *scanner) scanStmt() {
 	}
 
 	switch {
-	case r == '-' && s.peek(1) == '-':
+	case r == '-' && s.peek1(size) == '-':
 		s.state = stateLineComment
-		s.consume(2) // --
+		s.consume2() // --
 
-	case r == '/' && s.peek(1) == '*':
+	case r == '/' && s.peek1(size) == '*':
 		s.stateLoc = s.currentLoc
 		s.state = stateBlockComment
 		s.commentDepth = 1
-		s.consume(2) // /*
+		s.consume2() // /*
 
 	case r == '$':
-		if tag, endPos, ok := parseDollarQuoteTag(s.runes, s.currentLoc.Pos); ok {
+		if tag, endBytePos, ok := parseDollarQuoteTag(s.data, s.pos); ok {
 			s.stateLoc = s.currentLoc
 			s.state = stateDollarString
 			s.dollarTag = tag
-			s.consume(endPos - s.currentLoc.Pos)
+			s.consumeBytes(endBytePos - s.pos)
 		} else {
-			s.consume(1)
+			s.consume1()
 		}
 
 	case r == '\'':
 		s.stateLoc = s.currentLoc
 		s.state = stateString
-		s.consume(1)
+		s.consume1()
 
 	case r == '"':
 		s.stateLoc = s.currentLoc
 		s.state = stateIdent
-		s.consume(1)
+		s.consume1()
 
 	case r == ';':
-		s.consume(1)
+		s.consume1()
 		s.emitStmt()
 
 	default:
-		s.consume(1)
+		s.consume1()
 	}
 }
 
 func (s *scanner) scanLineComment() {
-	if s.peek(0) == '\n' {
+	r, size := s.peek0()
+
+	if r == '\n' {
 		// Check if this line comment is a directive that should be a separate statement
 		content := s.buf.String()
 
 		trimmed := strings.TrimSpace(content)
 		if _, ok := directivePatterns[trimmed]; ok {
 			s.emitStmt()
-			s.advance() // consume the newline
+			s.advance(r, size) // consume the newline
 			s.state = stateStmt
 
 			return
@@ -248,74 +274,86 @@ func (s *scanner) scanLineComment() {
 		s.state = stateStmt
 	}
 
-	s.consume(1)
+	s.consume1()
 }
 
 func (s *scanner) scanBlockComment() {
-	switch {
-	case s.peek(0) == '/' && s.peek(1) == '*':
-		s.commentDepth++
-		s.consume(2) // /*
+	r, size := s.peek0()
 
-	case s.peek(0) == '*' && s.peek(1) == '/':
+	switch {
+	case r == '/' && s.peek1(size) == '*':
+		s.commentDepth++
+		s.consume2() // /*
+
+	case r == '*' && s.peek1(size) == '/':
 		s.commentDepth--
-		s.consume(2) // */
+		s.consume2() // */
 
 		if s.commentDepth == 0 {
 			s.state = stateStmt
 		}
 
 	default:
-		s.consume(1)
+		s.consume1()
 	}
 }
 
 func (s *scanner) scanString() {
-	r := s.peek(0)
+	r, size := s.peek0()
 
 	switch {
-	case r == '\\' && s.currentLoc.Pos+1 < len(s.runes):
-		s.consume(2) // escape sequence
+	case r == '\\' && s.pos+size < len(s.data):
+		s.consume2() // escape sequence
 
-	case r == '\'' && s.peek(1) == '\'':
-		s.consume(2) // ''
+	case r == '\'' && s.peek1(size) == '\'':
+		s.consume2() // ''
 
 	case r == '\'':
 		s.state = stateStmt
-		s.consume(1)
+		s.consume1()
 
 	default:
-		s.consume(1)
+		s.consume1()
 	}
 }
 
 func (s *scanner) scanDollarString() {
-	if s.peek(0) == '$' {
-		if closeTag, closeEnd, ok := parseDollarQuoteTag(s.runes, s.currentLoc.Pos); ok &&
+	r, _ := s.peek0()
+
+	if r == '$' {
+		if closeTag, closeEnd, ok := parseDollarQuoteTag(s.data, s.pos); ok &&
 			closeTag == s.dollarTag {
 			s.state = stateStmt
-			s.consume(closeEnd - s.currentLoc.Pos)
+			s.consumeBytes(closeEnd - s.pos)
 
 			return
 		}
 	}
 
-	s.consume(1)
+	s.consume1()
 }
 
 func (s *scanner) scanIdent() {
-	r := s.peek(0)
+	r, size := s.peek0()
 
 	switch {
-	case r == '"' && s.peek(1) == '"':
-		s.consume(2) // ""
+	case r == '"' && s.peek1(size) == '"':
+		s.consume2() // ""
 
 	case r == '"':
 		s.state = stateStmt
-		s.consume(1)
+		s.consume1()
 
 	default:
-		s.consume(1)
+		s.consume1()
+	}
+}
+
+// consumeBytes consumes exactly n bytes worth of runes from the input.
+func (s *scanner) consumeBytes(n int) {
+	end := s.pos + n
+	for s.pos < end {
+		s.consume1()
 	}
 }
 
@@ -333,46 +371,47 @@ func newStmt(content string, start, end Location, typ StmtType) *Stmt {
 	}
 }
 
-// parseDollarQuoteTag attempts to parse a dollar-quote tag at the given position.
-// Returns (tag, endPos, ok) where tag is the identifier between $...$,
-// endPos is the position after the closing $, and ok indicates if parsing succeeded.
+// parseDollarQuoteTag attempts to parse a dollar-quote tag at the given byte position.
+// Returns (tag, endBytePos, ok) where tag is the identifier between $...$,
+// endBytePos is the byte position after the closing $, and ok indicates if parsing succeeded.
 // For $$, returns ("", pos+2, true). For $tag$, returns ("tag", pos+5, true).
-func parseDollarQuoteTag(runes []rune, pos int) (string, int, bool) {
-	if pos >= len(runes) || runes[pos] != '$' {
+func parseDollarQuoteTag(data []byte, pos int) (string, int, bool) {
+	if pos >= len(data) || data[pos] != '$' {
 		return "", pos, false
 	}
 
 	start := pos
 	pos++
-	tagStart := pos
 
 	// Empty tag: $$
-	if pos < len(runes) && runes[pos] == '$' {
+	if pos < len(data) && data[pos] == '$' {
 		return "", pos + 1, true
 	}
 
-	if pos >= len(runes) {
+	if pos >= len(data) {
 		return "", start, false
 	}
 
-	r := runes[pos]
+	tagStart := pos
+
+	r, size := utf8.DecodeRune(data[pos:])
 	if !unicode.IsLetter(r) && r != '_' {
 		return "", start, false
 	}
 
-	pos++
+	pos += size
 
-	for pos < len(runes) {
-		r = runes[pos]
+	for pos < len(data) {
+		r, size = utf8.DecodeRune(data[pos:])
 		if r == '$' {
-			return string(runes[tagStart:pos]), pos + 1, true
+			return string(data[tagStart:pos]), pos + 1, true
 		}
 
 		if !unicode.IsLetter(r) && !unicode.IsDigit(r) && r != '_' {
 			return "", start, false
 		}
 
-		pos++
+		pos += size
 	}
 
 	return "", start, false
