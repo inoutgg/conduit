@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/spf13/afero"
@@ -14,6 +15,8 @@ import (
 	"go.inout.gg/conduit/pkg/sqlsplit"
 	"go.inout.gg/conduit/pkg/version"
 )
+
+const DisableTxDirective = "---- disable-tx ----"
 
 // parseSQLMigrationsFromFS scans the fsys for SQL migration scripts and returns.
 func parseSQLMigrationsFromFS(fs afero.Fs, root string) ([]*Migration, error) {
@@ -100,10 +103,11 @@ func parseSQLMigrationsFromFS(fs afero.Fs, root string) ([]*Migration, error) {
 
 func sqlMigrateFunc(stmts []sqlsplit.Stmt) *migrateFunc {
 	disableTx := slices.ContainsFunc(stmts, func(stmt sqlsplit.Stmt) bool {
-		return stmt.Type == sqlsplit.StmtTypeDisableTx
+		return stmt.Type == sqlsplit.StmtTypeComment &&
+			strings.TrimSpace(stmt.Content) == DisableTxDirective
 	})
 
-	sqlStmts := sliceutil.Filter(stmts, func(stmt sqlsplit.Stmt) bool {
+	queryStmts := sliceutil.Filter(stmts, func(stmt sqlsplit.Stmt) bool {
 		return stmt.Type == sqlsplit.StmtTypeQuery
 	})
 
@@ -112,7 +116,7 @@ func sqlMigrateFunc(stmts []sqlsplit.Stmt) *migrateFunc {
 
 	if useTx {
 		migration.fnx = func(ctx context.Context, tx pgx.Tx) error {
-			for _, stmt := range sqlStmts {
+			for _, stmt := range queryStmts {
 				if _, err := tx.Exec(ctx, stmt.Content); err != nil {
 					return fmt.Errorf("conduit: failed to execute migration script: %w", err)
 				}
@@ -122,7 +126,7 @@ func sqlMigrateFunc(stmts []sqlsplit.Stmt) *migrateFunc {
 		}
 	} else {
 		migration.fn = func(ctx context.Context, conn *pgx.Conn) error {
-			for _, stmt := range sqlStmts {
+			for _, stmt := range queryStmts {
 				_, err := conn.Exec(ctx, stmt.Content)
 				if err != nil {
 					return fmt.Errorf("conduit: failed to execute migration script: %w", err)

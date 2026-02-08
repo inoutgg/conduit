@@ -11,16 +11,9 @@ import (
 type StmtType string
 
 const (
-	StmtTypeQuery     StmtType = "query"
-	StmtTypeUpDownSep StmtType = "up-down-sep"
-	StmtTypeDisableTx StmtType = "disable-tx"
+	StmtTypeQuery   StmtType = "query"
+	StmtTypeComment StmtType = "comment"
 )
-
-//nolint:gochecknoglobals
-var directivePatterns = map[string]StmtType{
-	"---- create above / drop below ----": StmtTypeUpDownSep,
-	"---- disable-tx ----":                StmtTypeDisableTx,
-}
 
 type state int
 
@@ -77,9 +70,10 @@ type scanner struct {
 	startLoc Location
 
 	// stateLoc is current state start location (e.g., can be a string within statement).
-	stateLoc     Location
-	state        state
-	commentDepth int
+	stateLoc        Location
+	state           state
+	commentDepth    int
+	topLevelComment bool
 }
 
 func newScanner(sql []byte) *scanner {
@@ -139,8 +133,9 @@ func (s *scanner) emitStmt() {
 	content := s.buf.String()
 
 	typ := StmtTypeQuery
-	if t, ok := directivePatterns[strings.TrimSpace(content)]; ok {
-		typ = t
+	if s.topLevelComment {
+		typ = StmtTypeComment
+		s.topLevelComment = false
 	}
 
 	if stmt := newStmt(content, s.startLoc, s.currentLoc, typ); stmt != nil {
@@ -217,10 +212,12 @@ func (s *scanner) scanStmt() {
 
 	switch {
 	case r == '-' && s.peek1(size) == '-':
+		s.topLevelComment = s.buf.Len() == 0
 		s.state = stateLineComment
 		s.consume2() // --
 
 	case r == '/' && s.peek1(size) == '*':
+		s.topLevelComment = s.buf.Len() == 0
 		s.stateLoc = s.currentLoc
 		s.state = stateBlockComment
 		s.commentDepth = 1
@@ -259,11 +256,7 @@ func (s *scanner) scanLineComment() {
 	r, size := s.peek0()
 
 	if r == '\n' {
-		// Check if this line comment is a directive that should be a separate statement
-		content := s.buf.String()
-
-		trimmed := strings.TrimSpace(content)
-		if _, ok := directivePatterns[trimmed]; ok {
+		if s.topLevelComment {
 			s.emitStmt()
 			s.advance(r, size) // consume the newline
 			s.state = stateStmt
@@ -290,6 +283,10 @@ func (s *scanner) scanBlockComment() {
 		s.consume2() // */
 
 		if s.commentDepth == 0 {
+			if s.topLevelComment {
+				s.emitStmt()
+			}
+
 			s.state = stateStmt
 		}
 

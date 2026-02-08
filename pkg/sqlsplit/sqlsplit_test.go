@@ -252,62 +252,47 @@ CREATE TABLE "user-data" (
 			input: `SELECT 'émoji 🎉 café'; SELECT "tëst_tàble" FROM "schëma"."tãble";`,
 		},
 
-		// Directives inside strings/comments should not be parsed as directives
+		// Top-level comments
 		{
-			name:  "up-down separator in single-quoted string",
-			input: `SELECT '---- create above / drop below ----';`,
+			name:  "top-level line comment standalone",
+			input: "-- this is a top-level comment",
 		},
 		{
-			name:  "up-down separator in double-quoted identifier",
-			input: `SELECT "---- create above / drop below ----";`,
-		},
-		{
-			name:  "up-down separator in dollar-quoted string",
-			input: `SELECT $$---- create above / drop below ----$$;`,
-		},
-		{
-			name:  "up-down separator in block comment",
-			input: `SELECT /* ---- create above / drop below ---- */ 1;`,
-		},
-		{
-			name:  "disable-tx in single-quoted string",
-			input: `SELECT '---- disable-tx ----';`,
-		},
-		{
-			name:  "disable-tx in dollar-quoted string",
-			input: `SELECT $$---- disable-tx ----$$;`,
-		},
-		{
-			name:  "disable-tx in block comment",
-			input: `SELECT /* ---- disable-tx ---- */ 1;`,
-		},
-
-		// Top-level directives
-		{
-			name:  "up-down separator as standalone",
-			input: "---- create above / drop below ----",
-		},
-		{
-			name: "up-down separator with newline",
-			input: `---- create above / drop below ----
+			name: "top-level line comment before statement",
+			input: `-- top-level comment
 SELECT 1;`,
 		},
 		{
-			name:  "disable-tx as standalone",
-			input: "---- disable-tx ----",
-		},
-		{
-			name: "disable-tx with newline",
-			input: `---- disable-tx ----
+			name: "top-level block comment before statement",
+			input: `/* top-level block comment */
 SELECT 1;`,
 		},
 		{
-			name: "disable-tx before statement",
-			input: `---- disable-tx ----
-CREATE TABLE users (id int);`,
+			name:  "top-level block comment standalone",
+			input: `/* top-level block comment */`,
 		},
 		{
-			name: "both directives",
+			name: "multiple top-level comments",
+			input: `-- first comment
+-- second comment
+SELECT 1;`,
+		},
+		{
+			name: "top-level comment between statements",
+			input: `SELECT 1;
+-- middle comment
+SELECT 2;`,
+		},
+		{
+			name:  "mid-statement comment stays in query",
+			input: `SELECT /* inline */ 1;`,
+		},
+		{
+			name:  "mid-statement line comment stays in query",
+			input: "SELECT 1 -- inline\n, 2;",
+		},
+		{
+			name: "top-level directive-style comments",
 			input: `---- disable-tx ----
 CREATE TABLE users (id int);
 ---- create above / drop below ----
@@ -369,7 +354,8 @@ func TestLocationTracking(t *testing.T) {
 			name:  "statement after multiline comment",
 			input: "/* comment\n   */ SELECT 1;",
 			expected: []struct{ start, end Location }{
-				{Location{Pos: 0, Line: 1, Col: 1}, Location{Pos: 26, Line: 2, Col: 16}},
+				{Location{Pos: 0, Line: 1, Col: 1}, Location{Pos: 16, Line: 2, Col: 6}},
+				{Location{Pos: 17, Line: 2, Col: 7}, Location{Pos: 26, Line: 2, Col: 16}},
 			},
 		},
 	}

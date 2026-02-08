@@ -102,17 +102,6 @@ func diff(ctx context.Context, fs afero.Fs, args DiffArgs) error {
 		return err
 	}
 
-	// Create down migration.
-	downFilename, err := version.MigrationFilename(ver, args.Name, version.MigrationDirectionDown, "sql")
-	if err != nil {
-		return fmt.Errorf("failed to generate migration filename: %w", err)
-	}
-
-	downPath := filepath.Join(migrationDir, downFilename)
-	if err := writeTemplate(fs, downPath, internaltpl.SQLDownMigrationTemplate, tplData); err != nil {
-		return err
-	}
-
 	//nolint:forbidigo
 	fmt.Printf("Created migration: %s\n", upPath)
 

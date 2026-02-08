@@ -1,7 +1,3 @@
 -- migration: {{.Version}}_{{.Name}}.down.sql
-{{- if .SchemaPath}}
--- Down migration not auto-generated for schema diffs.
--- Add rollback statements manually if needed.
-{{else}}
+
 SELECT "down_{{.Version}}";
-{{end}}
