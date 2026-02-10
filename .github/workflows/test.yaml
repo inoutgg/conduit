@@ -28,7 +28,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-v1-go-
       - name: Run Tests
-        run: go-test
+        run: devenv test
         shell: devenv shell bash -- -e {0}
   lint:
     name: lint

@@ -102,7 +102,7 @@ func parseSQLMigrationsFromFS(fs afero.Fs, root string) ([]*Migration, error) {
 }
 
 func sqlMigrateFunc(stmts []sqlsplit.Stmt) *migrateFunc {
-	disableTx := slices.ContainsFunc(stmts, func(stmt sqlsplit.Stmt) bool {
+	useTx := !slices.ContainsFunc(stmts, func(stmt sqlsplit.Stmt) bool {
 		return stmt.Type == sqlsplit.StmtTypeComment &&
 			strings.TrimSpace(stmt.Content) == DisableTxDirective
 	})
@@ -111,14 +111,17 @@ func sqlMigrateFunc(stmts []sqlsplit.Stmt) *migrateFunc {
 		return stmt.Type == sqlsplit.StmtTypeQuery
 	})
 
-	useTx := !disableTx
 	migration := &migrateFunc{useTx: useTx, fn: nil, fnx: nil}
 
 	if useTx {
 		migration.fnx = func(ctx context.Context, tx pgx.Tx) error {
 			for _, stmt := range queryStmts {
 				if _, err := tx.Exec(ctx, stmt.Content); err != nil {
-					return fmt.Errorf("conduit: failed to execute migration script: %w", err)
+					return fmt.Errorf(
+						"conduit: failed to execute migration script: %w\n\n%s",
+						err,
+						stmt.String(),
+					)
 				}
 			}
 
@@ -129,7 +132,7 @@ func sqlMigrateFunc(stmts []sqlsplit.Stmt) *migrateFunc {
 			for _, stmt := range queryStmts {
 				_, err := conn.Exec(ctx, stmt.Content)
 				if err != nil {
-					return fmt.Errorf("conduit: failed to execute migration script: %w", err)
+					return fmt.Errorf("conduit: failed to execute migration script: %w\n\n%s", err, stmt.String())
 				}
 			}
 

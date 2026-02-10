@@ -15,6 +15,7 @@ require (
 	github.com/urfave/cli/v3 v3.6.1
 	go.inout.gg/foundations v0.0.0-20251108094430-2c59a9842cd4
 	go.segfaultmedaddy.com/pgxephemeraltest v1.2.0
+	go.uber.org/goleak v1.3.0
 )
 
 require (

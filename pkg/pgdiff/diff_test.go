@@ -1,25 +1,18 @@
 package pgdiff
 
 import (
-	"context"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/gkampitakis/go-snaps/snaps"
-	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.segfaultmedaddy.com/pgxephemeraltest"
 
 	"go.inout.gg/conduit/internal/testutil"
 )
-
-type noopMigrator struct{}
-
-func (noopMigrator) Migrate(context.Context, *pgx.Conn) error { return nil }
-func (noopMigrator) Hash() string                             { return "pgdiff" }
 
 func TestReadStmtsFromFile(t *testing.T) {
 	t.Parallel()
@@ -113,14 +106,8 @@ func TestGeneratePlan(t *testing.T) {
 		t.Parallel()
 
 		// Arrange
-		factory, err := pgxephemeraltest.NewPoolFactoryFromConnString(
-			t.Context(),
-			os.Getenv("TEST_DATABASE_URL"),
-			noopMigrator{},
-		)
+		config, err := pgxpool.ParseConfig(os.Getenv("TEST_DATABASE_URL"))
 		require.NoError(t, err)
-
-		config := factory.Pool(t).Config()
 
 		fs, baseDir, migrationsDir := testutil.NewMigrationsDirBuilder(t).
 			WithFile("20230601120000_init.up.sql", "CREATE TABLE users (id int);").

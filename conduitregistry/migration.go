@@ -51,7 +51,7 @@ func (m *Migration) Name() string { return m.name }
 
 // Apply executes the migration in a given dir direction.
 func (m *Migration) Apply(ctx context.Context, dir direction.Direction, conn *pgx.Conn) error {
-	debug.Assert(conn != nil, "conduit: expected conn to be defined")
+	debug.Assert(conn != nil, "expected conn to be defined")
 
 	switch dir {
 	case direction.DirectionUp:
@@ -65,7 +65,7 @@ func (m *Migration) Apply(ctx context.Context, dir direction.Direction, conn *pg
 
 // ApplyTx executes the migration in a given dir direction in transaction.
 func (m *Migration) ApplyTx(ctx context.Context, dir direction.Direction, tx pgx.Tx) error {
-	debug.Assert(tx != nil, "conduit: expected tx to be defined")
+	debug.Assert(tx != nil, "expected tx to be defined")
 
 	switch dir {
 	case direction.DirectionUp:
@@ -78,29 +78,25 @@ func (m *Migration) ApplyTx(ctx context.Context, dir direction.Direction, tx pgx
 }
 
 func (m *Migration) migrateDown(ctx context.Context, conn *pgx.Conn, tx pgx.Tx) error {
-	debug.Assert(conn != nil && tx != nil, "conduit: expected either tx or conn, both defined")
-
 	if m.down.useTx {
-		debug.Assert(tx != nil, "conduit: expected tx to be defined")
+		debug.Assert(conn == nil && tx != nil, "expected only tx to be defined")
 
 		return m.down.fnx(ctx, tx)
 	}
 
-	debug.Assert(conn != nil, "conduit: expected conn to be defined")
+	debug.Assert(conn != nil && tx == nil, "expected only conn to be defined")
 
 	return m.down.fn(ctx, conn)
 }
 
 func (m *Migration) migrateUp(ctx context.Context, conn *pgx.Conn, tx pgx.Tx) error {
-	debug.Assert(conn != nil && tx != nil, "conduit: expected either tx or conn, both defined")
-
-	if m.down.useTx {
-		debug.Assert(tx != nil, "conduit: expected tx to be defined")
+	if m.up.useTx {
+		debug.Assert(conn == nil && tx != nil, "expected only tx to be defined")
 
 		return m.up.fnx(ctx, tx)
 	}
 
-	debug.Assert(conn != nil, "conduit: expected conn to be defined")
+	debug.Assert(conn != nil && tx == nil, "expected only conn to be defined")
 
 	return m.up.fn(ctx, conn)
 }

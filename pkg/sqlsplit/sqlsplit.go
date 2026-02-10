@@ -2,6 +2,7 @@ package sqlsplit
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -25,6 +26,8 @@ const (
 	stateDollarString
 	stateIdent
 )
+
+const maxHighlightLines = 5
 
 // Split splits a SQL file into individual statements.
 func Split(sql []byte) ([]Stmt, error) {
@@ -53,6 +56,38 @@ type Location struct {
 
 func (l Location) String() string {
 	return fmt.Sprintf("%d:%d", l.Line, l.Col)
+}
+
+// String formats the statement with line numbers for display.
+//
+// If the statement spans more than 5 lines, the middle is collapsed.
+func (s Stmt) String() string {
+	lines := strings.Split(s.Content, "\n")
+	gutter := len(strconv.Itoa(s.End.Line))
+
+	var b strings.Builder
+
+	if len(lines) <= maxHighlightLines {
+		for i, line := range lines {
+			fmt.Fprintf(&b, "%*d | %s\n", gutter, s.Start.Line+i, line)
+		}
+	} else {
+		headOffset := 2
+		tailOffset := 2
+
+		for i := range headOffset {
+			fmt.Fprintf(&b, "%*d | %s\n", gutter, s.Start.Line+i, lines[i])
+		}
+
+		fmt.Fprintf(&b, "%*s | ...\n", gutter, "")
+
+		tailStart := len(lines) - tailOffset
+		for i := range tailOffset {
+			fmt.Fprintf(&b, "%*d | %s\n", gutter, s.End.Line-tailOffset+1+i, lines[tailStart+i])
+		}
+	}
+
+	return b.String()
 }
 
 type scanner struct {
