@@ -31,13 +31,11 @@ let
           golangci-lint run --fix ./...
         '';
       };
-      go-test = {
-        exec = ''
-          devenv up -d &>/dev/null
-          go test ./...; ret=$?; devenv processes stop &>/dev/null; exit $ret
-        '';
-      };
     };
+
+    enterTest = ''
+      go test -race ./...
+    '';
 
     packages = with pkgs; [
       sqlc
@@ -57,7 +55,7 @@ let
     env.GOTOOLCHAIN = lib.mkForce "local";
     env.GOFUMPT_SPLIT_LONG_LINES = lib.mkForce "on";
 
-    env.TEST_DATABASE_URL = lib.mkForce "postgres://test:test@localhost:5432/test";
+    env.TEST_DATABASE_URL = lib.mkForce "postgres://test:test@localhost:5432/test?sslmode=disable";
   };
 
   services = {

@@ -9,19 +9,20 @@ import (
 	"github.com/urfave/cli/v3"
 
 	"go.inout.gg/conduit/internal/command/flagname"
-	"go.inout.gg/conduit/internal/command/migrationctx"
 	internaltpl "go.inout.gg/conduit/internal/template"
+	"go.inout.gg/conduit/internal/timegenerator"
 	"go.inout.gg/conduit/pkg/version"
 )
 
 //nolint:revive // ignore naming convention.
 type InitialiseArgs struct {
+	Dir                 string
 	Namespace           string
 	PackageName         string
 	NoConduitMigrations bool
 }
 
-func NewCommand(fs afero.Fs) *cli.Command {
+func NewCommand(fs afero.Fs, timeGen timegenerator.Generator) *cli.Command {
 	//nolint:exhaustruct
 	return &cli.Command{
 		Name:    "init",
@@ -57,37 +58,38 @@ func NewCommand(fs afero.Fs) *cli.Command {
 			},
 		},
 
-		Action: func(ctx context.Context, cmd *cli.Command) error {
+		Action: func(_ context.Context, cmd *cli.Command) error {
 			args := InitialiseArgs{
+				Dir:                 filepath.Clean(cmd.String(flagname.MigrationsDir)),
 				Namespace:           cmd.String("namespace"),
 				PackageName:         cmd.String(flagname.PackageName),
 				NoConduitMigrations: cmd.Bool("no-conduit-migrations"),
 			}
 
-			return initialise(ctx, fs, args)
+			return initialise(fs, timeGen, args)
 		},
 	}
 }
 
-func initialise(ctx context.Context, fs afero.Fs, args InitialiseArgs) error {
-	dir, err := migrationctx.Dir(ctx)
-	if err != nil {
-		//nolint:wrapcheck
-		return err
-	}
-
-	if err := createMigrationDir(fs, dir); err != nil {
+func initialise(fs afero.Fs, timeGen timegenerator.Generator, args InitialiseArgs) error {
+	if err := createMigrationDir(fs, args.Dir); err != nil {
 		return err
 	}
 
 	if args.Namespace != "" {
-		if _, err := createRegistryFile(fs, dir, args.Namespace); err != nil {
+		if _, err := createRegistryFile(fs, args.Dir, args.Namespace); err != nil {
 			return err
 		}
 	}
 
 	if !args.NoConduitMigrations {
-		if _, err := createConduitMigrationFile(fs, dir, args.Namespace, args.PackageName); err != nil {
+		if _, err := createConduitMigrationFile(
+			fs,
+			args.Dir,
+			args.Namespace,
+			args.PackageName,
+			timeGen,
+		); err != nil {
 			return err
 		}
 	}
@@ -108,9 +110,20 @@ func createMigrationDir(fs afero.Fs, dir string) error {
 
 // createConduitMigrationFile creates a new migration file with conduit's own migration file
 // in the migrations directory.
-func createConduitMigrationFile(fs afero.Fs, dirpath string, namespace string, packageName string) (string, error) {
-	ver := version.NewVersion()
-	filename := version.MigrationFilename(ver, "conduit_migration", "go")
+func createConduitMigrationFile(
+	fs afero.Fs,
+	dirpath string,
+	namespace string,
+	packageName string,
+	timeGen timegenerator.Generator,
+) (string, error) {
+	ver := version.NewFromTime(timeGen.Now())
+
+	filename, err := version.MigrationFilename(ver, "conduit_migration", "", "go")
+	if err != nil {
+		return "", fmt.Errorf("conduit: failed to generate migration filename: %w", err)
+	}
+
 	fpath := filepath.Join(dirpath, filename)
 
 	f, err := fs.Create(fpath)

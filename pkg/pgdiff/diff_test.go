@@ -1,15 +1,17 @@
 package pgdiff
 
 import (
-	"context"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/gkampitakis/go-snaps/snaps"
+	"github.com/jackc/pgx/v5"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"go.inout.gg/conduit/internal/testutil"
 )
 
 func TestReadStmtsFromFile(t *testing.T) {
@@ -19,7 +21,7 @@ func TestReadStmtsFromFile(t *testing.T) {
 		t.Parallel()
 
 		// Arrange
-		fs, _, dir := newMigrationsDirBuilder(t).
+		fs, _, dir := testutil.NewMigrationsDirBuilder(t).
 			WithFile("schema.sql", `CREATE TABLE users (id int);
 CREATE TABLE posts (id int);
 CREATE INDEX idx_posts ON posts (id);`).
@@ -37,7 +39,7 @@ CREATE INDEX idx_posts ON posts (id);`).
 		t.Parallel()
 
 		// Arrange
-		fs, _, dir := newMigrationsDirBuilder(t).Build()
+		fs, _, dir := testutil.NewMigrationsDirBuilder(t).Build()
 
 		// Act
 		_, err := readStmtsFromFile(fs, filepath.Join(dir, "nonexistent.sql"))
@@ -51,7 +53,7 @@ CREATE INDEX idx_posts ON posts (id);`).
 		t.Parallel()
 
 		// Arrange
-		fs, _, dir := newMigrationsDirBuilder(t).
+		fs, _, dir := testutil.NewMigrationsDirBuilder(t).
 			WithFile("bad.sql", "SELECT 'unclosed string").
 			Build()
 
@@ -67,7 +69,7 @@ CREATE INDEX idx_posts ON posts (id);`).
 		t.Parallel()
 
 		// Arrange
-		fs, _, dir := newMigrationsDirBuilder(t).
+		fs, _, dir := testutil.NewMigrationsDirBuilder(t).
 			WithFile("empty.sql", "").
 			Build()
 
@@ -79,14 +81,13 @@ CREATE INDEX idx_posts ON posts (id);`).
 		assert.Empty(t, stmts)
 	})
 
-	t.Run("only uses up statements ignoring down section", func(t *testing.T) {
+	t.Run("reads all statements from file", func(t *testing.T) {
 		t.Parallel()
 
 		// Arrange
-		fs, _, dir := newMigrationsDirBuilder(t).
+		fs, _, dir := testutil.NewMigrationsDirBuilder(t).
 			WithFile("schema.sql", `CREATE TABLE users (id int);
----- create above / drop below ----
-DROP TABLE users;`).
+CREATE TABLE posts (id int);`).
 			Build()
 
 		// Act
@@ -105,17 +106,11 @@ func TestGeneratePlan(t *testing.T) {
 		t.Parallel()
 
 		// Arrange
-		poolConfig, terminate, err := StartPostgresContainer(t.Context(), "postgres:17-alpine")
+		config, err := pgx.ParseConfig(os.Getenv("TEST_DATABASE_URL"))
 		require.NoError(t, err)
-		t.Cleanup(func() {
-			ctx, cancel := context.WithTimeout(t.Context(), 15)
-			defer cancel()
 
-			_ = terminate(ctx)
-		})
-
-		fs, baseDir, migrationsDir := newMigrationsDirBuilder(t).
-			WithFile("20230601120000_init.sql", "CREATE TABLE users (id int);").
+		fs, baseDir, migrationsDir := testutil.NewMigrationsDirBuilder(t).
+			WithFile("20230601120000_init.up.sql", "CREATE TABLE users (id int);").
 			WithBaseFile("schema.sql", `CREATE TABLE users (id int);
 CREATE TABLE posts (id int, user_id int);`).
 			Build()
@@ -124,7 +119,7 @@ CREATE TABLE posts (id int, user_id int);`).
 		plan, err := GeneratePlan(
 			t.Context(),
 			fs,
-			poolConfig,
+			config,
 			migrationsDir,
 			filepath.Join(baseDir, "schema.sql"),
 		)
@@ -144,10 +139,10 @@ func TestReadStmtsFromMigrationsDir(t *testing.T) {
 		// Arrange
 		// Migration filenames use YYYYMMDDHHMMSS format
 		// Files added out of order to verify sorting
-		fs, _, dir := newMigrationsDirBuilder(t).
-			WithFile("20230601140000_third.sql", "CREATE TABLE third (id int);").
-			WithFile("20230601120000_first.sql", "CREATE TABLE first (id int);").
-			WithFile("20230601130000_second.sql", "CREATE TABLE second (id int);").
+		fs, _, dir := testutil.NewMigrationsDirBuilder(t).
+			WithFile("20230601140000_third.up.sql", "CREATE TABLE third (id int);").
+			WithFile("20230601120000_first.up.sql", "CREATE TABLE first (id int);").
+			WithFile("20230601130000_second.up.sql", "CREATE TABLE second (id int);").
 			Build()
 
 		// Act
@@ -162,8 +157,8 @@ func TestReadStmtsFromMigrationsDir(t *testing.T) {
 		t.Parallel()
 
 		// Arrange
-		fs, _, dir := newMigrationsDirBuilder(t).
-			WithFile("20230601120000_first.sql", "CREATE TABLE first (id int);").
+		fs, _, dir := testutil.NewMigrationsDirBuilder(t).
+			WithFile("20230601120000_first.up.sql", "CREATE TABLE first (id int);").
 			WithFile("README.md", "# Migrations").
 			WithFile("config.json", "{}").
 			WithFile(".gitkeep", "").
@@ -181,9 +176,9 @@ func TestReadStmtsFromMigrationsDir(t *testing.T) {
 		t.Parallel()
 
 		// Arrange
-		fs, _, dir := newMigrationsDirBuilder(t).
+		fs, _, dir := testutil.NewMigrationsDirBuilder(t).
 			WithSubdir("subdir.sql"). // tricky: dir ending in .sql
-			WithFile("20230601120000_first.sql", "CREATE TABLE first (id int);").
+			WithFile("20230601120000_first.up.sql", "CREATE TABLE first (id int);").
 			Build()
 
 		// Act
@@ -212,9 +207,9 @@ func TestReadStmtsFromMigrationsDir(t *testing.T) {
 		t.Parallel()
 
 		// Arrange
-		fs, _, dir := newMigrationsDirBuilder(t).
-			WithFile("20230601120000_first.sql", "CREATE TABLE first (id int);").
-			WithReadError("20230601120000_first.sql", os.ErrPermission).
+		fs, _, dir := testutil.NewMigrationsDirBuilder(t).
+			WithFile("20230601120000_first.up.sql", "CREATE TABLE first (id int);").
+			WithReadError("20230601120000_first.up.sql", os.ErrPermission).
 			Build()
 
 		// Act
@@ -229,8 +224,8 @@ func TestReadStmtsFromMigrationsDir(t *testing.T) {
 		t.Parallel()
 
 		// Arrange
-		fs, _, dir := newMigrationsDirBuilder(t).
-			WithFile("20230601120000_bad.sql", "SELECT 'unclosed string").
+		fs, _, dir := testutil.NewMigrationsDirBuilder(t).
+			WithFile("20230601120000_bad.up.sql", "SELECT 'unclosed string").
 			Build()
 
 		// Act
@@ -245,7 +240,7 @@ func TestReadStmtsFromMigrationsDir(t *testing.T) {
 		t.Parallel()
 
 		// Arrange
-		fs, _, dir := newMigrationsDirBuilder(t).
+		fs, _, dir := testutil.NewMigrationsDirBuilder(t).
 			WithFile("invalid_filename.sql", "CREATE TABLE test (id int);").
 			Build()
 
@@ -261,7 +256,7 @@ func TestReadStmtsFromMigrationsDir(t *testing.T) {
 		t.Parallel()
 
 		// Arrange
-		fs, _, dir := newMigrationsDirBuilder(t).Build()
+		fs, _, dir := testutil.NewMigrationsDirBuilder(t).Build()
 
 		// Act
 		stmts, err := readStmtsFromMigrationsDir(fs, dir)
@@ -275,7 +270,7 @@ func TestReadStmtsFromMigrationsDir(t *testing.T) {
 		t.Parallel()
 
 		// Arrange
-		fs, _, dir := newMigrationsDirBuilder(t).
+		fs, _, dir := testutil.NewMigrationsDirBuilder(t).
 			WithFile("README.md", "# Migrations").
 			Build()
 
@@ -287,14 +282,13 @@ func TestReadStmtsFromMigrationsDir(t *testing.T) {
 		assert.Empty(t, stmts)
 	})
 
-	t.Run("only uses up statements ignoring down section", func(t *testing.T) {
+	t.Run("skips down migration files", func(t *testing.T) {
 		t.Parallel()
 
 		// Arrange
-		fs, _, dir := newMigrationsDirBuilder(t).
-			WithFile("20230601120000_users.sql", `CREATE TABLE users (id int);
----- create above / drop below ----
-DROP TABLE users;`).
+		fs, _, dir := testutil.NewMigrationsDirBuilder(t).
+			WithFile("20230601120000_users.up.sql", "CREATE TABLE users (id int);").
+			WithFile("20230601120000_users.down.sql", "DROP TABLE users;").
 			Build()
 
 		// Act
@@ -309,8 +303,8 @@ DROP TABLE users;`).
 		t.Parallel()
 
 		// Arrange
-		fs, _, dir := newMigrationsDirBuilder(t).
-			WithFile("20230601120000_init.sql", `CREATE TABLE users (id int);
+		fs, _, dir := testutil.NewMigrationsDirBuilder(t).
+			WithFile("20230601120000_init.up.sql", `CREATE TABLE users (id int);
 CREATE TABLE posts (id int);
 CREATE INDEX idx_posts ON posts (id);`).
 			Build()
@@ -327,9 +321,9 @@ CREATE INDEX idx_posts ON posts (id);`).
 		t.Parallel()
 
 		// Arrange
-		fs, _, dir := newMigrationsDirBuilder(t).
-			WithFile("20230601120000_first.sql", "CREATE TABLE a (id int); CREATE TABLE b (id int);").
-			WithFile("20230601130000_second.sql", "CREATE TABLE c (id int);").
+		fs, _, dir := testutil.NewMigrationsDirBuilder(t).
+			WithFile("20230601120000_first.up.sql", "CREATE TABLE a (id int); CREATE TABLE b (id int);").
+			WithFile("20230601130000_second.up.sql", "CREATE TABLE c (id int);").
 			Build()
 
 		// Act

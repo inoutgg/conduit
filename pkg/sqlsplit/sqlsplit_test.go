@@ -5,6 +5,8 @@ import (
 
 	"github.com/gkampitakis/go-snaps/snaps"
 	"github.com/stretchr/testify/require"
+
+	"go.inout.gg/conduit/internal/sliceutil"
 )
 
 func TestSplit(t *testing.T) {
@@ -252,62 +254,47 @@ CREATE TABLE "user-data" (
 			input: `SELECT 'émoji 🎉 café'; SELECT "tëst_tàble" FROM "schëma"."tãble";`,
 		},
 
-		// Directives inside strings/comments should not be parsed as directives
+		// Top-level comments
 		{
-			name:  "up-down separator in single-quoted string",
-			input: `SELECT '---- create above / drop below ----';`,
+			name:  "top-level line comment standalone",
+			input: "-- this is a top-level comment",
 		},
 		{
-			name:  "up-down separator in double-quoted identifier",
-			input: `SELECT "---- create above / drop below ----";`,
-		},
-		{
-			name:  "up-down separator in dollar-quoted string",
-			input: `SELECT $$---- create above / drop below ----$$;`,
-		},
-		{
-			name:  "up-down separator in block comment",
-			input: `SELECT /* ---- create above / drop below ---- */ 1;`,
-		},
-		{
-			name:  "disable-tx in single-quoted string",
-			input: `SELECT '---- disable-tx ----';`,
-		},
-		{
-			name:  "disable-tx in dollar-quoted string",
-			input: `SELECT $$---- disable-tx ----$$;`,
-		},
-		{
-			name:  "disable-tx in block comment",
-			input: `SELECT /* ---- disable-tx ---- */ 1;`,
-		},
-
-		// Top-level directives
-		{
-			name:  "up-down separator as standalone",
-			input: "---- create above / drop below ----",
-		},
-		{
-			name: "up-down separator with newline",
-			input: `---- create above / drop below ----
+			name: "top-level line comment before statement",
+			input: `-- top-level comment
 SELECT 1;`,
 		},
 		{
-			name:  "disable-tx as standalone",
-			input: "---- disable-tx ----",
-		},
-		{
-			name: "disable-tx with newline",
-			input: `---- disable-tx ----
+			name: "top-level block comment before statement",
+			input: `/* top-level block comment */
 SELECT 1;`,
 		},
 		{
-			name: "disable-tx before statement",
-			input: `---- disable-tx ----
-CREATE TABLE users (id int);`,
+			name:  "top-level block comment standalone",
+			input: `/* top-level block comment */`,
 		},
 		{
-			name: "both directives",
+			name: "multiple top-level comments",
+			input: `-- first comment
+-- second comment
+SELECT 1;`,
+		},
+		{
+			name: "top-level comment between statements",
+			input: `SELECT 1;
+-- middle comment
+SELECT 2;`,
+		},
+		{
+			name:  "mid-statement comment stays in query",
+			input: `SELECT /* inline */ 1;`,
+		},
+		{
+			name:  "mid-statement line comment stays in query",
+			input: "SELECT 1 -- inline\n, 2;",
+		},
+		{
+			name: "top-level directive-style comments",
 			input: `---- disable-tx ----
 CREATE TABLE users (id int);
 ---- create above / drop below ----
@@ -319,7 +306,7 @@ DROP TABLE users;`,
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			stmts, err := Split(tt.input)
+			stmts, err := Split([]byte(tt.input))
 			require.NoError(t, err)
 			snaps.MatchSnapshot(t, stmts)
 		})
@@ -369,7 +356,8 @@ func TestLocationTracking(t *testing.T) {
 			name:  "statement after multiline comment",
 			input: "/* comment\n   */ SELECT 1;",
 			expected: []struct{ start, end Location }{
-				{Location{Pos: 0, Line: 1, Col: 1}, Location{Pos: 26, Line: 2, Col: 16}},
+				{Location{Pos: 0, Line: 1, Col: 1}, Location{Pos: 16, Line: 2, Col: 6}},
+				{Location{Pos: 17, Line: 2, Col: 7}, Location{Pos: 26, Line: 2, Col: 16}},
 			},
 		},
 	}
@@ -378,7 +366,7 @@ func TestLocationTracking(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			stmts, err := Split(tt.input)
+			stmts, err := Split([]byte(tt.input))
 			require.NoError(t, err)
 			require.Len(t, stmts, len(tt.expected))
 
@@ -440,10 +428,99 @@ func TestUnclosedErrors(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			_, err := Split(tt.input)
+			_, err := Split([]byte(tt.input))
 			require.Error(t, err)
 			require.Contains(t, err.Error(), tt.errContains,
 				"expected error containing %q, got %q", tt.errContains, err.Error())
+		})
+	}
+}
+
+func TestStmtHighlight(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		input string
+	}{
+		{
+			name:  "single statement single line",
+			input: "SELECT 1;",
+		},
+		{
+			name: "two single-line statements",
+			input: `SELECT 1;
+SELECT 2;`,
+		},
+		{
+			name: "multiline statement followed by single line",
+			input: `CREATE TABLE users (
+  id int,
+  name text
+);
+SELECT 1;`,
+		},
+		{
+			name: "comment then multiline statement",
+			input: `---- disable-tx ----
+CREATE TABLE users (
+  id int,
+  name text
+);`,
+		},
+		{
+			name: "long function collapses middle",
+			input: `CREATE FUNCTION test() RETURNS text AS $body$
+BEGIN
+  x := 1;
+  y := 2;
+  z := 3;
+  RETURN x;
+END;
+$body$ LANGUAGE plpgsql;
+SELECT 1;`,
+		},
+		{
+			name: "multiple statements with blank lines",
+			input: `SELECT 1;
+
+SELECT 2;
+
+CREATE TABLE t (
+  id int
+);`,
+		},
+		{
+			name: "many short statements",
+			input: `SELECT 1;
+SELECT 2;
+SELECT 3;
+SELECT 4;
+SELECT 5;
+SELECT 6;
+SELECT 7;
+SELECT 8;
+SELECT 9;
+SELECT 10;`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			stmts, err := Split([]byte(tt.input))
+			require.NoError(t, err)
+
+			highlights := make([]string, len(stmts))
+			for i, stmt := range stmts {
+				highlights[i] = stmt.String()
+			}
+
+			snaps.MatchSnapshot(
+				t,
+				sliceutil.Map(highlights, func(h string) any { return any(h) })...,
+			)
 		})
 	}
 }

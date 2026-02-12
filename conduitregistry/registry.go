@@ -3,11 +3,11 @@ package conduitregistry
 import (
 	"context"
 	"errors"
-	"io/fs"
 	"maps"
 	"runtime"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/spf13/afero"
 	"go.inout.gg/foundations/must"
 
 	"go.inout.gg/conduit/pkg/version"
@@ -43,10 +43,8 @@ func New(namespace string) *Registry {
 //
 // SQL migrations run in transaction mode by default.
 // To disable transactions, add `---- disable-tx ----` comment in the SQL.
-// This comment applies to the current migration section (up or down).
-// For down migrations, place the comment below the `---- create above / drop below ----` separator.
-func (r *Registry) FromFS(fsys fs.FS) {
-	migrations := must.Must(parseSQLMigrationsFromFS(fsys, "."))
+func (r *Registry) FromFS(fs afero.Fs, root string) {
+	migrations := must.Must(parseSQLMigrationsFromFS(fs, root))
 	for _, m := range migrations {
 		r.migrations[m.Version().String()] = m
 	}

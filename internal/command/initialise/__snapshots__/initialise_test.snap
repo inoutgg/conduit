@@ -1,0 +1,147 @@
+
+[TestInitialise/creates_migration_directory_and_conduit_migration_file - 1]
+### 20240115123045_conduit_migration.go ###
+package migrations
+
+import (
+    "context"
+
+    "github.com/jackc/pgx/v5"
+    "go.inout.gg/conduit"
+    "go.inout.gg/conduit/conduitmigrate"
+)
+
+//nolint:exhaustruct
+var m20240115123045 = conduitmigrate.New(&conduitmigrate.Config{}) //nolint:gochecknoglobals
+
+//nolint:gochecknoinits
+func init() {
+    conduit.Up(up20240115123045)
+    conduit.Down(down20240115123045)
+}
+
+func up20240115123045(ctx context.Context, conn *pgx.Conn) error {
+    //nolint:wrapcheck
+    return m20240115123045.Up(ctx, conn)
+}
+
+func down20240115123045(ctx context.Context, conn *pgx.Conn) error {
+    //nolint:wrapcheck
+    return m20240115123045.Down(ctx, conn)
+}
+
+
+---
+
+[TestInitialise/creates_registry_file_when_namespace_is_set - 1]
+### 20240115123045_conduit_migration.go ###
+package migrations
+
+import (
+    "context"
+
+    "github.com/jackc/pgx/v5"
+    "go.inout.gg/conduit/conduitmigrate"
+)
+
+//nolint:exhaustruct
+var m20240115123045 = conduitmigrate.New(&conduitmigrate.Config{}) //nolint:gochecknoglobals
+
+//nolint:gochecknoinits
+func init() {
+    Registry.Up(up20240115123045)
+    Registry.Down(down20240115123045)
+}
+
+func up20240115123045(ctx context.Context, conn *pgx.Conn) error {
+    //nolint:wrapcheck
+    return m20240115123045.Up(ctx, conn)
+}
+
+func down20240115123045(ctx context.Context, conn *pgx.Conn) error {
+    //nolint:wrapcheck
+    return m20240115123045.Down(ctx, conn)
+}
+
+### registry.go ###
+package migrations
+
+import (
+    "embed"
+
+    "go.inout.gg/conduit/conduitregistry"
+)
+
+var Registry = conduitregistry.New(custom) //nolint:gochecknoglobals
+
+//go:embed **.sql
+var migrationFS embed.FS
+
+//nolint:gochecknoinits
+func init() {
+    Registry.FromFS(migrationFS, ".")
+}
+
+
+---
+
+[TestInitialise/creates_only_registry_file_when_namespace_is_set_and_NoConduitMigrations_is_set - 1]
+### registry.go ###
+package migrations
+
+import (
+    "embed"
+
+    "go.inout.gg/conduit/conduitregistry"
+)
+
+var Registry = conduitregistry.New(custom) //nolint:gochecknoglobals
+
+//go:embed **.sql
+var migrationFS embed.FS
+
+//nolint:gochecknoinits
+func init() {
+    Registry.FromFS(migrationFS, ".")
+}
+
+
+---
+
+[TestInitialise/uses_custom_package_name_in_conduit_migration_file - 1]
+### 20240115123045_conduit_migration.go ###
+package custompkg
+
+import (
+    "context"
+
+    "github.com/jackc/pgx/v5"
+    "go.inout.gg/conduit"
+    "go.inout.gg/conduit/conduitmigrate"
+)
+
+//nolint:exhaustruct
+var m20240115123045 = conduitmigrate.New(&conduitmigrate.Config{}) //nolint:gochecknoglobals
+
+//nolint:gochecknoinits
+func init() {
+    conduit.Up(up20240115123045)
+    conduit.Down(down20240115123045)
+}
+
+func up20240115123045(ctx context.Context, conn *pgx.Conn) error {
+    //nolint:wrapcheck
+    return m20240115123045.Up(ctx, conn)
+}
+
+func down20240115123045(ctx context.Context, conn *pgx.Conn) error {
+    //nolint:wrapcheck
+    return m20240115123045.Down(ctx, conn)
+}
+
+
+---
+
+[TestInitialise/skips_conduit_migration_file_when_NoConduitMigrations_is_set - 1]
+
+---

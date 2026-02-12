@@ -13,5 +13,5 @@ var migrationFS embed.FS
 
 //nolint:gochecknoinits
 func init() {
-	Registry.FromFS(migrationFS)
+	Registry.FromFS(migrationFS, ".")
 }
