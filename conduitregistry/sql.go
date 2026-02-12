@@ -132,7 +132,11 @@ func sqlMigrateFunc(stmts []sqlsplit.Stmt) *migrateFunc {
 			for _, stmt := range queryStmts {
 				_, err := conn.Exec(ctx, stmt.Content)
 				if err != nil {
-					return fmt.Errorf("conduit: failed to execute migration script: %w\n\n%s", err, stmt.String())
+					return fmt.Errorf(
+						"conduit: failed to execute migration script: %w\n\n%s",
+						err,
+						stmt.String(),
+					)
 				}
 			}
 
