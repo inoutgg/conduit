@@ -1,7 +1,6 @@
 package create
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"path/filepath"
@@ -9,37 +8,33 @@ import (
 
 	"github.com/spf13/afero"
 
-	"go.inout.gg/conduit/internal/command/migrationctx"
 	internaltpl "go.inout.gg/conduit/internal/template"
+	"go.inout.gg/conduit/internal/timegenerator"
 	"go.inout.gg/conduit/pkg/version"
 )
 
 type EmptyArgs struct {
+	Dir         string
 	Name        string
 	Ext         string
 	PackageName string
 }
 
-func empty(ctx context.Context, fs afero.Fs, args EmptyArgs) error {
-	dir, err := migrationctx.Dir(ctx)
-	if err != nil {
-		return fmt.Errorf("conduit: failed to get migration directory: %w", err)
-	}
-
+func empty(fs afero.Fs, timeGen timegenerator.Generator, args EmptyArgs) error {
 	// Ensure migration dir exists.
-	if !exists(fs, dir) {
+	if !exists(fs, args.Dir) {
 		return errors.New("conduit: migrations directory does not exist, try to initialise it first")
 	}
 
-	ver := version.NewVersion()
+	ver := version.NewFromTime(timeGen.Now())
 
 	switch args.Ext {
 	case "sql":
-		if err := createSQLMigration(fs, dir, ver, args); err != nil {
+		if err := createSQLMigration(fs, args.Dir, ver, args); err != nil {
 			return err
 		}
 	case "go":
-		if err := createGoMigration(fs, dir, ver, args); err != nil {
+		if err := createGoMigration(fs, args.Dir, ver, args); err != nil {
 			return err
 		}
 	}
@@ -48,10 +43,10 @@ func empty(ctx context.Context, fs afero.Fs, args EmptyArgs) error {
 }
 
 func createSQLMigration(fs afero.Fs, dir string, ver version.Version, args EmptyArgs) error {
-	tplData := struct {
-		Version version.Version
-		Name    string
-	}{ver, args.Name}
+	tplData := map[string]any{
+		"Version": ver,
+		"Name":    args.Name,
+	}
 
 	for _, pair := range []struct {
 		tpl       *template.Template
@@ -84,13 +79,13 @@ func createGoMigration(fs afero.Fs, dir string, ver version.Version, args EmptyA
 	path := filepath.Join(dir, filename)
 	hasCustomRegistry := exists(fs, filepath.Join(dir, "registry.go"))
 
-	return writeTemplate(fs, path, internaltpl.GoMigrationTemplate, struct {
-		Version           version.Version
-		Ext               string
-		Name              string
-		Package           string
-		HasCustomRegistry bool
-	}{ver, args.Ext, args.Name, args.PackageName, hasCustomRegistry})
+	return writeTemplate(fs, path, internaltpl.GoMigrationTemplate, map[string]any{
+		"Version":           ver,
+		"Ext":               args.Ext,
+		"Name":              args.Name,
+		"Package":           args.PackageName,
+		"HasCustomRegistry": hasCustomRegistry,
+	})
 }
 
 func writeTemplate(fs afero.Fs, path string, tpl *template.Template, data any) error {
@@ -109,10 +104,4 @@ func writeTemplate(fs afero.Fs, path string, tpl *template.Template, data any) e
 	}
 
 	return nil
-}
-
-// exists check if a FS entry exists at path.
-func exists(afs afero.Fs, path string) bool {
-	_, err := afs.Stat(path)
-	return !errors.Is(err, afero.ErrFileNotFound)
 }

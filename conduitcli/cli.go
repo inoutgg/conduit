@@ -13,7 +13,7 @@ import (
 	"go.inout.gg/conduit/internal/command/create"
 	"go.inout.gg/conduit/internal/command/flagname"
 	"go.inout.gg/conduit/internal/command/initialise"
-	"go.inout.gg/conduit/internal/command/migrationctx"
+	"go.inout.gg/conduit/internal/timegenerator"
 )
 
 // Execute evaluates given os.Args and executes a matched command.
@@ -24,6 +24,8 @@ func Execute(ctx context.Context, migrator *conduit.Migrator) error {
 	}
 
 	fs := afero.NewBasePathFs(afero.NewOsFs(), cwd)
+
+	var timeGen timegenerator.Standard
 
 	//nolint:exhaustruct
 	cmd := &cli.Command{
@@ -45,11 +47,10 @@ func Execute(ctx context.Context, migrator *conduit.Migrator) error {
 			},
 		},
 		Commands: []*cli.Command{
-			initialise.NewCommand(fs),
-			create.NewCommand(fs),
+			initialise.NewCommand(fs, timeGen),
+			create.NewCommand(fs, timeGen),
 			apply.NewCommand(migrator),
 		},
-		Before: migrationctx.OnBeforeHook,
 	}
 
 	//nolint:wrapcheck

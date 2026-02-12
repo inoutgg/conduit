@@ -13,7 +13,6 @@ const format = "20060102150405" // YYYYMMDDHHMMSS
 
 type Version struct{ t time.Time }
 
-func NewVersion() Version             { return Version{t: time.Now()} }
 func NewFromTime(t time.Time) Version { return Version{t: t} }
 
 // String returns the version as a string.

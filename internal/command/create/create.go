@@ -4,14 +4,16 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"path/filepath"
 
 	"github.com/spf13/afero"
 	"github.com/urfave/cli/v3"
 
 	"go.inout.gg/conduit/internal/command/flagname"
+	"go.inout.gg/conduit/internal/timegenerator"
 )
 
-func NewCommand(fs afero.Fs) *cli.Command {
+func NewCommand(fs afero.Fs, timeGen timegenerator.Generator) *cli.Command {
 	//nolint:exhaustruct
 	return &cli.Command{
 		Name:  "create",
@@ -51,12 +53,13 @@ func NewCommand(fs afero.Fs) *cli.Command {
 					}
 
 					args := EmptyArgs{
+						Dir:         filepath.Clean(cmd.String(flagname.MigrationsDir)),
 						Name:        name,
 						Ext:         ext,
 						PackageName: cmd.String(flagname.PackageName),
 					}
 
-					return empty(ctx, fs, args)
+					return empty(fs, timeGen, args)
 				},
 			},
 			//nolint:exhaustruct
@@ -76,12 +79,6 @@ func NewCommand(fs afero.Fs) *cli.Command {
 						Usage:   "database connection URL",
 						Sources: cli.EnvVars("CONDUIT_DATABASE_URL"),
 					},
-					//nolint:exhaustruct
-					&cli.StringFlag{
-						Name:  "image",
-						Usage: "PostgreSQL Docker image for testcontainers (e.g., \"postgres:16-alpine\")",
-						Value: "postgres:16-alpine",
-					},
 				},
 				Action: func(ctx context.Context, cmd *cli.Command) error {
 					name := cmd.Args().First()
@@ -90,15 +87,21 @@ func NewCommand(fs afero.Fs) *cli.Command {
 					}
 
 					args := DiffArgs{
+						Dir:         filepath.Clean(cmd.String(flagname.MigrationsDir)),
 						Name:        name,
 						SchemaPath:  cmd.String("schema"),
 						DatabaseURL: cmd.String(flagname.DatabaseURL),
-						Image:       cmd.String("image"),
 					}
 
-					return diff(ctx, fs, args)
+					return diff(ctx, fs, timeGen, args)
 				},
 			},
 		},
 	}
+}
+
+// exists check if a FS entry exists at path.
+func exists(afs afero.Fs, path string) bool {
+	_, err := afs.Stat(path)
+	return !errors.Is(err, afero.ErrFileNotFound)
 }

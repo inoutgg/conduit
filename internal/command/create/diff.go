@@ -10,107 +10,68 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/spf13/afero"
 
-	"go.inout.gg/conduit/internal/command/migrationctx"
 	internaltpl "go.inout.gg/conduit/internal/template"
+	"go.inout.gg/conduit/internal/timegenerator"
 	"go.inout.gg/conduit/pkg/pgdiff"
 	"go.inout.gg/conduit/pkg/version"
 )
 
 type DiffArgs struct {
+	Dir         string
 	Name        string
 	SchemaPath  string
 	DatabaseURL string
-	Image       string
 }
 
-func diff(ctx context.Context, fs afero.Fs, args DiffArgs) error {
-	migrationDir, err := migrationctx.Dir(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to get migration directory: %w", err)
-	}
-
-	if !exists(fs, migrationDir) {
+func diff(ctx context.Context, fs afero.Fs, timeGen timegenerator.Generator, args DiffArgs) error {
+	if !exists(fs, args.Dir) {
 		return errors.New("migrations directory does not exist, try to initialise it first")
 	}
 
-	var poolConfig *pgxpool.Config
-
-	if args.DatabaseURL != "" {
-		poolConfig, err = pgxpool.ParseConfig(args.DatabaseURL)
-		if err != nil {
-			return fmt.Errorf("failed to connect to database: %w", err)
-		}
-	} else {
-		var cleanup func(context.Context) error
-
-		poolConfig, cleanup, err = pgdiff.StartPostgresContainer(ctx, args.Image)
-		if err != nil {
-			return fmt.Errorf("failed to start postgres container: %w", err)
-		}
-
-		defer func() {
-			_ = cleanup(ctx)
-		}()
+	poolConfig, err := pgxpool.ParseConfig(args.DatabaseURL)
+	if err != nil {
+		return fmt.Errorf("failed to connect to database: %w", err)
 	}
 
-	plan, err := pgdiff.GeneratePlan(ctx, fs, poolConfig, migrationDir, args.SchemaPath)
+	plan, err := pgdiff.GeneratePlan(ctx, fs, poolConfig, args.Dir, args.SchemaPath)
 	if err != nil {
 		return fmt.Errorf("failed to generate diff plan: %w", err)
 	}
 
 	if len(plan.Statements) == 0 {
-		//nolint:forbidigo
-		fmt.Println("No schema changes detected.")
-		return nil
+		return errors.New("no schema changes detected")
 	}
 
-	ver := version.NewVersion()
+	v := version.NewFromTime(timeGen.Now())
 
 	var upStmts strings.Builder
-	for i, stmt := range plan.Statements {
-		upStmts.WriteString(stmt.ToSQL())
 
-		if !strings.HasSuffix(stmt.ToSQL(), ";") {
-			upStmts.WriteString(";")
+	for i, stmt := range plan.Statements {
+		for _, hazard := range stmt.Hazards {
+			upStmts.WriteString(fmt.Sprintf("-- [WARNING/%s]: %s\n", hazard.Type, hazard.Message))
 		}
+
+		upStmts.WriteString(stmt.ToSQL())
 
 		if i < len(plan.Statements)-1 {
 			upStmts.WriteString("\n\n")
 		}
 	}
 
-	tplData := struct {
-		Version    version.Version
-		Name       string
-		SchemaPath string
-		UpStmts    string
-	}{
-		Version:    ver,
-		Name:       args.Name,
-		SchemaPath: args.SchemaPath,
-		UpStmts:    upStmts.String(),
-	}
-
 	// Create up migration.
-	upFilename, err := version.MigrationFilename(ver, args.Name, version.MigrationDirectionUp, "sql")
+	upFilename, err := version.MigrationFilename(v, args.Name, version.MigrationDirectionUp, "sql")
 	if err != nil {
 		return fmt.Errorf("failed to generate migration filename: %w", err)
 	}
 
-	upPath := filepath.Join(migrationDir, upFilename)
-	if err := writeTemplate(fs, upPath, internaltpl.SQLUpMigrationTemplate, tplData); err != nil {
+	upPath := filepath.Join(args.Dir, upFilename)
+	if err := writeTemplate(fs, upPath, internaltpl.SQLUpMigrationTemplate, map[string]any{
+		"Version":    v,
+		"Name":       args.Name,
+		"SchemaPath": args.SchemaPath,
+		"UpStmts":    upStmts.String(),
+	}); err != nil {
 		return err
-	}
-
-	//nolint:forbidigo
-	fmt.Printf("Created migration: %s\n", upPath)
-
-	// Print hazards if any
-	for _, stmt := range plan.Statements {
-		for _, hazard := range stmt.Hazards {
-			//nolint:forbidigo
-			fmt.Printf("Warning [%s]: %s\n", hazard.Type, hazard.Message)
-		}
 	}
 
 	return nil
