@@ -38,7 +38,7 @@ func NewCommand(fs afero.Fs, timeGen timegenerator.Generator) *cli.Command {
 						Sources: cli.EnvVars("CONDUIT_PACKAGE_NAME"),
 					},
 				},
-				Action: func(ctx context.Context, cmd *cli.Command) error {
+				Action: func(_ context.Context, cmd *cli.Command) error {
 					name := cmd.Args().First()
 					if name == "" {
 						return errors.New("conduit: missing `name` argument")

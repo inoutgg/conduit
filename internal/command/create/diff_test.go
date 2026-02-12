@@ -31,7 +31,7 @@ func TestDiff(t *testing.T) {
 		err := diff(t.Context(), fs, timeGen, args)
 
 		// Assert
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.ErrorContains(t, err, "migrations directory does not exist")
 	})
 
@@ -51,8 +51,8 @@ func TestDiff(t *testing.T) {
 		err := diff(t.Context(), fs, timeGen, args)
 
 		// Assert
-		assert.Error(t, err)
-		assert.ErrorContains(t, err, "failed to connect to database")
+		require.Error(t, err)
+		assert.ErrorContains(t, err, "failed to parse database URL")
 	})
 
 	t.Run("creates migration file from schema diff", func(t *testing.T) {
@@ -102,7 +102,7 @@ CREATE TABLE posts (id int, user_id int);`).
 		err := diff(t.Context(), fs, timeGen, args)
 
 		// Assert
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.ErrorContains(t, err, "no schema changes detected")
 	})
 }

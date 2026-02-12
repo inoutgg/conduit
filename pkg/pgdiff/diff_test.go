@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/gkampitakis/go-snaps/snaps"
-	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/jackc/pgx/v5"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -106,7 +106,7 @@ func TestGeneratePlan(t *testing.T) {
 		t.Parallel()
 
 		// Arrange
-		config, err := pgxpool.ParseConfig(os.Getenv("TEST_DATABASE_URL"))
+		config, err := pgx.ParseConfig(os.Getenv("TEST_DATABASE_URL"))
 		require.NoError(t, err)
 
 		fs, baseDir, migrationsDir := testutil.NewMigrationsDirBuilder(t).

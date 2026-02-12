@@ -142,13 +142,14 @@
 ---
 
 [TestGeneratePlan/generates_plan_with_new_table - 1]
-5e3801c0798c90f9
+edf1bb36a97d2d9e
 []diff.Statement{
     {
-        DDL:         "CREATE TABLE \"public\".\"posts\" (\n\t\"id\" integer,\n\t\"user_id\" integer\n)",
-        Timeout:     3000000000,
-        LockTimeout: 3000000000,
-        Hazards:     nil,
+        DDL:            "CREATE TABLE \"public\".\"posts\" (\n\t\"id\" integer,\n\t\"user_id\" integer\n)",
+        Timeout:        3000000000,
+        LockTimeout:    3000000000,
+        Hazards:        nil,
+        SkipValidation: false,
     },
 }
 ---

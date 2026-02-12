@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/jackc/pgx/v5"
 	"github.com/spf13/afero"
 
 	internaltpl "go.inout.gg/conduit/internal/template"
@@ -28,12 +28,12 @@ func diff(ctx context.Context, fs afero.Fs, timeGen timegenerator.Generator, arg
 		return errors.New("migrations directory does not exist, try to initialise it first")
 	}
 
-	poolConfig, err := pgxpool.ParseConfig(args.DatabaseURL)
+	connConfig, err := pgx.ParseConfig(args.DatabaseURL)
 	if err != nil {
-		return fmt.Errorf("failed to connect to database: %w", err)
+		return fmt.Errorf("failed to parse database URL: %w", err)
 	}
 
-	plan, err := pgdiff.GeneratePlan(ctx, fs, poolConfig, args.Dir, args.SchemaPath)
+	plan, err := pgdiff.GeneratePlan(ctx, fs, connConfig, args.Dir, args.SchemaPath)
 	if err != nil {
 		return fmt.Errorf("failed to generate diff plan: %w", err)
 	}

@@ -8,7 +8,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/spf13/afero"
 	schemadiff "github.com/stripe/pg-schema-diff/pkg/diff"
@@ -24,7 +24,7 @@ import (
 func GeneratePlan(
 	ctx context.Context,
 	fs afero.Fs,
-	poolConfig *pgxpool.Config,
+	connConfig *pgx.ConnConfig,
 	migrationsDir, schemaPath string,
 ) (schemadiff.Plan, error) {
 	sourceStmts, err := readStmtsFromMigrationsDir(fs, migrationsDir)
@@ -37,26 +37,21 @@ func GeneratePlan(
 		return schemadiff.Plan{}, fmt.Errorf("failed to read schema file: %w", err)
 	}
 
-	return generatePlan(ctx, poolConfig, sourceStmts, targetStmts)
+	return generatePlan(ctx, connConfig, sourceStmts, targetStmts)
 }
 
 func generatePlan(
 	ctx context.Context,
-	poolConfig *pgxpool.Config,
+	connConfig *pgx.ConnConfig,
 	sourceStmts, targetStmts []sqlsplit.Stmt,
 ) (schemadiff.Plan, error) {
 	tempDbFactory, err := tempdb.NewOnInstanceFactory(
 		ctx,
-		func(ctx context.Context, dbName string) (*sql.DB, error) {
-			config := poolConfig.Copy()
-			config.ConnConfig.Database = dbName
+		func(_ context.Context, dbName string) (*sql.DB, error) {
+			cc := connConfig.Copy()
+			cc.Database = dbName
 
-			p, err := pgxpool.NewWithConfig(ctx, config)
-			if err != nil {
-				return nil, fmt.Errorf("failed to create connection pool for %s: %w", dbName, err)
-			}
-
-			return stdlib.OpenDBFromPool(p), nil
+			return stdlib.OpenDB(*cc), nil
 		},
 		tempdb.WithDbPrefix("conduit"),
 	)

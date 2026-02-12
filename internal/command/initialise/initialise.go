@@ -58,7 +58,7 @@ func NewCommand(fs afero.Fs, timeGen timegenerator.Generator) *cli.Command {
 			},
 		},
 
-		Action: func(ctx context.Context, cmd *cli.Command) error {
+		Action: func(_ context.Context, cmd *cli.Command) error {
 			args := InitialiseArgs{
 				Dir:                 filepath.Clean(cmd.String(flagname.MigrationsDir)),
 				Namespace:           cmd.String("namespace"),
