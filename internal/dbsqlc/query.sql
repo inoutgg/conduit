@@ -10,20 +10,18 @@ RESET ALL;
 -- name: AllExistingMigrationVersions :many
 SELECT version
 FROM conduit_migrations
-WHERE namespace = @namespace
 ORDER BY version;
 
 -- name: ApplyMigration :exec
-INSERT INTO  conduit_migrations (version, name, namespace, hash)
-VALUES (@version, @name, @namespace, @hash);
+INSERT INTO conduit_migrations (version, name, hash)
+VALUES (@version, @name, @hash);
 
 -- name: RollbackMigration :exec
 DELETE FROM conduit_migrations
-WHERE version = @version AND namespace = @namespace;
+WHERE version = @version;
 
 -- name: LatestSchemaHash :one
 SELECT hash FROM conduit_migrations
-WHERE namespace = @namespace
 ORDER BY version DESC
 LIMIT 1;
 

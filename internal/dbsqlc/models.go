@@ -13,6 +13,5 @@ type ConduitMigration struct {
 	CreatedAt pgtype.Timestamp
 	Version   string
 	Name      string
-	Namespace string
 	Hash      string
 }

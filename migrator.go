@@ -120,7 +120,6 @@ type MigrationResult struct {
 	// Version is the version of the applied migration.
 	Version       version.Version
 	Name          string
-	Namespace     string
 	DurationTotal time.Duration
 }
 
@@ -188,7 +187,7 @@ func (m *Migrator) Migrate(
 		return nil, err
 	}
 
-	lockNum := pgLockNum(m.registry.Namespace)
+	lockNum := pgLockNum("conduit")
 
 	if err := dbsqlc.New().AcquireLock(ctx, conn, lockNum); err != nil {
 		return nil, fmt.Errorf("conduit: failed to acquire a lock: %w", err)
@@ -226,7 +225,7 @@ func (m *Migrator) existingMigrationVersions(ctx context.Context, conn *pgx.Conn
 		return []string{}, nil
 	}
 
-	versions, err := dbsqlc.New().AllExistingMigrationVersions(ctx, conn, m.registry.Namespace)
+	versions, err := dbsqlc.New().AllExistingMigrationVersions(ctx, conn)
 	if err != nil {
 		return nil, fmt.Errorf("conduit: failed to fetch existing versions: %w", err)
 	}
@@ -301,7 +300,7 @@ func (m *Migrator) migrateDown(
 // stored in conduit_migrations for the last applied migration. This detects
 // manual schema changes (drift) that were not performed through migrations.
 func (m *Migrator) verifySchemaHash(ctx context.Context, conn *pgx.Conn) error {
-	expectedHash, err := dbsqlc.New().LatestSchemaHash(ctx, conn, m.registry.Namespace)
+	expectedHash, err := dbsqlc.New().LatestSchemaHash(ctx, conn)
 	if err != nil {
 		// No rows means no migrations applied yet — nothing to verify.
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -404,16 +403,12 @@ func (m *Migrator) applyMigrations(
 			DurationTotal: duration,
 			Version:       migration.Version(),
 			Name:          migration.Name(),
-			Namespace:     m.registry.Namespace,
 		}
 		results[i] = migrationResult
 
 		switch dir {
 		case DirectionDown:
-			err = dbsqlc.New().RollbackMigration(ctx, conn, dbsqlc.RollbackMigrationParams{
-				Version:   migrationResult.Version.String(),
-				Namespace: migrationResult.Namespace,
-			})
+			err = dbsqlc.New().RollbackMigration(ctx, conn, migrationResult.Version.String())
 
 		case DirectionUp:
 			// Compute the schema hash of the live database after applying the migration.
@@ -429,10 +424,9 @@ func (m *Migrator) applyMigrations(
 			}
 
 			err = dbsqlc.New().ApplyMigration(ctx, conn, dbsqlc.ApplyMigrationParams{
-				Version:   migrationResult.Version.String(),
-				Namespace: migrationResult.Namespace,
-				Name:      migrationResult.Name,
-				Hash:      schemaHash,
+				Version: migrationResult.Version.String(),
+				Name:    migrationResult.Name,
+				Hash:    schemaHash,
 			})
 		}
 
@@ -491,8 +485,6 @@ func (m *Migrator) applyMigrationTx(
 }
 
 // pgLockNum computes a lock number for a PostgreSQL advisory lock.
-//
-// The input string is typically a registry namespace.
 func pgLockNum(s string) int64 {
 	h := fnv.New32a()
 	h.Write([]byte(s))
