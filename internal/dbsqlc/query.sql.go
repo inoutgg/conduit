@@ -46,18 +46,24 @@ func (q *Queries) AllExistingMigrationVersions(ctx context.Context, db DBTX, nam
 }
 
 const applyMigration = `-- name: ApplyMigration :exec
-INSERT INTO  conduit_migrations (version, name, namespace)
-VALUES ($1, $2, $3)
+INSERT INTO  conduit_migrations (version, name, namespace, hash)
+VALUES ($1, $2, $3, $4)
 `
 
 type ApplyMigrationParams struct {
 	Version   string
 	Name      string
 	Namespace string
+	Hash      string
 }
 
 func (q *Queries) ApplyMigration(ctx context.Context, db DBTX, arg ApplyMigrationParams) error {
-	_, err := db.Exec(ctx, applyMigration, arg.Version, arg.Name, arg.Namespace)
+	_, err := db.Exec(ctx, applyMigration,
+		arg.Version,
+		arg.Name,
+		arg.Namespace,
+		arg.Hash,
+	)
 	return err
 }
 
@@ -74,6 +80,20 @@ func (q *Queries) DoesTableExist(ctx context.Context, db DBTX, tableName string)
 	var column_1 bool
 	err := row.Scan(&column_1)
 	return column_1, err
+}
+
+const latestSchemaHash = `-- name: LatestSchemaHash :one
+SELECT hash FROM conduit_migrations
+WHERE namespace = $1
+ORDER BY version DESC
+LIMIT 1
+`
+
+func (q *Queries) LatestSchemaHash(ctx context.Context, db DBTX, namespace string) (string, error) {
+	row := db.QueryRow(ctx, latestSchemaHash, namespace)
+	var hash string
+	err := row.Scan(&hash)
+	return hash, err
 }
 
 const releaseLock = `-- name: ReleaseLock :exec

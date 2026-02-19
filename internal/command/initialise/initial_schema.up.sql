@@ -1,6 +1,3 @@
-
-[TestInitialise/creates_migration_directory_and_initial_schema_migration - 1]
-### 20240115123045_conduit_initial_schema.up.sql ###
 CREATE TABLE IF NOT EXISTS conduit_migrations (
   id BIGSERIAL NOT NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -11,9 +8,3 @@ CREATE TABLE IF NOT EXISTS conduit_migrations (
   PRIMARY KEY (id),
   UNIQUE (version, namespace)
 );
-
-### conduit.sum ###
-840f2077a1e670fd
-
-
----

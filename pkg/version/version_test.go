@@ -45,24 +45,14 @@ func TestParseMigrationFilename(t *testing.T) {
 		name           string
 		filename       string
 		expectedName   string
-		expectedExt    string
 		expectedDir    version.MigrationDirection
 		expectedErrMsg string
 	}{
-		{
-			name:         "Valid Go migration",
-			filename:     "20230601130000_update_schema.go",
-			expectedTime: parseTime("20230601130000"),
-			expectedName: "update_schema",
-			expectedExt:  "go",
-			expectedDir:  "",
-		},
 		{
 			name:         "Valid up migration",
 			filename:     "20230601120000_create_user.up.sql",
 			expectedTime: parseTime("20230601120000"),
 			expectedName: "create_user",
-			expectedExt:  "sql",
 			expectedDir:  version.MigrationDirectionUp,
 		},
 		{
@@ -70,7 +60,6 @@ func TestParseMigrationFilename(t *testing.T) {
 			filename:     "20230601120000_create_user.down.sql",
 			expectedTime: parseTime("20230601120000"),
 			expectedName: "create_user",
-			expectedExt:  "sql",
 			expectedDir:  version.MigrationDirectionDown,
 		},
 		{
@@ -78,23 +67,17 @@ func TestParseMigrationFilename(t *testing.T) {
 			filename:     "/path/to/migrations/20230601140000_add_index.up.sql",
 			expectedTime: parseTime("20230601140000"),
 			expectedName: "add_index",
-			expectedExt:  "sql",
 			expectedDir:  version.MigrationDirectionUp,
 		},
 		{
 			name:           "Invalid extension",
 			filename:       "20230601150000_invalid_extension.txt",
-			expectedErrMsg: `conduit: unknown migration file extension ".txt", expected: .sql or .go`,
+			expectedErrMsg: `conduit: unknown migration file extension ".txt", expected: .sql`,
 		},
 		{
 			name:           "Malformed filename, no underscore",
-			filename:       "20230601160000malformed.go",
-			expectedErrMsg: `conduit: malformed migration filename, expected: <version>_<name>.[go|sql], got: 20230601160000malformed.go`,
-		},
-		{
-			name:           "Malformed filename, only version",
-			filename:       "20230601170000.go",
-			expectedErrMsg: `conduit: malformed migration filename, expected: <version>_<name>.[go|sql], got: 20230601170000.go`,
+			filename:       "20230601160000malformed.up.sql",
+			expectedErrMsg: `conduit: malformed migration filename, expected: <version>_<name>.sql, got: 20230601160000malformed.up.sql`,
 		},
 		{
 			name:           "SQL without direction suffix",
@@ -131,7 +114,6 @@ func TestParseMigrationFilename(t *testing.T) {
 				require.NoError(t, err)
 				assert.Equal(t, version.NewFromTime(tt.expectedTime), parsed.Version)
 				assert.Equal(t, tt.expectedName, parsed.Name)
-				assert.Equal(t, tt.expectedExt, parsed.Extension)
 				assert.Equal(t, tt.expectedDir, parsed.Direction)
 			}
 		})
@@ -140,22 +122,6 @@ func TestParseMigrationFilename(t *testing.T) {
 
 func TestParsedMigrationFilename_Filename(t *testing.T) {
 	t.Parallel()
-
-	t.Run("returns original filename for parsed Go migration", func(t *testing.T) {
-		t.Parallel()
-
-		// Arrange
-		original := "20230601130000_update_schema.go"
-		parsed, err := version.ParseMigrationFilename(original)
-		require.NoError(t, err)
-
-		// Act
-		result, err := parsed.Filename()
-
-		// Assert
-		require.NoError(t, err)
-		assert.Equal(t, original, result)
-	})
 
 	t.Run("returns original filename for parsed up migration", func(t *testing.T) {
 		t.Parallel()
@@ -166,10 +132,9 @@ func TestParsedMigrationFilename_Filename(t *testing.T) {
 		require.NoError(t, err)
 
 		// Act
-		result, err := parsed.Filename()
+		result := parsed.Filename()
 
 		// Assert
-		require.NoError(t, err)
 		assert.Equal(t, original, result)
 	})
 
@@ -182,10 +147,9 @@ func TestParsedMigrationFilename_Filename(t *testing.T) {
 		require.NoError(t, err)
 
 		// Act
-		result, err := parsed.Filename()
+		result := parsed.Filename()
 
 		// Assert
-		require.NoError(t, err)
 		assert.Equal(t, original, result)
 	})
 
@@ -198,10 +162,9 @@ func TestParsedMigrationFilename_Filename(t *testing.T) {
 		require.NoError(t, err)
 
 		// Act
-		result, err := parsed.Filename()
+		result := parsed.Filename()
 
 		// Assert
-		require.NoError(t, err)
 		assert.Equal(t, "20230601140000_add_index.up.sql", result)
 	})
 }

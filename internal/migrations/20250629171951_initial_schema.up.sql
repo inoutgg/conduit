@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS conduit_migrations (
   version VARCHAR(255) NOT NULL,
   name VARCHAR(4095) NOT NULL,
   namespace VARCHAR(4095) NOT NULL,
+  hash VARCHAR(64) NOT NULL DEFAULT '',
   PRIMARY KEY (id),
   UNIQUE (version, namespace)
 );

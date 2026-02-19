@@ -5,21 +5,26 @@ import (
 	"fmt"
 	"path/filepath"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/spf13/afero"
 	"github.com/urfave/cli/v3"
 
+	_ "embed"
+
 	"go.inout.gg/conduit/internal/command/flagname"
-	internaltpl "go.inout.gg/conduit/internal/template"
 	"go.inout.gg/conduit/internal/timegenerator"
+	"go.inout.gg/conduit/pkg/conduitsum"
+	"go.inout.gg/conduit/pkg/pgdiff"
 	"go.inout.gg/conduit/pkg/version"
 )
 
+//go:embed initial_schema.up.sql
+var initialMigrationContent []byte
+
 //nolint:revive // ignore naming convention.
 type InitialiseArgs struct {
-	Dir                 string
-	Namespace           string
-	PackageName         string
-	NoConduitMigrations bool
+	Dir         string
+	DatabaseURL string
 }
 
 func NewCommand(fs afero.Fs, timeGen timegenerator.Generator) *cli.Command {
@@ -38,67 +43,53 @@ func NewCommand(fs afero.Fs, timeGen timegenerator.Generator) *cli.Command {
 			},
 			//nolint:exhaustruct
 			&cli.StringFlag{
-				Name:    flagname.PackageName,
-				Usage:   "package name",
-				Value:   "migrations",
-				Sources: cli.EnvVars("CONDUIT_PACKAGE_NAME"),
-			},
-
-			//nolint:exhaustruct
-			&cli.StringFlag{
-				Name:    "namespace",
-				Aliases: []string{"ns"},
-				Usage:   "if set, creates a custom registry with provided namespace",
-			},
-
-			//nolint:exhaustruct
-			&cli.BoolFlag{
-				Name:  "no-conduit-migrations",
-				Usage: "if set, a migration file to create conduit's versioning table won't be included",
+				Name:    flagname.DatabaseURL,
+				Usage:   "database connection URL",
+				Sources: cli.EnvVars("CONDUIT_DATABASE_URL"),
 			},
 		},
 
-		Action: func(_ context.Context, cmd *cli.Command) error {
+		Action: func(ctx context.Context, cmd *cli.Command) error {
 			args := InitialiseArgs{
-				Dir:                 filepath.Clean(cmd.String(flagname.MigrationsDir)),
-				Namespace:           cmd.String("namespace"),
-				PackageName:         cmd.String(flagname.PackageName),
-				NoConduitMigrations: cmd.Bool("no-conduit-migrations"),
+				Dir:         filepath.Clean(cmd.String(flagname.MigrationsDir)),
+				DatabaseURL: cmd.String(flagname.DatabaseURL),
 			}
 
-			return initialise(fs, timeGen, args)
+			return initialise(ctx, fs, timeGen, args)
 		},
 	}
 }
 
-func initialise(fs afero.Fs, timeGen timegenerator.Generator, args InitialiseArgs) error {
+func initialise(ctx context.Context, fs afero.Fs, timeGen timegenerator.Generator, args InitialiseArgs) error {
 	if err := createMigrationDir(fs, args.Dir); err != nil {
 		return err
 	}
 
-	if args.Namespace != "" {
-		if _, err := createRegistryFile(fs, args.Dir, args.Namespace); err != nil {
-			return err
-		}
+	ver := version.NewFromTime(timeGen.Now())
+
+	if err := createInitialMigration(fs, ver, args.Dir); err != nil {
+		return err
 	}
 
-	if !args.NoConduitMigrations {
-		if _, err := createConduitMigrationFile(
-			fs,
-			args.Dir,
-			args.Namespace,
-			args.PackageName,
-			timeGen,
-		); err != nil {
-			return err
-		}
+	connConfig, err := pgx.ParseConfig(args.DatabaseURL)
+	if err != nil {
+		return fmt.Errorf("failed to parse database URL: %w", err)
+	}
+
+	hash, err := pgdiff.GenerateSchemaHash(ctx, fs, connConfig, args.Dir)
+	if err != nil {
+		return fmt.Errorf("failed to generate schema hash: %w", err)
+	}
+
+	sumPath := filepath.Join(args.Dir, conduitsum.Filename)
+	if err := afero.WriteFile(fs, sumPath, conduitsum.Format([]string{hash}), 0o644); err != nil {
+		return fmt.Errorf("conduit: failed to write conduit.sum: %w", err)
 	}
 
 	return nil
 }
 
-// createMigrationDir creates a new migration file at the dir resolved from the current
-// working directory.
+// createMigrationDir creates a new migration directory.
 func createMigrationDir(fs afero.Fs, dir string) error {
 	err := fs.MkdirAll(dir, 0o755)
 	if err != nil {
@@ -108,71 +99,15 @@ func createMigrationDir(fs afero.Fs, dir string) error {
 	return nil
 }
 
-// createConduitMigrationFile creates a new migration file with conduit's own migration file
-// in the migrations directory.
-func createConduitMigrationFile(
-	fs afero.Fs,
-	dirpath string,
-	namespace string,
-	packageName string,
-	timeGen timegenerator.Generator,
-) (string, error) {
-	ver := version.NewFromTime(timeGen.Now())
+// createInitialMigration writes the initial conduit schema migration into the
+// migrations directory.
+func createInitialMigration(fs afero.Fs, ver version.Version, dir string) error {
+	filename := version.MigrationFilename(ver, "conduit_initial_schema", version.MigrationDirectionUp)
+	path := filepath.Join(dir, filename)
 
-	filename, err := version.MigrationFilename(ver, "conduit_migration", "", "go")
-	if err != nil {
-		return "", fmt.Errorf("conduit: failed to generate migration filename: %w", err)
+	if err := afero.WriteFile(fs, path, initialMigrationContent, 0o644); err != nil {
+		return fmt.Errorf("conduit: failed to create initial migration file: %w", err)
 	}
 
-	fpath := filepath.Join(dirpath, filename)
-
-	f, err := fs.Create(fpath)
-	if err != nil {
-		return "", fmt.Errorf("conduit: failed to create migrations file: %w", err)
-	}
-	defer f.Close()
-
-	if err := internaltpl.ConduitMigrationTemplate.Execute(f, struct {
-		Version           version.Version
-		Package           string
-		HasCustomRegistry bool
-	}{HasCustomRegistry: namespace != "", Version: ver, Package: packageName}); err != nil {
-		return "", fmt.Errorf("conduit: failed to write a template: %w", err)
-	}
-
-	if err := f.Sync(); err != nil {
-		return "", fmt.Errorf(
-			"conduit: failed to write conduit migration file %s: %w",
-			filename,
-			err,
-		)
-	}
-
-	return filename, nil
-}
-
-// createRegistryFile creates a custom migration registry in the migrations directory.
-func createRegistryFile(fs afero.Fs, dir string, ns string) (string, error) {
-	fpath := filepath.Join(dir, "registry.go")
-
-	f, err := fs.Create(fpath)
-	if err != nil {
-		return "", fmt.Errorf("conduit: failed to create registry file: %w", err)
-	}
-
-	defer f.Close()
-
-	if err := internaltpl.RegistryTemplate.Execute(f, struct{ Namespace string }{Namespace: ns}); err != nil {
-		return "", fmt.Errorf("conduit: failed to write a template: %w", err)
-	}
-
-	if err := f.Sync(); err != nil {
-		return "", fmt.Errorf(
-			"conduit: failed to write migrations registry file %s: %w",
-			fpath,
-			err,
-		)
-	}
-
-	return fpath, nil
+	return nil
 }

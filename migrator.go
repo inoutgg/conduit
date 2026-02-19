@@ -13,6 +13,8 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/stdlib"
+	"github.com/stripe/pg-schema-diff/pkg/schema"
 	"go.inout.gg/foundations/debug"
 	"go.inout.gg/foundations/must"
 
@@ -37,16 +39,17 @@ const (
 	DirectionDown           = direction.DirectionDown // roll down
 )
 
-var ErrInvalidStep = errors.New(
-	"conduit: invalid migration step. Expected: -1 (all) or positive integer",
+var (
+	ErrInvalidStep = errors.New(
+		"conduit: invalid migration step. Expected: -1 (all) or positive integer",
+	)
+
+	ErrSchemaDrift = errors.New("conduit: schema drift detected")
 )
 
 type (
 	Direction = direction.Direction
-
-	MigrateFunc   = conduitregistry.MigrateFunc
-	MigrateFuncTx = conduitregistry.MigrateFuncTx
-	Migration     = conduitregistry.Migration
+	Migration = conduitregistry.Migration
 )
 
 // Config is the configuration for the Migrator.
@@ -244,6 +247,10 @@ func (m *Migrator) migrateUp(
 		return nil, err
 	}
 
+	if err := m.verifySchemaHash(ctx, conn); err != nil {
+		return nil, err
+	}
+
 	targetMigrations := m.registry.CloneMigrations()
 	for _, existingVersion := range existingMigrationVersions {
 		delete(targetMigrations, existingVersion)
@@ -288,6 +295,45 @@ func (m *Migrator) migrateDown(
 	})
 
 	return m.applyMigrations(ctx, migrations, DirectionDown, conn, opts)
+}
+
+// verifySchemaHash checks that the current database schema matches the hash
+// stored in conduit_migrations for the last applied migration. This detects
+// manual schema changes (drift) that were not performed through migrations.
+func (m *Migrator) verifySchemaHash(ctx context.Context, conn *pgx.Conn) error {
+	expectedHash, err := dbsqlc.New().LatestSchemaHash(ctx, conn, m.registry.Namespace)
+	if err != nil {
+		// No rows means no migrations applied yet — nothing to verify.
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil
+		}
+
+		return fmt.Errorf("conduit: failed to fetch latest schema hash: %w", err)
+	}
+
+	// Empty hash means the migration was applied before schema hashing was enabled.
+	if expectedHash == "" {
+		return nil
+	}
+
+	db := stdlib.OpenDB(*conn.Config())
+	defer db.Close()
+
+	actualHash, err := schema.GetSchemaHash(ctx, db)
+	if err != nil {
+		return fmt.Errorf("conduit: failed to compute schema hash: %w", err)
+	}
+
+	if actualHash != expectedHash {
+		return fmt.Errorf(
+			"%w: expected hash %s, got %s",
+			ErrSchemaDrift,
+			expectedHash,
+			actualHash,
+		)
+	}
+
+	return nil
 }
 
 // applyMigrations executes the given migrations in the specified direction.
@@ -370,10 +416,23 @@ func (m *Migrator) applyMigrations(
 			})
 
 		case DirectionUp:
+			// Compute the schema hash of the live database after applying the migration.
+			var schemaHash string
+
+			schemaHash, err = m.computeSchemaHash(ctx, conn)
+			if err != nil {
+				return nil, fmt.Errorf(
+					"conduit: failed to compute schema hash after migration %s: %w",
+					migration.Version().String(),
+					err,
+				)
+			}
+
 			err = dbsqlc.New().ApplyMigration(ctx, conn, dbsqlc.ApplyMigrationParams{
 				Version:   migrationResult.Version.String(),
 				Namespace: migrationResult.Namespace,
 				Name:      migrationResult.Name,
+				Hash:      schemaHash,
 			})
 		}
 
@@ -390,6 +449,19 @@ func (m *Migrator) applyMigrations(
 	}
 
 	return result, nil
+}
+
+// computeSchemaHash computes the hash of the current database schema.
+func (m *Migrator) computeSchemaHash(ctx context.Context, conn *pgx.Conn) (string, error) {
+	db := stdlib.OpenDB(*conn.Config())
+	defer db.Close()
+
+	hash, err := schema.GetSchemaHash(ctx, db)
+	if err != nil {
+		return "", fmt.Errorf("conduit: failed to compute schema hash: %w", err)
+	}
+
+	return hash, nil
 }
 
 // applyMigrationTx applies a single migration within a transaction.

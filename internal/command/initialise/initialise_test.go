@@ -1,6 +1,7 @@
 package initialise
 
 import (
+	"os"
 	"testing"
 	"time"
 
@@ -16,103 +17,22 @@ var timeGen = timegenerator.Stub{T: time.Date(2024, 1, 15, 12, 30, 45, 0, time.U
 func TestInitialise(t *testing.T) {
 	t.Parallel()
 
-	t.Run("creates migration directory and conduit migration file", func(t *testing.T) {
+	t.Run("creates migration directory and initial schema migration", func(t *testing.T) {
 		t.Parallel()
 
 		// Arrange
+		databaseURL := os.Getenv("TEST_DATABASE_URL")
 		fs, _, dir := testutil.NewMigrationsDirBuilder(t).Build()
 		args := InitialiseArgs{
-			Dir:                 dir,
-			PackageName:         "migrations",
-			Namespace:           "",
-			NoConduitMigrations: false,
+			Dir:         dir,
+			DatabaseURL: databaseURL,
 		}
 
 		// Act
-		err := initialise(fs, timeGen, args)
-		require.NoError(t, err)
+		err := initialise(t.Context(), fs, timeGen, args)
 
 		// Assert
-		testutil.SnapshotFS(t, fs, dir)
-	})
-
-	t.Run("creates registry file when namespace is set", func(t *testing.T) {
-		t.Parallel()
-
-		// Arrange
-		fs, _, dir := testutil.NewMigrationsDirBuilder(t).Build()
-		args := InitialiseArgs{
-			Dir:                 dir,
-			PackageName:         "migrations",
-			Namespace:           "custom",
-			NoConduitMigrations: false,
-		}
-
-		// Act
-		err := initialise(fs, timeGen, args)
 		require.NoError(t, err)
-
-		// Assert
-		testutil.SnapshotFS(t, fs, dir)
-	})
-
-	t.Run("skips conduit migration file when NoConduitMigrations is set", func(t *testing.T) {
-		t.Parallel()
-
-		// Arrange
-		fs, _, dir := testutil.NewMigrationsDirBuilder(t).Build()
-		args := InitialiseArgs{
-			Dir:                 dir,
-			PackageName:         "migrations",
-			Namespace:           "",
-			NoConduitMigrations: true,
-		}
-
-		// Act
-		err := initialise(fs, timeGen, args)
-		require.NoError(t, err)
-
-		// Assert
-		testutil.SnapshotFS(t, fs, dir)
-	})
-
-	t.Run("creates only registry file when namespace is set and NoConduitMigrations is set", func(t *testing.T) {
-		t.Parallel()
-
-		// Arrange
-		fs, _, dir := testutil.NewMigrationsDirBuilder(t).Build()
-		args := InitialiseArgs{
-			Dir:                 dir,
-			PackageName:         "migrations",
-			Namespace:           "custom",
-			NoConduitMigrations: true,
-		}
-
-		// Act
-		err := initialise(fs, timeGen, args)
-		require.NoError(t, err)
-
-		// Assert
-		testutil.SnapshotFS(t, fs, dir)
-	})
-
-	t.Run("uses custom package name in conduit migration file", func(t *testing.T) {
-		t.Parallel()
-
-		// Arrange
-		fs, _, dir := testutil.NewMigrationsDirBuilder(t).Build()
-		args := InitialiseArgs{
-			Dir:                 dir,
-			PackageName:         "custompkg",
-			Namespace:           "",
-			NoConduitMigrations: false,
-		}
-
-		// Act
-		err := initialise(fs, timeGen, args)
-		require.NoError(t, err)
-
-		// Assert
 		testutil.SnapshotFS(t, fs, dir)
 	})
 }
