@@ -19,18 +19,6 @@ const (
 //nolint:gochecknoglobals
 var globalRegistry = conduitregistry.New(GlobalRegistryNamespace)
 
-// Up registers an up migration function in the global registry.
-func Up(up MigrateFunc) { globalRegistry.Up(up) }
-
-// UpTx registers an up migration function that runs in a transaction in the global registry.
-func UpTx(up MigrateFuncTx) { globalRegistry.UpTx(up) }
-
-// Down registers a down migration function in the global registry.
-func Down(down MigrateFunc) { globalRegistry.Down(down) }
-
-// DownTx registers a down migration function that runs in a transaction in the global registry.
-func DownTx(down MigrateFuncTx) { globalRegistry.DownTx(down) }
-
 // FromFS registers SQL migrations from the provided filesystem in the global registry.
 func FromFS(fs fs.FS, root string) {
 	globalRegistry.FromFS(afero.FromIOFS{FS: fs}, root)

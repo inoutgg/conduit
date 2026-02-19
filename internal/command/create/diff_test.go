@@ -4,13 +4,18 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"go.inout.gg/conduit/internal/testutil"
+	"go.inout.gg/conduit/internal/timegenerator"
 )
+
+//nolint:gochecknoglobals
+var timeGen = timegenerator.Stub{T: time.Date(2024, 1, 15, 12, 30, 45, 0, time.UTC)}
 
 func TestDiff(t *testing.T) {
 	t.Parallel()

@@ -23,8 +23,7 @@ func (v Version) String() string { return v.t.Format(format) }
 // and 1 if current version is newer.
 func (v Version) Compare(other Version) int { return v.t.Compare(other.t) }
 
-// MigrationDirection indicates whether a migration file is up-only, down-only,
-// or combined (containing both up and down sections).
+// MigrationDirection indicates whether a migration file is up-only or down-only.
 type MigrationDirection string
 
 const (
@@ -34,23 +33,15 @@ const (
 	MigrationDirectionDown MigrationDirection = "down"
 )
 
-// MigrationFilename generates a filename for a migration file.
-func MigrationFilename(v Version, name string, direction MigrationDirection, ext string) (string, error) {
-	switch ext {
-	case "sql":
-		return fmt.Sprintf("%s_%s.%s.%s", v.String(), name, direction, ext), nil
-	case "go":
-		return fmt.Sprintf("%s_%s.%s", v.String(), name, ext), nil
-	}
-
-	return "", fmt.Errorf("unsupported migration file extension %s, expected: .sql or .go", ext)
+// MigrationFilename generates a filename for a SQL migration file.
+func MigrationFilename(v Version, name string, direction MigrationDirection) string {
+	return fmt.Sprintf("%s_%s.%s.sql", v.String(), name, direction)
 }
 
 // ParsedMigrationFilename represents the components of a parsed migration filename.
 type ParsedMigrationFilename struct {
 	Version   Version
 	Name      string
-	Extension string
 	Direction MigrationDirection
 }
 
@@ -62,8 +53,8 @@ func (f ParsedMigrationFilename) Compare(other ParsedMigrationFilename) int {
 }
 
 // Filename returns the migration filename as a string.
-func (f ParsedMigrationFilename) Filename() (string, error) {
-	return MigrationFilename(f.Version, f.Name, f.Direction, f.Extension)
+func (f ParsedMigrationFilename) Filename() string {
+	return MigrationFilename(f.Version, f.Name, f.Direction)
 }
 
 // ParseMigrationFilename parses a migration filename into its components.
@@ -71,7 +62,6 @@ func (f ParsedMigrationFilename) Filename() (string, error) {
 // Supported formats:
 //   - <version>_<name>.up.sql — up migration
 //   - <version>_<name>.down.sql — down migration
-//   - <version>_<name>.go — Go migration
 func ParseMigrationFilename(filename string) (ParsedMigrationFilename, error) {
 	var m ParsedMigrationFilename
 
@@ -81,9 +71,9 @@ func ParseMigrationFilename(filename string) (ParsedMigrationFilename, error) {
 	}
 
 	ext := filepath.Ext(basename)
-	if ext != ".go" && ext != ".sql" {
+	if ext != ".sql" {
 		return m, fmt.Errorf(
-			"conduit: unknown migration file extension %q, expected: .sql or .go", ext)
+			"conduit: unknown migration file extension %q, expected: .sql", ext)
 	}
 
 	// Check for direction suffix (.up.sql or .down.sql).
@@ -91,24 +81,22 @@ func ParseMigrationFilename(filename string) (ParsedMigrationFilename, error) {
 
 	var direction MigrationDirection
 
-	if ext == ".sql" {
-		switch {
-		case strings.HasSuffix(withoutExt, ".up"):
-			direction = MigrationDirectionUp
-			withoutExt = strings.TrimSuffix(withoutExt, ".up")
-		case strings.HasSuffix(withoutExt, ".down"):
-			direction = MigrationDirectionDown
-			withoutExt = strings.TrimSuffix(withoutExt, ".down")
-		default:
-			return m, fmt.Errorf(
-				"conduit: SQL migration file %q must have .up.sql or .down.sql suffix", basename)
-		}
+	switch {
+	case strings.HasSuffix(withoutExt, ".up"):
+		direction = MigrationDirectionUp
+		withoutExt = strings.TrimSuffix(withoutExt, ".up")
+	case strings.HasSuffix(withoutExt, ".down"):
+		direction = MigrationDirectionDown
+		withoutExt = strings.TrimSuffix(withoutExt, ".down")
+	default:
+		return m, fmt.Errorf(
+			"conduit: SQL migration file %q must have .up.sql or .down.sql suffix", basename)
 	}
 
 	version, name, ok := strings.Cut(withoutExt, "_")
 	if !ok {
 		return m, fmt.Errorf(
-			"conduit: malformed migration filename, expected: <version>_<name>.[go|sql], got: %s",
+			"conduit: malformed migration filename, expected: <version>_<name>.sql, got: %s",
 			basename,
 		)
 	}
@@ -122,7 +110,6 @@ func ParseMigrationFilename(filename string) (ParsedMigrationFilename, error) {
 	m = ParsedMigrationFilename{
 		Version:   Version{ver},
 		Name:      name,
-		Extension: ext[1:], // Drop leading dot from extension
 		Direction: direction,
 	}
 

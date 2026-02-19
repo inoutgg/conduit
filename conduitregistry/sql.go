@@ -31,6 +31,10 @@ func parseSQLMigrationsFromFS(fs afero.Fs, root string) ([]*Migration, error) {
 			return nil
 		}
 
+		if !strings.HasSuffix(fileInfo.Name(), ".sql") {
+			return nil
+		}
+
 		info, err := version.ParseMigrationFilename(filepath.Base(path))
 		if err != nil {
 			return fmt.Errorf("conduit: failed to parse migration filename: %w", err)

@@ -18,8 +18,8 @@ var emptyMigrateFunc = &migrateFunc{
 }
 
 type migrateFunc struct {
-	fn    MigrateFunc
-	fnx   MigrateFuncTx
+	fn    applyFunc
+	fnx   applyFuncTx
 	useTx bool
 }
 

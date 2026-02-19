@@ -14,4 +14,5 @@ type ConduitMigration struct {
 	Version   string
 	Name      string
 	Namespace string
+	Hash      string
 }
