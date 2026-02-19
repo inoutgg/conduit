@@ -21,12 +21,11 @@ func (q *Queries) AcquireLock(ctx context.Context, db DBTX, lockNum int64) error
 const allExistingMigrationVersions = `-- name: AllExistingMigrationVersions :many
 SELECT version
 FROM conduit_migrations
-WHERE namespace = $1
 ORDER BY version
 `
 
-func (q *Queries) AllExistingMigrationVersions(ctx context.Context, db DBTX, namespace string) ([]string, error) {
-	rows, err := db.Query(ctx, allExistingMigrationVersions, namespace)
+func (q *Queries) AllExistingMigrationVersions(ctx context.Context, db DBTX) ([]string, error) {
+	rows, err := db.Query(ctx, allExistingMigrationVersions)
 	if err != nil {
 		return nil, err
 	}
@@ -46,24 +45,18 @@ func (q *Queries) AllExistingMigrationVersions(ctx context.Context, db DBTX, nam
 }
 
 const applyMigration = `-- name: ApplyMigration :exec
-INSERT INTO  conduit_migrations (version, name, namespace, hash)
-VALUES ($1, $2, $3, $4)
+INSERT INTO conduit_migrations (version, name, hash)
+VALUES ($1, $2, $3)
 `
 
 type ApplyMigrationParams struct {
-	Version   string
-	Name      string
-	Namespace string
-	Hash      string
+	Version string
+	Name    string
+	Hash    string
 }
 
 func (q *Queries) ApplyMigration(ctx context.Context, db DBTX, arg ApplyMigrationParams) error {
-	_, err := db.Exec(ctx, applyMigration,
-		arg.Version,
-		arg.Name,
-		arg.Namespace,
-		arg.Hash,
-	)
+	_, err := db.Exec(ctx, applyMigration, arg.Version, arg.Name, arg.Hash)
 	return err
 }
 
@@ -84,13 +77,12 @@ func (q *Queries) DoesTableExist(ctx context.Context, db DBTX, tableName string)
 
 const latestSchemaHash = `-- name: LatestSchemaHash :one
 SELECT hash FROM conduit_migrations
-WHERE namespace = $1
 ORDER BY version DESC
 LIMIT 1
 `
 
-func (q *Queries) LatestSchemaHash(ctx context.Context, db DBTX, namespace string) (string, error) {
-	row := db.QueryRow(ctx, latestSchemaHash, namespace)
+func (q *Queries) LatestSchemaHash(ctx context.Context, db DBTX) (string, error) {
+	row := db.QueryRow(ctx, latestSchemaHash)
 	var hash string
 	err := row.Scan(&hash)
 	return hash, err
@@ -116,15 +108,10 @@ func (q *Queries) ResetConn(ctx context.Context, db DBTX) error {
 
 const rollbackMigration = `-- name: RollbackMigration :exec
 DELETE FROM conduit_migrations
-WHERE version = $1 AND namespace = $2
+WHERE version = $1
 `
 
-type RollbackMigrationParams struct {
-	Version   string
-	Namespace string
-}
-
-func (q *Queries) RollbackMigration(ctx context.Context, db DBTX, arg RollbackMigrationParams) error {
-	_, err := db.Exec(ctx, rollbackMigration, arg.Version, arg.Namespace)
+func (q *Queries) RollbackMigration(ctx context.Context, db DBTX, version string) error {
+	_, err := db.Exec(ctx, rollbackMigration, version)
 	return err
 }

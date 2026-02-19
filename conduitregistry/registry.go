@@ -25,14 +25,12 @@ type applyFuncTx func(context.Context, pgx.Tx) error
 // Registry stores SQL migration files.
 type Registry struct {
 	migrations map[string]*Migration
-	Namespace  string
 }
 
-// New creates a new Registry with the given namespace.
-func New(namespace string) *Registry {
+// New creates a new Registry.
+func New() *Registry {
 	return &Registry{
 		migrations: make(map[string]*Migration),
-		Namespace:  namespace,
 	}
 }
 
