@@ -9,17 +9,13 @@ import (
 	"github.com/spf13/afero"
 	"github.com/urfave/cli/v3"
 
-	_ "embed"
-
 	"go.inout.gg/conduit/internal/command/flagname"
+	"go.inout.gg/conduit/internal/migrations"
 	"go.inout.gg/conduit/internal/timegenerator"
 	"go.inout.gg/conduit/pkg/conduitsum"
 	"go.inout.gg/conduit/pkg/pgdiff"
 	"go.inout.gg/conduit/pkg/version"
 )
-
-//go:embed initial_schema.up.sql
-var initialMigrationContent []byte
 
 //nolint:revive // ignore naming convention.
 type InitialiseArgs struct {
@@ -105,7 +101,7 @@ func createInitialMigration(fs afero.Fs, ver version.Version, dir string) error 
 	filename := version.MigrationFilename(ver, "conduit_initial_schema", version.MigrationDirectionUp)
 	path := filepath.Join(dir, filename)
 
-	if err := afero.WriteFile(fs, path, initialMigrationContent, 0o644); err != nil {
+	if err := afero.WriteFile(fs, path, migrations.InitialSchema, 0o644); err != nil {
 		return fmt.Errorf("conduit: failed to create initial migration file: %w", err)
 	}
 
