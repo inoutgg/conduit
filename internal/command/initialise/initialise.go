@@ -14,6 +14,7 @@ import (
 	"go.inout.gg/conduit/internal/timegenerator"
 	"go.inout.gg/conduit/pkg/conduitsum"
 	"go.inout.gg/conduit/pkg/pgdiff"
+	"go.inout.gg/conduit/pkg/sqlsplit"
 	"go.inout.gg/conduit/pkg/version"
 )
 
@@ -72,7 +73,12 @@ func initialise(ctx context.Context, fs afero.Fs, timeGen timegenerator.Generato
 		return fmt.Errorf("failed to parse database URL: %w", err)
 	}
 
-	hash, err := pgdiff.GenerateSchemaHash(ctx, fs, connConfig, args.Dir)
+	stmts, err := sqlsplit.Split(migrations.Schema)
+	if err != nil {
+		return fmt.Errorf("failed to parse initial schema: %w", err)
+	}
+
+	hash, err := pgdiff.GenerateSchemaHash(ctx, connConfig, stmts)
 	if err != nil {
 		return fmt.Errorf("failed to generate schema hash: %w", err)
 	}
@@ -101,7 +107,7 @@ func createInitialMigration(fs afero.Fs, ver version.Version, dir string) error 
 	filename := version.MigrationFilename(ver, "conduit_initial_schema", version.MigrationDirectionUp)
 	path := filepath.Join(dir, filename)
 
-	if err := afero.WriteFile(fs, path, migrations.InitialSchema, 0o644); err != nil {
+	if err := afero.WriteFile(fs, path, migrations.Schema, 0o644); err != nil {
 		return fmt.Errorf("conduit: failed to create initial migration file: %w", err)
 	}
 
