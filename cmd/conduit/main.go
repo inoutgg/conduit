@@ -16,7 +16,6 @@ func main() {
 	_ = dotenv.Load()
 
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM)
-
 	migrator := conduit.NewMigrator(conduit.NewConfig())
 
 	err := conduitcli.Execute(ctx, migrator)

@@ -190,3 +190,35 @@ CREATE TABLE comments (id int, post_id int);`), 0o644),
 		assert.ErrorContains(t, err, "no schema changes detected")
 	})
 }
+
+func TestRequiresDisableTx(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		ddl  string
+		want bool
+	}{
+		{"CREATE INDEX CONCURRENTLY", "CREATE INDEX CONCURRENTLY idx ON t (c)", true},
+		{"CREATE UNIQUE INDEX CONCURRENTLY", "CREATE UNIQUE INDEX CONCURRENTLY idx ON t (c)", true},
+		{"DROP INDEX CONCURRENTLY", "DROP INDEX CONCURRENTLY idx", true},
+		{"REINDEX INDEX CONCURRENTLY", "REINDEX INDEX CONCURRENTLY idx", true},
+		{"REINDEX TABLE CONCURRENTLY", "REINDEX TABLE CONCURRENTLY t", true},
+		{"ALTER TYPE ADD VALUE", "ALTER TYPE my_enum ADD VALUE 'new_val'", true},
+		{"ALTER TYPE ADD VALUE with BEFORE", "ALTER TYPE my_enum ADD VALUE 'x' BEFORE 'y'", true},
+		{"lowercase create index concurrently", "create index concurrently idx on t (c)", true},
+		{"mixed case", "Create Index Concurrently idx ON t (c)", true},
+		{"CREATE INDEX without CONCURRENTLY", "CREATE INDEX idx ON t (c)", false},
+		{"DROP INDEX without CONCURRENTLY", "DROP INDEX idx", false},
+		{"CREATE TABLE", "CREATE TABLE t (id int)", false},
+		{"ALTER TABLE ADD COLUMN", "ALTER TABLE t ADD COLUMN c int", false},
+		{"ALTER TYPE RENAME", "ALTER TYPE my_enum RENAME TO other_enum", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.want, requiresDisableTx(tt.ddl))
+		})
+	}
+}
