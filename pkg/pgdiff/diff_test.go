@@ -126,7 +126,7 @@ CREATE TABLE posts (id int, user_id int);`).
 
 		// Assert
 		require.NoError(t, err)
-		snaps.MatchSnapshot(t, plan.CurrentSchemaHash, plan.Statements)
+		snaps.MatchSnapshot(t, plan.TargetSchemaHash, plan.SourceSchemaHash, plan.Statements)
 	})
 }
 

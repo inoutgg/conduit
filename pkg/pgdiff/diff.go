@@ -20,44 +20,84 @@ import (
 	"go.inout.gg/conduit/pkg/version"
 )
 
+// Plan holds the generated migration plan and the target schema hash.
+type Plan struct {
+	SourceSchemaHash string
+	TargetSchemaHash string
+	Statements       []schemadiff.Statement
+}
+
 // GeneratePlan generates a migration plan by comparing the source schema
-// from migrationsDir against the target schema in schemaPath.
+// from migrationsDir against the target schema in schemaPath. It also
+// computes the target schema hash without creating an additional temp database.
 func GeneratePlan(
 	ctx context.Context,
 	fs afero.Fs,
 	connConfig *pgx.ConnConfig,
 	migrationsDir, schemaPath string,
-) (schemadiff.Plan, error) {
+) (Plan, error) {
+	var result Plan
+
 	sourceStmts, err := readStmtsFromMigrationsDir(fs, migrationsDir)
 	if err != nil {
-		return schemadiff.Plan{}, fmt.Errorf("failed to read migrations: %w", err)
+		return result, fmt.Errorf("failed to read migrations: %w", err)
 	}
 
 	targetStmts, err := readStmtsFromFile(fs, schemaPath)
 	if err != nil {
-		return schemadiff.Plan{}, fmt.Errorf("failed to read schema file: %w", err)
+		return result, fmt.Errorf("failed to read schema file: %w", err)
 	}
 
-	return generatePlan(ctx, connConfig, sourceStmts, targetStmts)
-}
-
-// GenerateSchemaHash creates a temp database, applies all up migrations from
-// the given directory, and returns the schema hash.
-func GenerateSchemaHash(
-	ctx context.Context,
-	fs afero.Fs,
-	connConfig *pgx.ConnConfig,
-	migrationsDir string,
-) (string, error) {
-	stmts, err := readStmtsFromMigrationsDir(fs, migrationsDir)
+	factory, err := newTempDbFactory(ctx, connConfig)
 	if err != nil {
-		return "", fmt.Errorf("failed to read migrations: %w", err)
+		return result, err
+	}
+	defer factory.Close()
+
+	targetDb, err := factory.Create(ctx)
+	if err != nil {
+		return result, fmt.Errorf("failed to create target temp db: %w", err)
+	}
+	defer targetDb.Close(ctx)
+
+	for _, stmt := range targetStmts {
+		if stmt.Type != sqlsplit.StmtTypeQuery {
+			continue
+		}
+
+		if _, err := targetDb.ConnPool.ExecContext(ctx, stmt.Content); err != nil {
+			return result, fmt.Errorf("failed to execute target schema statement: %w", err)
+		}
 	}
 
-	return generateSchemaHash(ctx, connConfig, stmts)
+	plan, err := schemadiff.Generate(
+		ctx,
+		schemadiff.DDLSchemaSource(
+			sliceutil.Map(sourceStmts, func(stmt sqlsplit.Stmt) string { return stmt.Content }),
+		),
+		schemadiff.DBSchemaSource(targetDb.ConnPool),
+		schemadiff.WithTempDbFactory(factory),
+		schemadiff.WithGetSchemaOpts(targetDb.ExcludeMetadataOptions...),
+	)
+	if err != nil {
+		return result, fmt.Errorf("failed to generate plan: %w", err)
+	}
+
+	hash, err := schema.GetSchemaHash(ctx, targetDb.ConnPool, targetDb.ExcludeMetadataOptions...)
+	if err != nil {
+		return result, fmt.Errorf("failed to generate target schema hash: %w", err)
+	}
+
+	result.Statements = plan.Statements
+	result.SourceSchemaHash = plan.CurrentSchemaHash
+	result.TargetSchemaHash = hash
+
+	return result, nil
 }
 
-func generateSchemaHash(
+// GenerateSchemaHash creates a temp database, applies the given DDL statements,
+// and returns the schema hash.
+func GenerateSchemaHash(
 	ctx context.Context,
 	connConfig *pgx.ConnConfig,
 	stmts []sqlsplit.Stmt,
@@ -80,7 +120,7 @@ func generateSchemaHash(
 		}
 
 		if _, err := db.ConnPool.ExecContext(ctx, stmt.Content); err != nil {
-			return "", fmt.Errorf("failed to execute migration statement: %w", err)
+			return "", fmt.Errorf("failed to execute statement: %w", err)
 		}
 	}
 
@@ -90,34 +130,6 @@ func generateSchemaHash(
 	}
 
 	return hash, nil
-}
-
-func generatePlan(
-	ctx context.Context,
-	connConfig *pgx.ConnConfig,
-	sourceStmts, targetStmts []sqlsplit.Stmt,
-) (schemadiff.Plan, error) {
-	factory, err := newTempDbFactory(ctx, connConfig)
-	if err != nil {
-		return schemadiff.Plan{}, err
-	}
-	defer factory.Close()
-
-	plan, err := schemadiff.Generate(
-		ctx,
-		schemadiff.DDLSchemaSource(
-			sliceutil.Map(sourceStmts, func(stmt sqlsplit.Stmt) string { return stmt.Content }),
-		),
-		schemadiff.DDLSchemaSource(
-			sliceutil.Map(targetStmts, func(stmt sqlsplit.Stmt) string { return stmt.Content }),
-		),
-		schemadiff.WithTempDbFactory(factory),
-	)
-	if err != nil {
-		return schemadiff.Plan{}, fmt.Errorf("failed to generate plan: %w", err)
-	}
-
-	return plan, nil
 }
 
 func newTempDbFactory(ctx context.Context, connConfig *pgx.ConnConfig) (tempdb.Factory, error) {

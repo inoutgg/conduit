@@ -60,8 +60,9 @@ type (
 // If Registry is omitted, the global registry is used.
 // If Logger is omitted, slog.Default is used.
 type Config struct {
-	Logger   *slog.Logger              // optional
-	Registry *conduitregistry.Registry // optional
+	Logger                 *slog.Logger              // optional
+	Registry               *conduitregistry.Registry // optional
+	ShouldCheckSchemaDrift bool                      // optional
 }
 
 // WithLogger adds a logger to the Config.
@@ -76,6 +77,13 @@ func WithLogger(l *slog.Logger) func(*Config) {
 // It's provided for convenience and intended to be used with NewConfig.
 func WithRegistry(r *conduitregistry.Registry) func(*Config) {
 	return func(c *Config) { c.Registry = r }
+}
+
+// WithNoSchemaDriftCheck disables schema drift check.
+//
+// It's provided for convenience and intended to be used with NewConfig.
+func WithNoSchemaDriftCheck() func(*Config) {
+	return func(c *Config) { c.ShouldCheckSchemaDrift = false }
 }
 
 // NewConfig creates a new Config and applies the provided configurations.
@@ -104,6 +112,7 @@ func (c *Config) defaults() {
 	}
 
 	c.Registry = cmp.Or(c.Registry, globalRegistry)
+	c.ShouldCheckSchemaDrift = cmp.Or(c.ShouldCheckSchemaDrift, true)
 }
 
 // MigrateResult represents the outcome of applied migrations batch.
@@ -139,8 +148,9 @@ func (m *MigrateOptions) validate() error {
 // Migrator is a database migration tool that can rolls up and down migrations
 // in order.
 type Migrator struct {
-	logger   *slog.Logger
-	registry *conduitregistry.Registry
+	logger                 *slog.Logger
+	registry               *conduitregistry.Registry
+	shouldCheckSchemaDrift bool
 }
 
 // NewMigrator creates a new migrator with the given config.
@@ -149,8 +159,9 @@ func NewMigrator(config *Config) *Migrator {
 	debug.Assert(config.Registry != nil, "config.Registry must be defined")
 
 	return &Migrator{
-		logger:   config.Logger,
-		registry: config.Registry,
+		logger:                 config.Logger,
+		registry:               config.Registry,
+		shouldCheckSchemaDrift: config.ShouldCheckSchemaDrift,
 	}
 }
 
@@ -246,8 +257,10 @@ func (m *Migrator) migrateUp(
 		return nil, err
 	}
 
-	if err := m.verifySchemaHash(ctx, conn); err != nil {
-		return nil, err
+	if m.shouldCheckSchemaDrift {
+		if err := m.detectSchemaDrift(ctx, conn); err != nil {
+			return nil, err
+		}
 	}
 
 	targetMigrations := m.registry.CloneMigrations()
@@ -296,13 +309,14 @@ func (m *Migrator) migrateDown(
 	return m.applyMigrations(ctx, migrations, DirectionDown, conn, opts)
 }
 
-// verifySchemaHash checks that the current database schema matches the hash
+// detectSchemaDrift checks that the current database schema matches the hash
 // stored in conduit_migrations for the last applied migration. This detects
 // manual schema changes (drift) that were not performed through migrations.
-func (m *Migrator) verifySchemaHash(ctx context.Context, conn *pgx.Conn) error {
-	expectedHash, err := dbsqlc.New().LatestSchemaHash(ctx, conn)
+func (m *Migrator) detectSchemaDrift(ctx context.Context, conn *pgx.Conn) error {
+	internaldebug.Log("detecting schema drift")
+
+	expected, err := dbsqlc.New().LatestSchemaHash(ctx, conn)
 	if err != nil {
-		// No rows means no migrations applied yet — nothing to verify.
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil
 		}
@@ -310,25 +324,20 @@ func (m *Migrator) verifySchemaHash(ctx context.Context, conn *pgx.Conn) error {
 		return fmt.Errorf("conduit: failed to fetch latest schema hash: %w", err)
 	}
 
-	// Empty hash means the migration was applied before schema hashing was enabled.
-	if expectedHash == "" {
-		return nil
-	}
-
 	db := stdlib.OpenDB(*conn.Config())
 	defer db.Close()
 
-	actualHash, err := schema.GetSchemaHash(ctx, db)
+	actual, err := schema.GetSchemaHash(ctx, db)
 	if err != nil {
 		return fmt.Errorf("conduit: failed to compute schema hash: %w", err)
 	}
 
-	if actualHash != expectedHash {
+	if actual != expected {
 		return fmt.Errorf(
 			"%w: expected hash %s, got %s",
 			ErrSchemaDrift,
-			expectedHash,
-			actualHash,
+			expected,
+			actual,
 		)
 	}
 

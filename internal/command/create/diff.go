@@ -50,7 +50,7 @@ func diff(ctx context.Context, fs afero.Fs, timeGen timegenerator.Generator, arg
 
 	for i, stmt := range plan.Statements {
 		for _, hazard := range stmt.Hazards {
-			upStmts.WriteString(fmt.Sprintf("-- [WARNING/%s]: %s\n", hazard.Type, hazard.Message))
+			fmt.Fprintf(&upStmts, "-- [WARNING/%s]: %s\n", hazard.Type, hazard.Message)
 		}
 
 		upStmts.WriteString(stmt.ToSQL())
@@ -73,11 +73,7 @@ func diff(ctx context.Context, fs afero.Fs, timeGen timegenerator.Generator, arg
 		return err
 	}
 
-	// Compute the schema hash after applying all migrations (including the new one).
-	currentHash, err := pgdiff.GenerateSchemaHash(ctx, fs, connConfig, args.Dir)
-	if err != nil {
-		return fmt.Errorf("failed to generate schema hash: %w", err)
-	}
+	currentHash := plan.TargetSchemaHash
 
 	// Read existing conduit.sum and append the new hash.
 	sumPath := filepath.Join(args.Dir, conduitsum.Filename)
