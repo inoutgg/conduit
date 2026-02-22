@@ -64,7 +64,6 @@ func NewCommand(migrator *conduit.Migrator) *cli.Command {
 	}
 }
 
-// apply applies a migration in the defined direction.
 func apply(
 	ctx context.Context,
 	migrator *conduit.Migrator,

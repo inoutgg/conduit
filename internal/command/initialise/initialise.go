@@ -91,7 +91,6 @@ func initialise(ctx context.Context, fs afero.Fs, timeGen timegenerator.Generato
 	return nil
 }
 
-// createMigrationDir creates a new migration directory.
 func createMigrationDir(fs afero.Fs, dir string) error {
 	err := fs.MkdirAll(dir, 0o755)
 	if err != nil {
@@ -101,8 +100,6 @@ func createMigrationDir(fs afero.Fs, dir string) error {
 	return nil
 }
 
-// createInitialMigration writes the initial conduit schema migration into the
-// migrations directory.
 func createInitialMigration(fs afero.Fs, ver version.Version) error {
 	filename := version.MigrationFilename(ver, "conduit_initial_schema", version.MigrationDirectionUp)
 

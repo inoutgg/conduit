@@ -14,7 +14,6 @@ type NoopMigrator struct{}
 func (NoopMigrator) Migrate(context.Context, *pgx.Conn) error { return nil }
 func (NoopMigrator) Hash() string                             { return "noop" }
 
-// TableExists checks whether a table with the given name exists in the database.
 func TableExists(tb testing.TB, pool *pgxpool.Pool, name string) bool {
 	tb.Helper()
 

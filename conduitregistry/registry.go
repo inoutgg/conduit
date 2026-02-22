@@ -16,18 +16,16 @@ var (
 	ErrDownExists     = errors.New("conduit: down migration already registered")
 )
 
-// applyFunc applies an up or down migration.
-type applyFunc func(context.Context, *pgx.Conn) error
-
-// applyFuncTx applies an up or down migration within a transaction.
-type applyFuncTx func(context.Context, pgx.Tx) error
+type (
+	applyFunc   func(context.Context, *pgx.Conn) error
+	applyFuncTx func(context.Context, pgx.Tx) error
+)
 
 // Registry stores SQL migration files.
 type Registry struct {
 	migrations map[string]*Migration
 }
 
-// New creates a new Registry.
 func New() *Registry {
 	return &Registry{
 		migrations: make(map[string]*Migration),
@@ -45,7 +43,6 @@ func (r *Registry) FromFS(fs afero.Fs, root string) {
 	}
 }
 
-// CloneMigrations returns a copy of the registered migrations map.
 func (r *Registry) CloneMigrations() map[string]*Migration {
 	return maps.Clone(r.migrations)
 }

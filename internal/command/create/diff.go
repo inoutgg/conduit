@@ -45,8 +45,6 @@ func diff(ctx context.Context, fs afero.Fs, timeGen timegenerator.Generator, arg
 		return errors.New("no schema changes detected")
 	}
 
-	// Verify the source schema hash matches conduit.sum to detect drift
-	// before creating any files.
 	if expectedHash, err := conduitsum.ReadFile(migrationsFs); err == nil {
 		if plan.SourceSchemaHash != expectedHash {
 			return fmt.Errorf(
@@ -73,7 +71,6 @@ func diff(ctx context.Context, fs afero.Fs, timeGen timegenerator.Generator, arg
 		}
 	}
 
-	// Create up migration.
 	upFilename := version.MigrationFilename(v, args.Name, version.MigrationDirectionUp)
 
 	if err := writeTemplate(migrationsFs, upFilename, internaltpl.SQLUpMigrationTemplate, map[string]any{

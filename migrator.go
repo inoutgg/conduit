@@ -105,7 +105,6 @@ func NewConfig(cfgs ...func(*Config)) *Config {
 	return config
 }
 
-// defaults applies default configurations.
 func (c *Config) defaults() {
 	if c.Logger == nil {
 		c.Logger = slog.Default()
@@ -224,7 +223,6 @@ func (m *Migrator) Migrate(
 	return result, nil
 }
 
-// existingMigrationVersions retrieves a list of already applied migration versions.
 func (m *Migrator) existingMigrationVersions(ctx context.Context, conn *pgx.Conn) ([]string, error) {
 	ok, err := dbsqlc.New().DoesTableExist(ctx, conn, "conduit_migrations")
 	if err != nil {
@@ -244,9 +242,6 @@ func (m *Migrator) existingMigrationVersions(ctx context.Context, conn *pgx.Conn
 	return versions, nil
 }
 
-// migrateUp applies pending migrations in the up direction.
-//
-// Migrations are rolled up in ascending order.
 func (m *Migrator) migrateUp(
 	ctx context.Context,
 	conn *pgx.Conn,
@@ -276,9 +271,6 @@ func (m *Migrator) migrateUp(
 	return m.applyMigrations(ctx, migrations, DirectionUp, conn, opts)
 }
 
-// migrateDown rolls back applied migrations in the down direction.
-//
-// Migrations are rolled back in descending order.
 func (m *Migrator) migrateDown(
 	ctx context.Context,
 	conn *pgx.Conn,
@@ -289,7 +281,6 @@ func (m *Migrator) migrateDown(
 		return nil, err
 	}
 
-	// Filter only applied migrations.
 	existingMigrationsMap := sliceutil.KeyBy(existingMigrations, func(e string) string { return e })
 	targetMigrations := m.registry.CloneMigrations()
 
@@ -299,8 +290,6 @@ func (m *Migrator) migrateDown(
 		}
 	}
 
-	// Sort in descending order, as we need to roll back starting from the
-	// last applied migration to the first one.
 	migrations := slices.Collect(maps.Values(targetMigrations))
 	slices.SortFunc(migrations, func(a, b *Migration) int {
 		return b.Version().Compare(a.Version())
@@ -309,9 +298,6 @@ func (m *Migrator) migrateDown(
 	return m.applyMigrations(ctx, migrations, DirectionDown, conn, opts)
 }
 
-// detectSchemaDrift checks that the current database schema matches the hash
-// stored in conduit_migrations for the last applied migration. This detects
-// manual schema changes (drift) that were not performed through migrations.
 func (m *Migrator) detectSchemaDrift(ctx context.Context, conn *pgx.Conn) error {
 	internaldebug.Log("detecting schema drift")
 
@@ -344,10 +330,6 @@ func (m *Migrator) detectSchemaDrift(ctx context.Context, conn *pgx.Conn) error 
 	return nil
 }
 
-// applyMigrations executes the given migrations in the specified direction.
-//
-// It assumes the passed migrations are already sorted in the necessary order.
-//
 //nolint:nonamedreturns
 func (m *Migrator) applyMigrations(
 	ctx context.Context,
@@ -420,7 +402,6 @@ func (m *Migrator) applyMigrations(
 			err = dbsqlc.New().RollbackMigration(ctx, conn, migrationResult.Version.String())
 
 		case DirectionUp:
-			// Compute the schema hash of the live database after applying the migration.
 			var schemaHash string
 
 			schemaHash, err = m.computeSchemaHash(ctx, conn)
@@ -454,7 +435,6 @@ func (m *Migrator) applyMigrations(
 	return result, nil
 }
 
-// computeSchemaHash computes the hash of the current database schema.
 func (m *Migrator) computeSchemaHash(ctx context.Context, conn *pgx.Conn) (string, error) {
 	db := stdlib.OpenDB(*conn.Config())
 	defer db.Close()
@@ -467,7 +447,6 @@ func (m *Migrator) computeSchemaHash(ctx context.Context, conn *pgx.Conn) (strin
 	return hash, nil
 }
 
-// applyMigrationTx applies a single migration within a transaction.
 func (m *Migrator) applyMigrationTx(
 	ctx context.Context,
 	migration *conduitregistry.Migration,
@@ -493,7 +472,6 @@ func (m *Migrator) applyMigrationTx(
 	return nil
 }
 
-// pgLockNum computes a lock number for a PostgreSQL advisory lock.
 func pgLockNum(s string) int64 {
 	h := fnv.New32a()
 	h.Write([]byte(s))
