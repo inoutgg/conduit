@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"path/filepath"
 	"strings"
 	"text/template"
 
@@ -30,6 +29,8 @@ func diff(ctx context.Context, fs afero.Fs, timeGen timegenerator.Generator, arg
 		return errors.New("migrations directory does not exist, try to initialise it first")
 	}
 
+	migrationsFs := afero.NewBasePathFs(fs, args.Dir)
+
 	connConfig, err := pgx.ParseConfig(args.DatabaseURL)
 	if err != nil {
 		return fmt.Errorf("failed to parse database URL: %w", err)
@@ -42,6 +43,18 @@ func diff(ctx context.Context, fs afero.Fs, timeGen timegenerator.Generator, arg
 
 	if len(plan.Statements) == 0 {
 		return errors.New("no schema changes detected")
+	}
+
+	// Verify the source schema hash matches conduit.sum to detect drift
+	// before creating any files.
+	if expectedHash, err := conduitsum.ReadFile(migrationsFs); err == nil {
+		if plan.SourceSchemaHash != expectedHash {
+			return fmt.Errorf(
+				"source schema drift detected: expected hash %s (from conduit.sum), got %s",
+				expectedHash,
+				plan.SourceSchemaHash,
+			)
+		}
 	}
 
 	v := version.NewFromTime(timeGen.Now())
@@ -63,8 +76,7 @@ func diff(ctx context.Context, fs afero.Fs, timeGen timegenerator.Generator, arg
 	// Create up migration.
 	upFilename := version.MigrationFilename(v, args.Name, version.MigrationDirectionUp)
 
-	upPath := filepath.Join(args.Dir, upFilename)
-	if err := writeTemplate(fs, upPath, internaltpl.SQLUpMigrationTemplate, map[string]any{
+	if err := writeTemplate(migrationsFs, upFilename, internaltpl.SQLUpMigrationTemplate, map[string]any{
 		"Version":    v,
 		"Name":       args.Name,
 		"SchemaPath": args.SchemaPath,
@@ -73,23 +85,7 @@ func diff(ctx context.Context, fs afero.Fs, timeGen timegenerator.Generator, arg
 		return err
 	}
 
-	currentHash := plan.TargetSchemaHash
-
-	// Read existing conduit.sum and append the new hash.
-	sumPath := filepath.Join(args.Dir, conduitsum.Filename)
-
-	hashes := make([]string, 0, 1)
-
-	if existingData, err := afero.ReadFile(fs, sumPath); err == nil {
-		hashes, err = conduitsum.Parse(existingData)
-		if err != nil {
-			return fmt.Errorf("failed to parse conduit.sum: %w", err)
-		}
-	}
-
-	hashes = append(hashes, currentHash)
-
-	if err := afero.WriteFile(fs, sumPath, conduitsum.Format(hashes), 0o644); err != nil {
+	if err := conduitsum.WriteFile(migrationsFs, plan.TargetSchemaHash); err != nil {
 		return fmt.Errorf("conduit: failed to write conduit.sum: %w", err)
 	}
 
