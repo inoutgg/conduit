@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 	"text/template"
 
@@ -16,6 +17,14 @@ import (
 	"go.inout.gg/conduit/pkg/pgdiff"
 	"go.inout.gg/conduit/pkg/version"
 )
+
+//nolint:gochecknoglobals
+var nonTxPatterns = []*regexp.Regexp{
+	regexp.MustCompile(`(?i)CREATE\s+(UNIQUE\s+)?INDEX\s+CONCURRENTLY`),
+	regexp.MustCompile(`(?i)DROP\s+INDEX\s+CONCURRENTLY`),
+	regexp.MustCompile(`(?i)REINDEX\s+.*CONCURRENTLY`),
+	regexp.MustCompile(`(?i)ALTER\s+TYPE\s+.*ADD\s+VALUE`),
+}
 
 type DiffArgs struct {
 	Dir         string
@@ -57,7 +66,10 @@ func diff(ctx context.Context, fs afero.Fs, timeGen timegenerator.Generator, arg
 
 	v := version.NewFromTime(timeGen.Now())
 
-	var upStmts strings.Builder
+	var (
+		upStmts   strings.Builder
+		disableTx bool
+	)
 
 	for i, stmt := range plan.Statements {
 		for _, hazard := range stmt.Hazards {
@@ -69,6 +81,10 @@ func diff(ctx context.Context, fs afero.Fs, timeGen timegenerator.Generator, arg
 		if i < len(plan.Statements)-1 {
 			upStmts.WriteString("\n\n")
 		}
+
+		if requiresDisableTx(stmt.DDL) {
+			disableTx = true
+		}
 	}
 
 	upFilename := version.MigrationFilename(v, args.Name, version.MigrationDirectionUp)
@@ -78,6 +94,7 @@ func diff(ctx context.Context, fs afero.Fs, timeGen timegenerator.Generator, arg
 		"Name":       args.Name,
 		"SchemaPath": args.SchemaPath,
 		"UpStmts":    upStmts.String(),
+		"DisableTx":  disableTx,
 	}); err != nil {
 		return err
 	}
@@ -87,6 +104,16 @@ func diff(ctx context.Context, fs afero.Fs, timeGen timegenerator.Generator, arg
 	}
 
 	return nil
+}
+
+func requiresDisableTx(ddl string) bool {
+	for _, p := range nonTxPatterns {
+		if p.MatchString(ddl) {
+			return true
+		}
+	}
+
+	return false
 }
 
 func writeTemplate(fs afero.Fs, path string, tpl *template.Template, data any) error {
