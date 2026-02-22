@@ -56,7 +56,6 @@ func NewCommand(fs afero.Fs, timeGen timegenerator.Generator) *cli.Command {
 	}
 }
 
-// exists check if a FS entry exists at path.
 func exists(afs afero.Fs, path string) bool {
 	_, err := afs.Stat(path)
 	return !errors.Is(err, afero.ErrFileNotFound)

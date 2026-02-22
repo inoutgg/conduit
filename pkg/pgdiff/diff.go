@@ -156,7 +156,6 @@ func readStmtsFromMigrationsDir(fs afero.Fs, dir string) ([]sqlsplit.Stmt, error
 		return nil, fmt.Errorf("failed to read directory: %w", err)
 	}
 
-	// Filter and parse up migration files
 	migrations := make([]version.ParsedMigrationFilename, 0, len(entries))
 	for _, entry := range entries {
 		name := entry.Name()

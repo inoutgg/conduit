@@ -15,7 +15,6 @@ type Version struct{ t time.Time }
 
 func NewFromTime(t time.Time) Version { return Version{t: t} }
 
-// String returns the version as a string.
 func (v Version) String() string { return v.t.Format(format) }
 
 // Compare compares current version and the other one,
@@ -52,7 +51,6 @@ func (f ParsedMigrationFilename) Compare(other ParsedMigrationFilename) int {
 	return f.Version.Compare(other.Version)
 }
 
-// Filename returns the migration filename as a string.
 func (f ParsedMigrationFilename) Filename() string {
 	return MigrationFilename(f.Version, f.Name, f.Direction)
 }

@@ -31,7 +31,6 @@ type Migration struct {
 	name    string
 }
 
-// UseTx tests whether migration should run in transition for given direction.
 func (m *Migration) UseTx(dir direction.Direction) (bool, error) {
 	switch dir {
 	case direction.DirectionUp:
@@ -43,13 +42,10 @@ func (m *Migration) UseTx(dir direction.Direction) (bool, error) {
 	return false, direction.ErrUnknownDirection
 }
 
-// Version returns the version of this migration.
 func (m *Migration) Version() version.Version { return m.version }
 
-// Name returns the name of this migration.
 func (m *Migration) Name() string { return m.name }
 
-// Apply executes the migration in a given dir direction.
 func (m *Migration) Apply(ctx context.Context, dir direction.Direction, conn *pgx.Conn) error {
 	debug.Assert(conn != nil, "expected conn to be defined")
 
@@ -63,7 +59,6 @@ func (m *Migration) Apply(ctx context.Context, dir direction.Direction, conn *pg
 	return direction.ErrUnknownDirection
 }
 
-// ApplyTx executes the migration in a given dir direction in transaction.
 func (m *Migration) ApplyTx(ctx context.Context, dir direction.Direction, tx pgx.Tx) error {
 	debug.Assert(tx != nil, "expected tx to be defined")
 

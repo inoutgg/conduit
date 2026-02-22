@@ -18,7 +18,6 @@ import (
 
 const DisableTxDirective = "---- disable-tx ----"
 
-// parseSQLMigrationsFromFS scans the fsys for SQL migration scripts and returns.
 func parseSQLMigrationsFromFS(fs afero.Fs, root string) ([]*Migration, error) {
 	migrations := make(map[string]*Migration)
 
