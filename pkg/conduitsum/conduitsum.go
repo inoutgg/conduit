@@ -1,48 +1,36 @@
 package conduitsum
 
 import (
-	"bufio"
 	"bytes"
+	"errors"
 	"fmt"
-	"strings"
+
+	"github.com/spf13/afero"
 )
 
 const Filename = "conduit.sum"
 
-// Parse parses the contents of a conduit.sum file.
-// Each line contains a single schema hash representing the expected state
-// of the database after the corresponding migration is applied.
-func Parse(data []byte) ([]string, error) {
-	var hashes []string
-
-	scanner := bufio.NewScanner(bytes.NewReader(data))
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		if line == "" {
-			continue
-		}
-
-		if strings.ContainsAny(line, " \t") {
-			return nil, fmt.Errorf("conduitsum: invalid line: %q", line)
-		}
-
-		hashes = append(hashes, line)
+// ReadFile reads and parses a conduit.sum file from the given filesystem.
+func ReadFile(fs afero.Fs) (string, error) {
+	data, err := afero.ReadFile(fs, Filename)
+	if err != nil {
+		return "", fmt.Errorf("conduitsum: failed to read file: %w", err)
 	}
 
-	if err := scanner.Err(); err != nil {
-		return nil, fmt.Errorf("conduitsum: failed to read: %w", err)
+	hash := bytes.TrimSpace(data)
+
+	if len(hash) == 0 {
+		return "", errors.New("conduitsum: empty file")
 	}
 
-	return hashes, nil
+	return string(hash), nil
 }
 
-// Format serializes schema hashes into the conduit.sum file format.
-func Format(hashes []string) []byte {
-	var buf bytes.Buffer
-
-	for _, h := range hashes {
-		fmt.Fprintf(&buf, "%s\n", h)
+// WriteFile writes a schema hash to a conduit.sum file in the given filesystem.
+func WriteFile(fs afero.Fs, hash string) error {
+	if err := afero.WriteFile(fs, Filename, []byte(hash+"\n"), 0o644); err != nil {
+		return fmt.Errorf("conduitsum: failed to write file: %w", err)
 	}
 
-	return buf.Bytes()
+	return nil
 }

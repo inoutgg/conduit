@@ -62,9 +62,10 @@ func initialise(ctx context.Context, fs afero.Fs, timeGen timegenerator.Generato
 		return err
 	}
 
+	migrationsFs := afero.NewBasePathFs(fs, args.Dir)
 	ver := version.NewFromTime(timeGen.Now())
 
-	if err := createInitialMigration(fs, ver, args.Dir); err != nil {
+	if err := createInitialMigration(migrationsFs, ver); err != nil {
 		return err
 	}
 
@@ -83,8 +84,7 @@ func initialise(ctx context.Context, fs afero.Fs, timeGen timegenerator.Generato
 		return fmt.Errorf("failed to generate schema hash: %w", err)
 	}
 
-	sumPath := filepath.Join(args.Dir, conduitsum.Filename)
-	if err := afero.WriteFile(fs, sumPath, conduitsum.Format([]string{hash}), 0o644); err != nil {
+	if err := conduitsum.WriteFile(migrationsFs, hash); err != nil {
 		return fmt.Errorf("conduit: failed to write conduit.sum: %w", err)
 	}
 
@@ -103,11 +103,10 @@ func createMigrationDir(fs afero.Fs, dir string) error {
 
 // createInitialMigration writes the initial conduit schema migration into the
 // migrations directory.
-func createInitialMigration(fs afero.Fs, ver version.Version, dir string) error {
+func createInitialMigration(fs afero.Fs, ver version.Version) error {
 	filename := version.MigrationFilename(ver, "conduit_initial_schema", version.MigrationDirectionUp)
-	path := filepath.Join(dir, filename)
 
-	if err := afero.WriteFile(fs, path, migrations.Schema, 0o644); err != nil {
+	if err := afero.WriteFile(fs, filename, migrations.Schema, 0o644); err != nil {
 		return fmt.Errorf("conduit: failed to create initial migration file: %w", err)
 	}
 
