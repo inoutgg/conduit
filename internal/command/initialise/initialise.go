@@ -10,9 +10,9 @@ import (
 	"github.com/urfave/cli/v3"
 
 	"go.inout.gg/conduit/internal/command/flagname"
+	"go.inout.gg/conduit/internal/conduitsum"
 	"go.inout.gg/conduit/internal/migrations"
 	"go.inout.gg/conduit/internal/timegenerator"
-	"go.inout.gg/conduit/pkg/conduitsum"
 	"go.inout.gg/conduit/pkg/pgdiff"
 	"go.inout.gg/conduit/pkg/sqlsplit"
 	"go.inout.gg/conduit/pkg/version"

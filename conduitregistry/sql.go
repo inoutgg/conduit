@@ -16,7 +16,10 @@ import (
 	"go.inout.gg/conduit/pkg/version"
 )
 
-const DisableTxDirective = "---- disable-tx ----"
+const (
+	DisableTxDirective    = "---- disable-tx ----"
+	HazardDirectivePrefix = "---- hazard:"
+)
 
 func parseSQLMigrationsFromFS(fs afero.Fs, root string) ([]*Migration, error) {
 	migrations := make(map[string]*Migration)
@@ -110,11 +113,35 @@ func sqlMigrateFunc(stmts []sqlsplit.Stmt) *migrateFunc {
 			strings.TrimSpace(stmt.Content) == DisableTxDirective
 	})
 
+	var hazards []Hazard
+
+	for _, stmt := range stmts {
+		if stmt.Type != sqlsplit.StmtTypeComment {
+			continue
+		}
+
+		content := strings.TrimSpace(stmt.Content)
+		if !strings.HasPrefix(content, HazardDirectivePrefix) {
+			continue
+		}
+
+		// Parse "---- hazard: TYPE // message ----"
+		inner := strings.TrimPrefix(content, HazardDirectivePrefix)
+		inner = strings.TrimSuffix(inner, "----")
+		inner = strings.TrimSpace(inner)
+
+		hazardType, message, _ := strings.Cut(inner, "//")
+		hazards = append(hazards, Hazard{
+			Type:    strings.TrimSpace(hazardType),
+			Message: strings.TrimSpace(message),
+		})
+	}
+
 	queryStmts := sliceutil.Filter(stmts, func(stmt sqlsplit.Stmt) bool {
 		return stmt.Type == sqlsplit.StmtTypeQuery
 	})
 
-	migration := &migrateFunc{useTx: useTx, fn: nil, fnx: nil}
+	migration := &migrateFunc{useTx: useTx, hazards: hazards, fn: nil, fnx: nil}
 
 	if useTx {
 		migration.fnx = func(ctx context.Context, tx pgx.Tx) error {

@@ -44,7 +44,8 @@ var (
 		"conduit: invalid migration step. Expected: -1 (all) or positive integer",
 	)
 
-	ErrSchemaDrift = errors.New("conduit: schema drift detected")
+	ErrSchemaDrift    = errors.New("conduit: schema drift detected")
+	ErrHazardDetected = errors.New("conduit: hazardous migration detected")
 )
 
 type (
@@ -63,37 +64,48 @@ type Config struct {
 	Logger                 *slog.Logger              // optional
 	Registry               *conduitregistry.Registry // optional
 	ShouldCheckSchemaDrift bool                      // optional
+	AllowHazards           bool                      // optional
 }
+
+// Option is a function that configures a Config.
+type Option func(*Config)
 
 // WithLogger adds a logger to the Config.
 //
 // It's provided for convenience and intended to be used with NewConfig.
-func WithLogger(l *slog.Logger) func(*Config) {
+func WithLogger(l *slog.Logger) Option {
 	return func(c *Config) { c.Logger = l }
 }
 
 // WithRegistry adds a registry to the Config.
 //
 // It's provided for convenience and intended to be used with NewConfig.
-func WithRegistry(r *conduitregistry.Registry) func(*Config) {
+func WithRegistry(r *conduitregistry.Registry) Option {
 	return func(c *Config) { c.Registry = r }
 }
 
 // WithNoSchemaDriftCheck disables schema drift check.
 //
 // It's provided for convenience and intended to be used with NewConfig.
-func WithNoSchemaDriftCheck() func(*Config) {
+func WithNoSchemaDriftCheck() Option {
 	return func(c *Config) { c.ShouldCheckSchemaDrift = false }
+}
+
+// WithAllowHazards allows applying migrations that contain hazardous operations.
+//
+// It's provided for convenience and intended to be used with NewConfig.
+func WithAllowHazards() Option {
+	return func(c *Config) { c.AllowHazards = true }
 }
 
 // NewConfig creates a new Config and applies the provided configurations.
 //
 // If Config.Registry is not provided, it falls back to the global registry.
 // If Config.Logger is not provided, it falls back to slog.Default.
-func NewConfig(cfgs ...func(*Config)) *Config {
+func NewConfig(opts ...Option) *Config {
 	//nolint:exhaustruct
 	config := &Config{}
-	for _, c := range cfgs {
+	for _, c := range opts {
 		c(config)
 	}
 
@@ -150,6 +162,7 @@ type Migrator struct {
 	logger                 *slog.Logger
 	registry               *conduitregistry.Registry
 	shouldCheckSchemaDrift bool
+	allowHazards           bool
 }
 
 // NewMigrator creates a new migrator with the given config.
@@ -161,6 +174,7 @@ func NewMigrator(config *Config) *Migrator {
 		logger:                 config.Logger,
 		registry:               config.Registry,
 		shouldCheckSchemaDrift: config.ShouldCheckSchemaDrift,
+		allowHazards:           config.AllowHazards,
 	}
 }
 
@@ -363,6 +377,21 @@ func (m *Migrator) applyMigrations(
 			migration.Version().String(),
 			dir,
 		)
+
+		if hazards := migration.Hazards(dir); !m.allowHazards && len(hazards) > 0 {
+			msgs := make([]string, 0, len(hazards))
+			for _, h := range hazards {
+				msgs = append(msgs, fmt.Sprintf("%s: %s", h.Type, h.Message))
+			}
+
+			return nil, fmt.Errorf(
+				"%w: migration %s_%s contains hazards:\n  - %s",
+				ErrHazardDetected,
+				migration.Version().String(),
+				migration.Name(),
+				strings.Join(msgs, "\n  - "),
+			)
+		}
 
 		inTx := must.Must(migration.UseTx(dir))
 

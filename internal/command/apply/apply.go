@@ -2,6 +2,7 @@ package apply
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/jackc/pgx/v5"
@@ -13,7 +14,11 @@ import (
 )
 
 //nolint:gochecknoglobals
-var stepsFlag = "steps"
+var (
+	stepsFlag         = "steps"
+	allowHazardsFlag  = "allow-hazards"
+	noSchemaDriftFlag = "no-check-schema-drift"
+)
 
 //nolint:revive // ignore naming convention.
 type ApplyArgs struct {
@@ -22,7 +27,7 @@ type ApplyArgs struct {
 	Steps       int
 }
 
-func NewCommand(migrator *conduit.Migrator) *cli.Command {
+func NewCommand() *cli.Command {
 	//nolint:exhaustruct
 	return &cli.Command{
 		Name:  "apply",
@@ -41,6 +46,20 @@ func NewCommand(migrator *conduit.Migrator) *cli.Command {
 				Name:  stepsFlag,
 				Usage: "maximum migrations steps",
 			},
+
+			//nolint:exhaustruct
+			&cli.BoolFlag{
+				Name:  allowHazardsFlag,
+				Usage: "allow applying migrations that contain hazardous operations",
+				Value: false,
+			},
+
+			//nolint:exhaustruct
+			&cli.BoolFlag{
+				Name:  noSchemaDriftFlag,
+				Usage: "skip check for schema drift before applying migrations",
+				Value: false,
+			},
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			dir, err := direction.FromString(cmd.Args().First())
@@ -52,6 +71,18 @@ func NewCommand(migrator *conduit.Migrator) *cli.Command {
 			if url == "" {
 				return fmt.Errorf("missing `%s' flag", flagname.DatabaseURL)
 			}
+
+			var opts []conduit.Option
+			if cmd.Bool(allowHazardsFlag) {
+				opts = append(opts, conduit.WithAllowHazards())
+			}
+
+			if cmd.Bool(noSchemaDriftFlag) {
+				opts = append(opts, conduit.WithNoSchemaDriftCheck())
+			}
+
+			config := conduit.NewConfig(opts...)
+			migrator := conduit.NewMigrator(config)
 
 			args := ApplyArgs{
 				DatabaseURL: url,
@@ -78,6 +109,10 @@ func apply(
 		Steps: args.Steps,
 	})
 	if err != nil {
+		if errors.Is(err, conduit.ErrHazardDetected) {
+			return fmt.Errorf("%w\n\nuse --%s to proceed", err, allowHazardsFlag)
+		}
+
 		return fmt.Errorf("failed to apply migrations: %w", err)
 	}
 
