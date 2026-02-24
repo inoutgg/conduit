@@ -7,14 +7,16 @@ import (
 	"regexp"
 	"strings"
 	"text/template"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/spf13/afero"
 	schemadiff "github.com/stripe/pg-schema-diff/pkg/diff"
 
+	"go.inout.gg/conduit/internal/buildinfo"
+	"go.inout.gg/conduit/internal/conduitsum"
 	internaltpl "go.inout.gg/conduit/internal/template"
 	"go.inout.gg/conduit/internal/timegenerator"
-	"go.inout.gg/conduit/pkg/conduitsum"
 	"go.inout.gg/conduit/pkg/pgdiff"
 	"go.inout.gg/conduit/pkg/version"
 )
@@ -74,11 +76,32 @@ func diff(ctx context.Context, fs afero.Fs, timeGen timegenerator.Generator, arg
 			name = fmt.Sprintf("%s_%d", args.Name, i+1)
 		}
 
+		// Compute the max timeout across all statements in this migration group.
+		// statement_timeout is applied by PostgreSQL to each statement individually,
+		// not to the migration as a whole.
+		var stmtTimeout, lockTimeout time.Duration
+		for _, stmt := range m.stmts {
+			stmtTimeout = max(stmtTimeout, stmt.Timeout)
+			lockTimeout = max(lockTimeout, stmt.LockTimeout)
+		}
+
 		var upStmts strings.Builder
+
+		if stmtTimeout > 0 {
+			fmt.Fprintf(&upStmts, "SET statement_timeout = '%dms';\n", stmtTimeout.Milliseconds())
+		}
+
+		if lockTimeout > 0 {
+			fmt.Fprintf(&upStmts, "SET lock_timeout = '%dms';\n", lockTimeout.Milliseconds())
+		}
+
+		if stmtTimeout > 0 || lockTimeout > 0 {
+			upStmts.WriteString("\n")
+		}
 
 		for j, stmt := range m.stmts {
 			for _, hazard := range stmt.Hazards {
-				fmt.Fprintf(&upStmts, "-- [WARNING/%s]: %s\n", hazard.Type, hazard.Message)
+				fmt.Fprintf(&upStmts, "---- hazard: %s // %s ----\n", hazard.Type, hazard.Message)
 			}
 
 			upStmts.WriteString(stmt.ToSQL())
@@ -95,11 +118,10 @@ func diff(ctx context.Context, fs afero.Fs, timeGen timegenerator.Generator, arg
 			filename,
 			internaltpl.SQLUpMigrationTemplate,
 			map[string]any{
-				"Version":    v,
-				"Name":       name,
-				"SchemaPath": args.SchemaPath,
-				"UpStmts":    upStmts.String(),
-				"DisableTx":  m.isNonTx,
+				"SchemaPath":     args.SchemaPath,
+				"ConduitVersion": buildinfo.Version(),
+				"UpStmts":        upStmts.String(),
+				"DisableTx":      m.isNonTx,
 			},
 		); err != nil {
 			return err

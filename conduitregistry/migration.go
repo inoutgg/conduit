@@ -12,15 +12,23 @@ import (
 
 //nolint:gochecknoglobals
 var emptyMigrateFunc = &migrateFunc{
-	fn:    func(_ context.Context, _ *pgx.Conn) error { return nil },
-	fnx:   func(_ context.Context, _ pgx.Tx) error { return nil },
-	useTx: false,
+	fn:      func(_ context.Context, _ *pgx.Conn) error { return nil },
+	fnx:     func(_ context.Context, _ pgx.Tx) error { return nil },
+	hazards: nil,
+	useTx:   false,
+}
+
+// Hazard represents a hazardous operation detected in a migration.
+type Hazard struct {
+	Type    string
+	Message string
 }
 
 type migrateFunc struct {
-	fn    applyFunc
-	fnx   applyFuncTx
-	useTx bool
+	fn      applyFunc
+	fnx     applyFuncTx
+	hazards []Hazard
+	useTx   bool
 }
 
 // Migration represents a single database migration.
@@ -45,6 +53,17 @@ func (m *Migration) UseTx(dir direction.Direction) (bool, error) {
 func (m *Migration) Version() version.Version { return m.version }
 
 func (m *Migration) Name() string { return m.name }
+
+func (m *Migration) Hazards(dir direction.Direction) []Hazard {
+	switch dir {
+	case direction.DirectionUp:
+		return m.up.hazards
+	case direction.DirectionDown:
+		return m.down.hazards
+	}
+
+	return nil
+}
 
 func (m *Migration) Apply(ctx context.Context, dir direction.Direction, conn *pgx.Conn) error {
 	debug.Assert(conn != nil, "expected conn to be defined")
