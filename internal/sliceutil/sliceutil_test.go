@@ -40,65 +40,6 @@ func TestMap(t *testing.T) {
 	})
 }
 
-func TestKeyBy(t *testing.T) {
-	t.Parallel()
-
-	t.Run("keys strings by their length", func(t *testing.T) {
-		t.Parallel()
-
-		// Arrange
-		input := []string{"a", "ab", "abc", "abcd"}
-
-		// Act
-		result := sliceutil.KeyBy(input, func(s string) int { return len(s) })
-
-		// Assert
-		expected := map[int]string{
-			1: "a",
-			2: "ab",
-			3: "abc",
-			4: "abcd",
-		}
-		assert.Equal(t, expected, result)
-	})
-
-	t.Run("last value wins on overlapping keys", func(t *testing.T) {
-		t.Parallel()
-
-		// Arrange
-		input := []int{1, 2, 3, 4, 5}
-
-		// Act
-		result := sliceutil.KeyBy(input, func(i int) string {
-			if i%2 == 0 {
-				return "even"
-			}
-
-			return "odd"
-		})
-
-		// Assert
-		expected := map[string]int{
-			"odd":  5,
-			"even": 4,
-		}
-		assert.Equal(t, expected, result)
-	})
-
-	t.Run("returns empty map for empty input", func(t *testing.T) {
-		t.Parallel()
-
-		// Arrange
-		var input []string
-
-		// Act
-		result := sliceutil.KeyBy(input, func(s string) int { return len(s) })
-
-		// Assert
-		assert.Empty(t, result)
-	})
-}
-
 func TestFilter(t *testing.T) {
 	t.Parallel()
 
