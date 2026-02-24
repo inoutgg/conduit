@@ -8,11 +8,11 @@ CREATE TABLE IF NOT EXISTS conduit_migrations (
   name VARCHAR(4095) NOT NULL,
   hash VARCHAR(64) NOT NULL DEFAULT '',
   PRIMARY KEY (id),
-  UNIQUE (version)
+  UNIQUE (version, name)
 );
 
 ### conduit.sum ###
-5ac46ed1e4109f8b
+93e081ed14bd9b9e
 
 
 ---

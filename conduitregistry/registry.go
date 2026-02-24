@@ -39,7 +39,7 @@ func New() *Registry {
 func (r *Registry) FromFS(fs afero.Fs, root string) {
 	migrations := must.Must(parseSQLMigrationsFromFS(fs, root))
 	for _, m := range migrations {
-		r.migrations[m.Version().String()] = m
+		r.migrations[m.migrationKey()] = m
 	}
 }
 

@@ -2,6 +2,7 @@
 package version
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
 	"path/filepath"
@@ -46,9 +47,14 @@ type ParsedMigrationFilename struct {
 
 // Compare compares current ParsedMigrationFilename and the other one.
 //
-// It ignore the names part and compares only Versions.
+// It compares by Version first, then by Name lexicographically when
+// versions are equal (e.g. split migrations with the same timestamp).
 func (f ParsedMigrationFilename) Compare(other ParsedMigrationFilename) int {
-	return f.Version.Compare(other.Version)
+	if c := f.Version.Compare(other.Version); c != 0 {
+		return c
+	}
+
+	return cmp.Compare(f.Name, other.Name)
 }
 
 func (f ParsedMigrationFilename) Filename() string {

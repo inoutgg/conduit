@@ -17,6 +17,7 @@ func TestMigration_Apply(t *testing.T) {
 	t.Run("applies up migration", func(t *testing.T) {
 		t.Parallel()
 
+		// Arrange
 		pool := poolFactory.Pool(t)
 		ctx := t.Context()
 
@@ -37,15 +38,19 @@ DROP TABLE test_apply_up;`).
 		require.NoError(t, err)
 		require.Len(t, migrations, 1)
 
+		// Act
 		err = migrations[0].Apply(ctx, direction.DirectionUp, conn.Conn())
-		require.NoError(t, err)
 
+		// Assert
+		require.NoError(t, err)
 		assert.True(t, testutil.TableExists(t, pool, "test_apply_up"),
 			"table should exist after up migration")
 
+		// Act — apply down migration
 		err = migrations[0].Apply(ctx, direction.DirectionDown, conn.Conn())
-		require.NoError(t, err)
 
+		// Assert
+		require.NoError(t, err)
 		assert.False(t, testutil.TableExists(t, pool, "test_apply_up"),
 			"table should not exist after down migration")
 	})
@@ -53,6 +58,7 @@ DROP TABLE test_apply_up;`).
 	t.Run("returns error on invalid SQL", func(t *testing.T) {
 		t.Parallel()
 
+		// Arrange
 		pool := poolFactory.Pool(t)
 		ctx := t.Context()
 
@@ -69,7 +75,10 @@ INVALID SQL STATEMENT;`).
 		require.NoError(t, err)
 		require.Len(t, migrations, 1)
 
+		// Act
 		err = migrations[0].Apply(ctx, direction.DirectionUp, conn.Conn())
+
+		// Assert
 		require.Error(t, err)
 		snaps.MatchSnapshot(t, err.Error())
 	})
@@ -81,6 +90,7 @@ func TestMigration_ApplyTx(t *testing.T) {
 	t.Run("applies up migration in transaction", func(t *testing.T) {
 		t.Parallel()
 
+		// Arrange
 		pool := poolFactory.Pool(t)
 		ctx := t.Context()
 
@@ -102,12 +112,14 @@ func TestMigration_ApplyTx(t *testing.T) {
 		tx, err := conn.Begin(ctx)
 		require.NoError(t, err)
 
+		// Act
 		err = migrations[0].ApplyTx(ctx, direction.DirectionUp, tx)
 		require.NoError(t, err)
 
 		err = tx.Commit(ctx)
 		require.NoError(t, err)
 
+		// Assert
 		assert.True(t, testutil.TableExists(t, pool, "test_apply_tx"),
 			"table should exist after committed tx migration")
 	})
@@ -115,6 +127,7 @@ func TestMigration_ApplyTx(t *testing.T) {
 	t.Run("returns error on invalid SQL", func(t *testing.T) {
 		t.Parallel()
 
+		// Arrange
 		pool := poolFactory.Pool(t)
 		ctx := t.Context()
 
@@ -133,7 +146,10 @@ func TestMigration_ApplyTx(t *testing.T) {
 		tx, err := conn.Begin(ctx)
 		require.NoError(t, err)
 
+		// Act
 		err = migrations[0].ApplyTx(ctx, direction.DirectionUp, tx)
+
+		// Assert
 		require.Error(t, err)
 		snaps.MatchSnapshot(t, err.Error())
 

@@ -72,6 +72,8 @@ func (m *Migration) ApplyTx(ctx context.Context, dir direction.Direction, tx pgx
 	return direction.ErrUnknownDirection
 }
 
+func (m *Migration) migrationKey() string { return migrationKey(m.version, m.name) }
+
 func (m *Migration) migrateDown(ctx context.Context, conn *pgx.Conn, tx pgx.Tx) error {
 	if m.down.useTx {
 		debug.Assert(conn == nil && tx != nil, "expected only tx to be defined")

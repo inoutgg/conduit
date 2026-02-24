@@ -223,7 +223,7 @@ func (m *Migrator) Migrate(
 	return result, nil
 }
 
-func (m *Migrator) existingMigrationVersions(ctx context.Context, conn *pgx.Conn) ([]string, error) {
+func (m *Migrator) existingMigrationKeys(ctx context.Context, conn *pgx.Conn) ([]string, error) {
 	ok, err := dbsqlc.New().DoesTableExist(ctx, conn, "conduit_migrations")
 	if err != nil {
 		return nil, fmt.Errorf("conduit: failed to fetch from migrations table: %w", err)
@@ -234,12 +234,17 @@ func (m *Migrator) existingMigrationVersions(ctx context.Context, conn *pgx.Conn
 		return []string{}, nil
 	}
 
-	versions, err := dbsqlc.New().AllExistingMigrationVersions(ctx, conn)
+	rows, err := dbsqlc.New().AllExistingMigrations(ctx, conn)
 	if err != nil {
-		return nil, fmt.Errorf("conduit: failed to fetch existing versions: %w", err)
+		return nil, fmt.Errorf("conduit: failed to fetch existing migrations: %w", err)
 	}
 
-	return versions, nil
+	keys := make([]string, len(rows))
+	for i, row := range rows {
+		keys[i] = row.Version + "_" + row.Name
+	}
+
+	return keys, nil
 }
 
 func (m *Migrator) migrateUp(
@@ -247,7 +252,7 @@ func (m *Migrator) migrateUp(
 	conn *pgx.Conn,
 	opts *MigrateOptions,
 ) (*MigrateResult, error) {
-	existingMigrationVersions, err := m.existingMigrationVersions(ctx, conn)
+	existingKeys, err := m.existingMigrationKeys(ctx, conn)
 	if err != nil {
 		return nil, err
 	}
@@ -259,14 +264,12 @@ func (m *Migrator) migrateUp(
 	}
 
 	targetMigrations := m.registry.CloneMigrations()
-	for _, existingVersion := range existingMigrationVersions {
-		delete(targetMigrations, existingVersion)
+	for _, key := range existingKeys {
+		delete(targetMigrations, key)
 	}
 
 	migrations := slices.Collect(maps.Values(targetMigrations))
-	slices.SortFunc(migrations, func(a, b *Migration) int {
-		return a.Version().Compare(b.Version())
-	})
+	slices.SortFunc(migrations, compareMigrations)
 
 	return m.applyMigrations(ctx, migrations, DirectionUp, conn, opts)
 }
@@ -276,23 +279,23 @@ func (m *Migrator) migrateDown(
 	conn *pgx.Conn,
 	opts *MigrateOptions,
 ) (*MigrateResult, error) {
-	existingMigrations, err := m.existingMigrationVersions(ctx, conn)
+	existingKeys, err := m.existingMigrationKeys(ctx, conn)
 	if err != nil {
 		return nil, err
 	}
 
-	existingMigrationsMap := sliceutil.KeyBy(existingMigrations, func(e string) string { return e })
+	existingKeysMap := sliceutil.KeyBy(existingKeys, func(e string) string { return e })
 	targetMigrations := m.registry.CloneMigrations()
 
-	for _, m := range targetMigrations {
-		if _, ok := existingMigrationsMap[m.Version().String()]; !ok {
-			delete(targetMigrations, m.Version().String())
+	for key := range targetMigrations {
+		if _, ok := existingKeysMap[key]; !ok {
+			delete(targetMigrations, key)
 		}
 	}
 
 	migrations := slices.Collect(maps.Values(targetMigrations))
 	slices.SortFunc(migrations, func(a, b *Migration) int {
-		return b.Version().Compare(a.Version())
+		return compareMigrations(b, a)
 	})
 
 	return m.applyMigrations(ctx, migrations, DirectionDown, conn, opts)
@@ -399,7 +402,10 @@ func (m *Migrator) applyMigrations(
 
 		switch dir {
 		case DirectionDown:
-			err = dbsqlc.New().RollbackMigration(ctx, conn, migrationResult.Version.String())
+			err = dbsqlc.New().RollbackMigration(ctx, conn, dbsqlc.RollbackMigrationParams{
+				Version: migrationResult.Version.String(),
+				Name:    migrationResult.Name,
+			})
 
 		case DirectionUp:
 			var schemaHash string
@@ -470,6 +476,14 @@ func (m *Migrator) applyMigrationTx(
 	}
 
 	return nil
+}
+
+func compareMigrations(a, b *conduitregistry.Migration) int {
+	if c := a.Version().Compare(b.Version()); c != 0 {
+		return c
+	}
+
+	return cmp.Compare(a.Name(), b.Name())
 }
 
 func pgLockNum(s string) int64 {

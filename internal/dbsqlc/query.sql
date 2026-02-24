@@ -7,10 +7,10 @@ SELECT pg_advisory_unlock(@lock_num::BIGINT);
 -- name: ResetConn :exec
 RESET ALL;
 
--- name: AllExistingMigrationVersions :many
-SELECT version
+-- name: AllExistingMigrations :many
+SELECT version, name
 FROM conduit_migrations
-ORDER BY version;
+ORDER BY version, name;
 
 -- name: ApplyMigration :exec
 INSERT INTO conduit_migrations (version, name, hash)
@@ -18,11 +18,11 @@ VALUES (@version, @name, @hash);
 
 -- name: RollbackMigration :exec
 DELETE FROM conduit_migrations
-WHERE version = @version;
+WHERE version = @version AND name = @name;
 
 -- name: LatestSchemaHash :one
 SELECT hash FROM conduit_migrations
-ORDER BY version DESC
+ORDER BY version DESC, name DESC
 LIMIT 1;
 
 -- name: DoesTableExist :one

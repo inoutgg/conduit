@@ -17,12 +17,16 @@ func TestParseSQLMigrationsFromFS(t *testing.T) {
 	t.Run("split up and down migration files", func(t *testing.T) {
 		t.Parallel()
 
+		// Arrange
 		fs, _, dir := testutil.NewMigrationsDirBuilder(t).
 			WithFile("20230601120000_create_user.up.sql", "CREATE TABLE users (id INT);").
 			WithFile("20230601120000_create_user.down.sql", "DROP TABLE users;").
 			Build()
 
+		// Act
 		migrations, err := parseSQLMigrationsFromFS(fs, dir)
+
+		// Assert
 		require.NoError(t, err)
 		require.Len(t, migrations, 1)
 
@@ -42,11 +46,15 @@ func TestParseSQLMigrationsFromFS(t *testing.T) {
 	t.Run("up-only migration", func(t *testing.T) {
 		t.Parallel()
 
+		// Arrange
 		fs, _, dir := testutil.NewMigrationsDirBuilder(t).
 			WithFile("20230601120000_create_user.up.sql", "CREATE TABLE users (id INT);").
 			Build()
 
+		// Act
 		migrations, err := parseSQLMigrationsFromFS(fs, dir)
+
+		// Assert
 		require.NoError(t, err)
 		require.Len(t, migrations, 1)
 
@@ -64,6 +72,7 @@ func TestParseSQLMigrationsFromFS(t *testing.T) {
 	t.Run("disable-tx directive", func(t *testing.T) {
 		t.Parallel()
 
+		// Arrange
 		fs, _, dir := testutil.NewMigrationsDirBuilder(t).
 			WithFile("20230601120000_create_user.up.sql",
 				"---- disable-tx ----\nCREATE TABLE users (id INT);").
@@ -71,7 +80,10 @@ func TestParseSQLMigrationsFromFS(t *testing.T) {
 				"---- disable-tx ----\nDROP TABLE users;").
 			Build()
 
+		// Act
 		migrations, err := parseSQLMigrationsFromFS(fs, dir)
+
+		// Assert
 		require.NoError(t, err)
 		require.Len(t, migrations, 1)
 
@@ -89,6 +101,7 @@ func TestParseSQLMigrationsFromFS(t *testing.T) {
 	t.Run("disable-tx directive only in up migration", func(t *testing.T) {
 		t.Parallel()
 
+		// Arrange
 		fs, _, dir := testutil.NewMigrationsDirBuilder(t).
 			WithFile("20230601120000_create_user.up.sql",
 				"---- disable-tx ----\nCREATE TABLE users (id INT);").
@@ -96,7 +109,10 @@ func TestParseSQLMigrationsFromFS(t *testing.T) {
 				"DROP TABLE users;").
 			Build()
 
+		// Act
 		migrations, err := parseSQLMigrationsFromFS(fs, dir)
+
+		// Assert
 		require.NoError(t, err)
 		require.Len(t, migrations, 1)
 
@@ -114,6 +130,7 @@ func TestParseSQLMigrationsFromFS(t *testing.T) {
 	t.Run("multiple versions sorted", func(t *testing.T) {
 		t.Parallel()
 
+		// Arrange
 		fs, _, dir := testutil.NewMigrationsDirBuilder(t).
 			WithFile("20230601130000_add_email.up.sql",
 				"ALTER TABLE users ADD COLUMN email TEXT;").
@@ -121,7 +138,10 @@ func TestParseSQLMigrationsFromFS(t *testing.T) {
 			WithFile("20230601120000_create_user.down.sql", "DROP TABLE users;").
 			Build()
 
+		// Act
 		migrations, err := parseSQLMigrationsFromFS(fs, dir)
+
+		// Assert
 		require.NoError(t, err)
 		require.Len(t, migrations, 2)
 
@@ -138,27 +158,77 @@ func TestParseSQLMigrationsFromFS(t *testing.T) {
 		assert.Equal(t, emptyMigrateFunc, migrations[1].down)
 	})
 
-	t.Run("error on SQL file without direction suffix", func(t *testing.T) {
+	t.Run("returns error on SQL file without direction suffix", func(t *testing.T) {
 		t.Parallel()
 
+		// Arrange
 		fs, _, dir := testutil.NewMigrationsDirBuilder(t).
 			WithFile("20230601120000_create_user.sql", "CREATE TABLE users (id INT);").
 			Build()
 
+		// Act
 		_, err := parseSQLMigrationsFromFS(fs, dir)
+
+		// Assert
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "must have .up.sql or .down.sql suffix")
 	})
 
-	t.Run("error on down-only migration", func(t *testing.T) {
+	t.Run("returns error on down-only migration", func(t *testing.T) {
 		t.Parallel()
 
+		// Arrange
 		fs, _, dir := testutil.NewMigrationsDirBuilder(t).
 			WithFile("20230601120000_create_user.down.sql", "DROP TABLE users;").
 			Build()
 
+		// Act
 		_, err := parseSQLMigrationsFromFS(fs, dir)
+
+		// Assert
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "has a down file but no up file")
+	})
+
+	t.Run("same version different names coexist", func(t *testing.T) {
+		t.Parallel()
+
+		// Arrange
+		fs, _, dir := testutil.NewMigrationsDirBuilder(t).
+			WithFile("20230601120000_add_posts_1.up.sql", "CREATE TABLE posts (id INT);").
+			WithFile("20230601120000_add_posts_2.up.sql",
+				"---- disable-tx ----\nCREATE INDEX CONCURRENTLY idx ON posts (id);").
+			Build()
+
+		// Act
+		migrations, err := parseSQLMigrationsFromFS(fs, dir)
+
+		// Assert
+		require.NoError(t, err)
+		require.Len(t, migrations, 2)
+
+		slices.SortFunc(migrations, func(a, b *Migration) int {
+			if c := a.Version().Compare(b.Version()); c != 0 {
+				return c
+			}
+
+			if a.Name() < b.Name() {
+				return -1
+			}
+
+			return 1
+		})
+
+		assert.Equal(t, "add_posts_1", migrations[0].Name())
+		assert.Equal(t, "add_posts_2", migrations[1].Name())
+		assert.Equal(t, migrations[0].Version().String(), migrations[1].Version().String())
+
+		upTx1, err := migrations[0].UseTx(direction.DirectionUp)
+		require.NoError(t, err)
+		assert.True(t, upTx1)
+
+		upTx2, err := migrations[1].UseTx(direction.DirectionUp)
+		require.NoError(t, err)
+		assert.False(t, upTx2)
 	})
 }

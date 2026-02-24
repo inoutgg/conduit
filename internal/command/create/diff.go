@@ -10,6 +10,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/spf13/afero"
+	schemadiff "github.com/stripe/pg-schema-diff/pkg/diff"
 
 	internaltpl "go.inout.gg/conduit/internal/template"
 	"go.inout.gg/conduit/internal/timegenerator"
@@ -65,38 +66,44 @@ func diff(ctx context.Context, fs afero.Fs, timeGen timegenerator.Generator, arg
 	}
 
 	v := version.NewFromTime(timeGen.Now())
+	migrations := splitMigrations(plan.Statements)
 
-	var (
-		upStmts   strings.Builder
-		disableTx bool
-	)
-
-	for i, stmt := range plan.Statements {
-		for _, hazard := range stmt.Hazards {
-			fmt.Fprintf(&upStmts, "-- [WARNING/%s]: %s\n", hazard.Type, hazard.Message)
+	for i, m := range migrations {
+		name := args.Name
+		if len(migrations) > 1 {
+			name = fmt.Sprintf("%s_%d", args.Name, i+1)
 		}
 
-		upStmts.WriteString(stmt.ToSQL())
+		var upStmts strings.Builder
 
-		if i < len(plan.Statements)-1 {
-			upStmts.WriteString("\n\n")
+		for j, stmt := range m.stmts {
+			for _, hazard := range stmt.Hazards {
+				fmt.Fprintf(&upStmts, "-- [WARNING/%s]: %s\n", hazard.Type, hazard.Message)
+			}
+
+			upStmts.WriteString(stmt.ToSQL())
+
+			if j < len(m.stmts)-1 {
+				upStmts.WriteString("\n\n")
+			}
 		}
 
-		if requiresDisableTx(stmt.DDL) {
-			disableTx = true
+		filename := version.MigrationFilename(v, name, version.MigrationDirectionUp)
+
+		if err := writeMigration(
+			migrationsFs,
+			filename,
+			internaltpl.SQLUpMigrationTemplate,
+			map[string]any{
+				"Version":    v,
+				"Name":       name,
+				"SchemaPath": args.SchemaPath,
+				"UpStmts":    upStmts.String(),
+				"DisableTx":  m.isNonTx,
+			},
+		); err != nil {
+			return err
 		}
-	}
-
-	upFilename := version.MigrationFilename(v, args.Name, version.MigrationDirectionUp)
-
-	if err := writeTemplate(migrationsFs, upFilename, internaltpl.SQLUpMigrationTemplate, map[string]any{
-		"Version":    v,
-		"Name":       args.Name,
-		"SchemaPath": args.SchemaPath,
-		"UpStmts":    upStmts.String(),
-		"DisableTx":  disableTx,
-	}); err != nil {
-		return err
 	}
 
 	if err := conduitsum.WriteFile(migrationsFs, plan.TargetSchemaHash); err != nil {
@@ -106,7 +113,41 @@ func diff(ctx context.Context, fs afero.Fs, timeGen timegenerator.Generator, arg
 	return nil
 }
 
-func requiresDisableTx(ddl string) bool {
+type migration struct {
+	stmts   []schemadiff.Statement
+	isNonTx bool
+}
+
+// splitMigrations splits statements into contiguous groups based on whether
+// they require non-transactional execution.
+func splitMigrations(stmts []schemadiff.Statement) []migration {
+	if len(stmts) == 0 {
+		return nil
+	}
+
+	var migrations []migration
+
+	//nolint:exhaustruct
+	current := migration{isNonTx: isNonTxStmt(stmts[0].DDL)}
+
+	for _, stmt := range stmts {
+		isNonTx := isNonTxStmt(stmt.DDL)
+		if isNonTx != current.isNonTx {
+			migrations = append(migrations, current)
+
+			//nolint:exhaustruct
+			current = migration{isNonTx: isNonTx}
+		}
+
+		current.stmts = append(current.stmts, stmt)
+	}
+
+	migrations = append(migrations, current)
+
+	return migrations
+}
+
+func isNonTxStmt(ddl string) bool {
 	for _, p := range nonTxPatterns {
 		if p.MatchString(ddl) {
 			return true
@@ -116,7 +157,7 @@ func requiresDisableTx(ddl string) bool {
 	return false
 }
 
-func writeTemplate(fs afero.Fs, path string, tpl *template.Template, data any) error {
+func writeMigration(fs afero.Fs, path string, tpl *template.Template, data any) error {
 	f, err := fs.Create(path)
 	if err != nil {
 		return fmt.Errorf("conduit: failed to create migration file %s: %w", path, err)

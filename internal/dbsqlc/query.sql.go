@@ -18,25 +18,30 @@ func (q *Queries) AcquireLock(ctx context.Context, db DBTX, lockNum int64) error
 	return err
 }
 
-const allExistingMigrationVersions = `-- name: AllExistingMigrationVersions :many
-SELECT version
+const allExistingMigrations = `-- name: AllExistingMigrations :many
+SELECT version, name
 FROM conduit_migrations
-ORDER BY version
+ORDER BY version, name
 `
 
-func (q *Queries) AllExistingMigrationVersions(ctx context.Context, db DBTX) ([]string, error) {
-	rows, err := db.Query(ctx, allExistingMigrationVersions)
+type AllExistingMigrationsRow struct {
+	Version string
+	Name    string
+}
+
+func (q *Queries) AllExistingMigrations(ctx context.Context, db DBTX) ([]AllExistingMigrationsRow, error) {
+	rows, err := db.Query(ctx, allExistingMigrations)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []string
+	var items []AllExistingMigrationsRow
 	for rows.Next() {
-		var version string
-		if err := rows.Scan(&version); err != nil {
+		var i AllExistingMigrationsRow
+		if err := rows.Scan(&i.Version, &i.Name); err != nil {
 			return nil, err
 		}
-		items = append(items, version)
+		items = append(items, i)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -77,7 +82,7 @@ func (q *Queries) DoesTableExist(ctx context.Context, db DBTX, tableName string)
 
 const latestSchemaHash = `-- name: LatestSchemaHash :one
 SELECT hash FROM conduit_migrations
-ORDER BY version DESC
+ORDER BY version DESC, name DESC
 LIMIT 1
 `
 
@@ -108,10 +113,15 @@ func (q *Queries) ResetConn(ctx context.Context, db DBTX) error {
 
 const rollbackMigration = `-- name: RollbackMigration :exec
 DELETE FROM conduit_migrations
-WHERE version = $1
+WHERE version = $1 AND name = $2
 `
 
-func (q *Queries) RollbackMigration(ctx context.Context, db DBTX, version string) error {
-	_, err := db.Exec(ctx, rollbackMigration, version)
+type RollbackMigrationParams struct {
+	Version string
+	Name    string
+}
+
+func (q *Queries) RollbackMigration(ctx context.Context, db DBTX, arg RollbackMigrationParams) error {
+	_, err := db.Exec(ctx, rollbackMigration, arg.Version, arg.Name)
 	return err
 }

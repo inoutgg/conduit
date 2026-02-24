@@ -20,9 +20,13 @@ func TestVersion_Compare(t *testing.T) {
 		earlier := version.NewFromTime(parseTime("20230601120000"))
 		later := version.NewFromTime(parseTime("20230601130000"))
 
-		// Act & Assert
-		assert.Equal(t, -1, earlier.Compare(later))
-		assert.Equal(t, 1, later.Compare(earlier))
+		// Act
+		result1 := earlier.Compare(later)
+		result2 := later.Compare(earlier)
+
+		// Assert
+		assert.Equal(t, -1, result1)
+		assert.Equal(t, 1, result2)
 	})
 
 	t.Run("equal versions compare as zero", func(t *testing.T) {
@@ -32,8 +36,11 @@ func TestVersion_Compare(t *testing.T) {
 		v1 := version.NewFromTime(parseTime("20230601120000"))
 		v2 := version.NewFromTime(parseTime("20230601120000"))
 
-		// Act & Assert
-		assert.Equal(t, 0, v1.Compare(v2))
+		// Act
+		result := v1.Compare(v2)
+
+		// Assert
+		assert.Equal(t, 0, result)
 	})
 }
 
@@ -105,8 +112,10 @@ func TestParseMigrationFilename(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
+			// Act
 			parsed, err := version.ParseMigrationFilename(tt.filename)
 
+			// Assert
 			if tt.expectedErrMsg != "" {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.expectedErrMsg)
