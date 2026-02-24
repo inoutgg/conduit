@@ -78,7 +78,7 @@ func NewCommand() *cli.Command {
 			}
 
 			if cmd.Bool(noSchemaDriftFlag) {
-				opts = append(opts, conduit.WithNoSchemaDriftCheck())
+				opts = append(opts, conduit.WithSkipSchemaDriftCheck())
 			}
 
 			config := conduit.NewConfig(opts...)

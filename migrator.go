@@ -61,10 +61,10 @@ type (
 // If Registry is omitted, the global registry is used.
 // If Logger is omitted, slog.Default is used.
 type Config struct {
-	Logger                 *slog.Logger              // optional
-	Registry               *conduitregistry.Registry // optional
-	ShouldCheckSchemaDrift bool                      // optional
-	AllowHazards           bool                      // optional
+	Logger               *slog.Logger              // optional
+	Registry             *conduitregistry.Registry // optional
+	SkipSchemaDriftCheck bool                      // optional
+	AllowHazards         bool                      // optional
 }
 
 // Option is a function that configures a Config.
@@ -84,11 +84,11 @@ func WithRegistry(r *conduitregistry.Registry) Option {
 	return func(c *Config) { c.Registry = r }
 }
 
-// WithNoSchemaDriftCheck disables schema drift check.
+// WithSkipSchemaDriftCheck disables schema drift check.
 //
 // It's provided for convenience and intended to be used with NewConfig.
-func WithNoSchemaDriftCheck() Option {
-	return func(c *Config) { c.ShouldCheckSchemaDrift = false }
+func WithSkipSchemaDriftCheck() Option {
+	return func(c *Config) { c.SkipSchemaDriftCheck = true }
 }
 
 // WithAllowHazards allows applying migrations that contain hazardous operations.
@@ -123,7 +123,6 @@ func (c *Config) defaults() {
 	}
 
 	c.Registry = cmp.Or(c.Registry, globalRegistry)
-	c.ShouldCheckSchemaDrift = cmp.Or(c.ShouldCheckSchemaDrift, true)
 }
 
 // MigrateResult represents the outcome of applied migrations batch.
@@ -159,10 +158,10 @@ func (m *MigrateOptions) validate() error {
 // Migrator is a database migration tool that can rolls up and down migrations
 // in order.
 type Migrator struct {
-	logger                 *slog.Logger
-	registry               *conduitregistry.Registry
-	shouldCheckSchemaDrift bool
-	allowHazards           bool
+	logger               *slog.Logger
+	registry             *conduitregistry.Registry
+	skipSchemaDriftCheck bool
+	allowHazards         bool
 }
 
 // NewMigrator creates a new migrator with the given config.
@@ -171,10 +170,10 @@ func NewMigrator(config *Config) *Migrator {
 	debug.Assert(config.Registry != nil, "config.Registry must be defined")
 
 	return &Migrator{
-		logger:                 config.Logger,
-		registry:               config.Registry,
-		shouldCheckSchemaDrift: config.ShouldCheckSchemaDrift,
-		allowHazards:           config.AllowHazards,
+		logger:               config.Logger,
+		registry:             config.Registry,
+		skipSchemaDriftCheck: config.SkipSchemaDriftCheck,
+		allowHazards:         config.AllowHazards,
 	}
 }
 
@@ -271,7 +270,7 @@ func (m *Migrator) migrateUp(
 		return nil, err
 	}
 
-	if m.shouldCheckSchemaDrift {
+	if !m.skipSchemaDriftCheck {
 		if err := m.detectSchemaDrift(ctx, conn); err != nil {
 			return nil, err
 		}
@@ -298,11 +297,14 @@ func (m *Migrator) migrateDown(
 		return nil, err
 	}
 
-	existingKeysMap := sliceutil.KeyBy(existingKeys, func(e string) string { return e })
-	targetMigrations := m.registry.CloneMigrations()
+	existingKeysSet := make(map[string]struct{}, len(existingKeys))
+	for _, key := range existingKeys {
+		existingKeysSet[key] = struct{}{}
+	}
 
+	targetMigrations := m.registry.CloneMigrations()
 	for key := range targetMigrations {
-		if _, ok := existingKeysMap[key]; !ok {
+		if _, ok := existingKeysSet[key]; !ok {
 			delete(targetMigrations, key)
 		}
 	}
@@ -407,6 +409,8 @@ func (m *Migrator) applyMigrations(
 			slog.Bool("transacting", inTx),
 		)
 
+		start := time.Now()
+
 		if inTx {
 			err = m.applyMigrationTx(ctx, migration, dir, conn)
 		} else {
@@ -421,7 +425,7 @@ func (m *Migrator) applyMigrations(
 			)
 		}
 
-		duration := time.Since(time.Now())
+		duration := time.Since(start)
 		migrationResult := MigrationResult{
 			DurationTotal: duration,
 			Version:       migration.Version(),
@@ -464,7 +468,7 @@ func (m *Migrator) applyMigrations(
 
 	result = &MigrateResult{
 		MigrationResults: results,
-		Direction:        DirectionDown,
+		Direction:        dir,
 	}
 
 	return result, nil
