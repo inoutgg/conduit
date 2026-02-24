@@ -5,5 +5,5 @@ CREATE TABLE IF NOT EXISTS conduit_migrations (
   name VARCHAR(4095) NOT NULL,
   hash VARCHAR(64) NOT NULL DEFAULT '',
   PRIMARY KEY (id),
-  UNIQUE (version)
+  UNIQUE (version, name)
 );

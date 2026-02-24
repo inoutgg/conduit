@@ -49,7 +49,7 @@ func parseSQLMigrationsFromFS(fs afero.Fs, root string) ([]*Migration, error) {
 			return fmt.Errorf("conduit: failed to split migration SQL: %w", err)
 		}
 
-		key := info.Version.String()
+		key := migrationKey(info.Version, info.Name)
 
 		m, ok := migrations[key]
 		if !ok {
@@ -66,7 +66,7 @@ func parseSQLMigrationsFromFS(fs afero.Fs, root string) ([]*Migration, error) {
 		case version.MigrationDirectionUp:
 			if m.up != nil {
 				return fmt.Errorf(
-					"conduit: duplicate up migration for version %s: %w",
+					"conduit: duplicate up migration for %s: %w",
 					key,
 					ErrUpExists,
 				)
@@ -77,7 +77,7 @@ func parseSQLMigrationsFromFS(fs afero.Fs, root string) ([]*Migration, error) {
 		case version.MigrationDirectionDown:
 			if m.down != emptyMigrateFunc {
 				return fmt.Errorf(
-					"conduit: duplicate down migration for version %s: %w",
+					"conduit: duplicate down migration for %s: %w",
 					key,
 					ErrDownExists,
 				)
@@ -148,4 +148,9 @@ func sqlMigrateFunc(stmts []sqlsplit.Stmt) *migrateFunc {
 	}
 
 	return migration
+}
+
+// migrationKey returns a composite key identifying a migration by version and name.
+func migrationKey(v version.Version, name string) string {
+	return v.String() + "_" + name
 }
