@@ -36,11 +36,15 @@ func New() *Registry {
 //
 // SQL migrations run in transaction mode by default.
 // To disable transactions, add `---- disable-tx ----` comment in the SQL.
-func (r *Registry) FromFS(fs afero.Fs, root string) {
+func FromFS(fs afero.Fs, root string) *Registry {
+	r := New()
+
 	migrations := must.Must(parseSQLMigrationsFromFS(fs, root))
 	for _, m := range migrations {
 		r.migrations[m.migrationKey()] = m
 	}
+
+	return r
 }
 
 func (r *Registry) CloneMigrations() map[string]*Migration {

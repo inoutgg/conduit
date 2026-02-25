@@ -125,3 +125,34 @@ func (q *Queries) RollbackMigration(ctx context.Context, db DBTX, arg RollbackMi
 	_, err := db.Exec(ctx, rollbackMigration, arg.Version, arg.Name)
 	return err
 }
+
+const testAllMigrations = `-- name: TestAllMigrations :many
+SELECT version, name
+FROM conduit_migrations
+ORDER BY version, name
+`
+
+type TestAllMigrationsRow struct {
+	Version string
+	Name    string
+}
+
+func (q *Queries) TestAllMigrations(ctx context.Context, db DBTX) ([]TestAllMigrationsRow, error) {
+	rows, err := db.Query(ctx, testAllMigrations)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []TestAllMigrationsRow
+	for rows.Next() {
+		var i TestAllMigrationsRow
+		if err := rows.Scan(&i.Version, &i.Name); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}

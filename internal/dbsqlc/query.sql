@@ -25,6 +25,11 @@ SELECT hash FROM conduit_migrations
 ORDER BY version DESC, name DESC
 LIMIT 1;
 
+-- name: TestAllMigrations :many
+SELECT version, name
+FROM conduit_migrations
+ORDER BY version, name;
+
 -- name: DoesTableExist :one
 SELECT
   CASE
