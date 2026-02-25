@@ -14,7 +14,7 @@ import (
 func TestParseSQLMigrationsFromFS(t *testing.T) {
 	t.Parallel()
 
-	t.Run("split up and down migration files", func(t *testing.T) {
+	t.Run("should parse up and down migrations, when both files exist", func(t *testing.T) {
 		t.Parallel()
 
 		// Arrange
@@ -43,7 +43,7 @@ func TestParseSQLMigrationsFromFS(t *testing.T) {
 		assert.True(t, downTx, "down migration should use transaction by default")
 	})
 
-	t.Run("up-only migration", func(t *testing.T) {
+	t.Run("should parse migration, when only up file exists", func(t *testing.T) {
 		t.Parallel()
 
 		// Arrange
@@ -69,7 +69,7 @@ func TestParseSQLMigrationsFromFS(t *testing.T) {
 		assert.Equal(t, emptyMigrateFunc, m.down)
 	})
 
-	t.Run("disable-tx directive", func(t *testing.T) {
+	t.Run("should disable transactions, when disable-tx directive is in both files", func(t *testing.T) {
 		t.Parallel()
 
 		// Arrange
@@ -98,7 +98,7 @@ func TestParseSQLMigrationsFromFS(t *testing.T) {
 		assert.False(t, downTx, "disable-tx directive should disable transactions for down migration")
 	})
 
-	t.Run("disable-tx directive only in up migration", func(t *testing.T) {
+	t.Run("should disable tx only for up, when disable-tx directive is only in up file", func(t *testing.T) {
 		t.Parallel()
 
 		// Arrange
@@ -127,7 +127,7 @@ func TestParseSQLMigrationsFromFS(t *testing.T) {
 		assert.True(t, downTx, "down migration without disable-tx directive should use transactions")
 	})
 
-	t.Run("multiple versions sorted", func(t *testing.T) {
+	t.Run("should sort by version, when multiple versions exist", func(t *testing.T) {
 		t.Parallel()
 
 		// Arrange
@@ -158,7 +158,7 @@ func TestParseSQLMigrationsFromFS(t *testing.T) {
 		assert.Equal(t, emptyMigrateFunc, migrations[1].down)
 	})
 
-	t.Run("returns error on SQL file without direction suffix", func(t *testing.T) {
+	t.Run("should return error, when SQL file has no direction suffix", func(t *testing.T) {
 		t.Parallel()
 
 		// Arrange
@@ -174,7 +174,7 @@ func TestParseSQLMigrationsFromFS(t *testing.T) {
 		assert.Contains(t, err.Error(), "must have .up.sql or .down.sql suffix")
 	})
 
-	t.Run("returns error on down-only migration", func(t *testing.T) {
+	t.Run("should return error, when only down file exists", func(t *testing.T) {
 		t.Parallel()
 
 		// Arrange
@@ -190,7 +190,7 @@ func TestParseSQLMigrationsFromFS(t *testing.T) {
 		assert.Contains(t, err.Error(), "has a down file but no up file")
 	})
 
-	t.Run("same version different names coexist", func(t *testing.T) {
+	t.Run("should allow coexistence, when same version has different names", func(t *testing.T) {
 		t.Parallel()
 
 		// Arrange

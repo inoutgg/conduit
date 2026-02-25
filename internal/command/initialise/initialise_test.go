@@ -17,7 +17,7 @@ var timeGen = timegenerator.Stub{T: time.Date(2024, 1, 15, 12, 30, 45, 0, time.U
 func TestInitialise(t *testing.T) {
 	t.Parallel()
 
-	t.Run("creates migration directory and initial schema migration", func(t *testing.T) {
+	t.Run("should create migration directory and schema file, when initialising fresh project", func(t *testing.T) {
 		t.Parallel()
 
 		// Arrange

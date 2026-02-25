@@ -21,7 +21,7 @@ var timeGen = timegenerator.Stub{T: time.Date(2024, 1, 15, 12, 30, 45, 0, time.U
 func TestDiff(t *testing.T) {
 	t.Parallel()
 
-	t.Run("returns error when migrations directory does not exist", func(t *testing.T) {
+	t.Run("should return error, when migrations directory does not exist", func(t *testing.T) {
 		t.Parallel()
 
 		// Arrange
@@ -41,7 +41,7 @@ func TestDiff(t *testing.T) {
 		assert.ErrorContains(t, err, "migrations directory does not exist")
 	})
 
-	t.Run("returns error when database URL is invalid", func(t *testing.T) {
+	t.Run("should return error, when database URL is invalid", func(t *testing.T) {
 		t.Parallel()
 
 		// Arrange
@@ -61,7 +61,7 @@ func TestDiff(t *testing.T) {
 		assert.ErrorContains(t, err, "failed to parse database URL")
 	})
 
-	t.Run("creates migration file from schema diff", func(t *testing.T) {
+	t.Run("should create migration file, when schema has new table", func(t *testing.T) {
 		t.Parallel()
 
 		// Arrange
@@ -87,7 +87,7 @@ CREATE TABLE posts (id int, user_id int);`).
 		testutil.SnapshotFS(t, fs, dir)
 	})
 
-	t.Run("returns error when source schema hash does not match conduit.sum", func(t *testing.T) {
+	t.Run("should return error, when source schema hash does not match conduit.sum", func(t *testing.T) {
 		t.Parallel()
 
 		// Arrange
@@ -121,7 +121,7 @@ CREATE TABLE posts (id int, user_id int);`).
 		}
 	})
 
-	t.Run("succeeds when source schema hash matches conduit.sum", func(t *testing.T) {
+	t.Run("should succeed, when source schema hash matches conduit.sum", func(t *testing.T) {
 		t.Parallel()
 
 		// Arrange
@@ -166,7 +166,7 @@ CREATE TABLE comments (id int, post_id int);`), 0o644),
 		require.NoError(t, err)
 	})
 
-	t.Run("includes disable-tx directive when diff contains concurrent index", func(t *testing.T) {
+	t.Run("should include disable-tx directive, when diff contains concurrent index", func(t *testing.T) {
 		t.Parallel()
 
 		// Arrange
@@ -196,7 +196,7 @@ CREATE INDEX idx_users_id ON users (id);`).
 		assert.Contains(t, string(content), "---- disable-tx ----")
 	})
 
-	t.Run("omits disable-tx directive when diff has no concurrent DDL", func(t *testing.T) {
+	t.Run("should omit disable-tx directive, when diff has no concurrent DDL", func(t *testing.T) {
 		t.Parallel()
 
 		// Arrange
@@ -226,7 +226,7 @@ CREATE TABLE posts (id int);`).
 		assert.NotContains(t, string(content), "---- disable-tx ----")
 	})
 
-	t.Run("returns error when no schema changes detected", func(t *testing.T) {
+	t.Run("should return error, when no schema changes detected", func(t *testing.T) {
 		t.Parallel()
 
 		// Arrange
@@ -259,14 +259,14 @@ func TestSplitMigrations(t *testing.T) {
 		return schemadiff.Statement{DDL: ddl}
 	}
 
-	t.Run("empty statements", func(t *testing.T) {
+	t.Run("should return empty, when no statements provided", func(t *testing.T) {
 		t.Parallel()
 
 		migrations := splitMigrations(nil)
 		assert.Empty(t, migrations)
 	})
 
-	t.Run("all transactional", func(t *testing.T) {
+	t.Run("should produce single tx group, when all statements are transactional", func(t *testing.T) {
 		t.Parallel()
 
 		migrations := splitMigrations([]schemadiff.Statement{
@@ -278,7 +278,7 @@ func TestSplitMigrations(t *testing.T) {
 		assert.Len(t, migrations[0].stmts, 2)
 	})
 
-	t.Run("all non-transactional", func(t *testing.T) {
+	t.Run("should produce single non-tx group, when all statements are concurrent", func(t *testing.T) {
 		t.Parallel()
 
 		migrations := splitMigrations([]schemadiff.Statement{
@@ -290,7 +290,7 @@ func TestSplitMigrations(t *testing.T) {
 		assert.Len(t, migrations[0].stmts, 2)
 	})
 
-	t.Run("mixed tx and non-tx", func(t *testing.T) {
+	t.Run("should split into three groups, when statements alternate tx and non-tx", func(t *testing.T) {
 		t.Parallel()
 
 		migrations := splitMigrations([]schemadiff.Statement{
@@ -312,7 +312,7 @@ func TestSplitMigrations(t *testing.T) {
 		assert.Len(t, migrations[2].stmts, 1)
 	})
 
-	t.Run("single non-tx statement", func(t *testing.T) {
+	t.Run("should produce single non-tx group, when one concurrent statement exists", func(t *testing.T) {
 		t.Parallel()
 
 		migrations := splitMigrations([]schemadiff.Statement{
@@ -327,7 +327,7 @@ func TestSplitMigrations(t *testing.T) {
 func TestDiffSplitsMigrations(t *testing.T) {
 	t.Parallel()
 
-	t.Run("splits into tx and non-tx migration files", func(t *testing.T) {
+	t.Run("should split into tx and non-tx files, when diff contains mixed DDL", func(t *testing.T) {
 		t.Parallel()
 
 		// Arrange

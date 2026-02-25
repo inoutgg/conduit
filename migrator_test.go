@@ -63,7 +63,7 @@ func appliedMigrations(t *testing.T, pool *pgxpool.Pool) []dbsqlc.TestAllMigrati
 func TestMigrator_MigrateUp(t *testing.T) {
 	t.Parallel()
 
-	t.Run("applies all pending migrations", func(t *testing.T) {
+	t.Run("should apply all migrations, when all are pending", func(t *testing.T) {
 		t.Parallel()
 
 		// Arrange
@@ -92,7 +92,7 @@ func TestMigrator_MigrateUp(t *testing.T) {
 		}, appliedMigrations(t, pool))
 	})
 
-	t.Run("skips already applied", func(t *testing.T) {
+	t.Run("should skip migrations, when already applied", func(t *testing.T) {
 		t.Parallel()
 
 		// Arrange
@@ -116,7 +116,7 @@ func TestMigrator_MigrateUp(t *testing.T) {
 		assert.Empty(t, result.MigrationResults)
 	})
 
-	t.Run("respects step count", func(t *testing.T) {
+	t.Run("should apply only one migration, when step count is 1", func(t *testing.T) {
 		t.Parallel()
 
 		// Arrange
@@ -141,7 +141,7 @@ func TestMigrator_MigrateUp(t *testing.T) {
 		}, appliedMigrations(t, pool))
 	})
 
-	t.Run("applies non-tx migration", func(t *testing.T) {
+	t.Run("should apply migration, when disable-tx directive is set", func(t *testing.T) {
 		t.Parallel()
 
 		// Arrange
@@ -169,7 +169,7 @@ func TestMigrator_MigrateUp(t *testing.T) {
 func TestMigrator_MigrateDown(t *testing.T) {
 	t.Parallel()
 
-	t.Run("rolls back one by default", func(t *testing.T) {
+	t.Run("should roll back one migration, when no step count is given", func(t *testing.T) {
 		t.Parallel()
 
 		// Arrange
@@ -200,7 +200,7 @@ func TestMigrator_MigrateDown(t *testing.T) {
 		}, appliedMigrations(t, pool))
 	})
 
-	t.Run("rolls back all with AllSteps", func(t *testing.T) {
+	t.Run("should roll back all migrations, when AllSteps is used", func(t *testing.T) {
 		t.Parallel()
 
 		// Arrange
@@ -230,7 +230,7 @@ func TestMigrator_MigrateDown(t *testing.T) {
 		assert.Empty(t, appliedMigrations(t, pool))
 	})
 
-	t.Run("rolls back non-tx migration", func(t *testing.T) {
+	t.Run("should roll back migration, when disable-tx directive is set", func(t *testing.T) {
 		t.Parallel()
 
 		// Arrange
@@ -259,7 +259,7 @@ func TestMigrator_MigrateDown(t *testing.T) {
 func TestMigrator_Migrate_Hazards(t *testing.T) {
 	t.Parallel()
 
-	t.Run("blocked by default", func(t *testing.T) {
+	t.Run("should block migration, when hazard is detected", func(t *testing.T) {
 		t.Parallel()
 
 		// Arrange
@@ -279,7 +279,7 @@ func TestMigrator_Migrate_Hazards(t *testing.T) {
 		assert.False(t, testutil.TableExists(t, pool, "hazard_test"))
 	})
 
-	t.Run("allowed with WithAllowHazards option", func(t *testing.T) {
+	t.Run("should allow migration, when WithAllowHazards is set", func(t *testing.T) {
 		t.Parallel()
 
 		// Arrange
@@ -304,94 +304,57 @@ func TestMigrator_Migrate_Hazards(t *testing.T) {
 func TestMigrator_Migrate_Result(t *testing.T) {
 	t.Parallel()
 
-	t.Run("direction matches actual direction", func(t *testing.T) {
-		t.Parallel()
+	// Arrange
+	_, conn := newConn(t)
 
-		// Arrange
-		_, conn := newConn(t)
-
-		r := newRegistry(t, map[string]string{
-			"20230601120000_create_dir.up.sql":   "CREATE TABLE dir_test (id INT);",
-			"20230601120000_create_dir.down.sql": "DROP TABLE dir_test;",
-		})
-		m := newTestMigrator(t, r)
-
-		// Act
-		upResult, err := m.Migrate(t.Context(), conduit.DirectionUp, conn, nil)
-		require.NoError(t, err)
-
-		downResult, err := m.Migrate(t.Context(), conduit.DirectionDown, conn, nil)
-		require.NoError(t, err)
-
-		// Assert
-		assert.Equal(t, conduit.DirectionUp, upResult.Direction)
-		assert.Equal(t, conduit.DirectionDown, downResult.Direction)
+	r := newRegistry(t, map[string]string{
+		"20230603120000_create_c.up.sql":   "CREATE TABLE c_result (id INT);",
+		"20230603120000_create_c.down.sql": "DROP TABLE c_result;",
+		"20230601120000_create_a.up.sql":   "CREATE TABLE a_result (id INT);",
+		"20230601120000_create_a.down.sql": "DROP TABLE a_result;",
+		"20230602120000_create_b.up.sql":   "CREATE TABLE b_result (id INT);",
+		"20230602120000_create_b.down.sql": "DROP TABLE b_result;",
 	})
+	m := newTestMigrator(t, r)
 
-	t.Run("records positive duration", func(t *testing.T) {
-		t.Parallel()
+	// Act — up
+	upResult, err := m.Migrate(t.Context(), conduit.DirectionUp, conn, nil)
+	require.NoError(t, err)
 
-		// Arrange
-		_, conn := newConn(t)
+	// Assert — direction
+	assert.Equal(t, conduit.DirectionUp, upResult.Direction)
 
-		r := newRegistry(t, map[string]string{
-			"20230601120000_create_dur.up.sql": "CREATE TABLE dur_test (id INT);",
-		})
-		m := newTestMigrator(t, r)
+	// Assert — ascending order
+	require.Len(t, upResult.MigrationResults, 3)
+	assert.Equal(t, "create_a", upResult.MigrationResults[0].Name)
+	assert.Equal(t, "create_b", upResult.MigrationResults[1].Name)
+	assert.Equal(t, "create_c", upResult.MigrationResults[2].Name)
 
-		// Act
-		result, err := m.Migrate(t.Context(), conduit.DirectionUp, conn, nil)
+	// Assert — positive duration
+	for _, mr := range upResult.MigrationResults {
+		assert.Greater(t, mr.DurationTotal, time.Duration(0))
+	}
 
-		// Assert
-		require.NoError(t, err)
-		require.Len(t, result.MigrationResults, 1)
-		assert.Greater(t, result.MigrationResults[0].DurationTotal, time.Duration(0))
+	// Act — down all
+	downResult, err := m.Migrate(t.Context(), conduit.DirectionDown, conn, &conduit.MigrateOptions{
+		Steps: conduit.AllSteps,
 	})
+	require.NoError(t, err)
 
-	t.Run("migrations ordered by version", func(t *testing.T) {
-		t.Parallel()
+	// Assert — direction
+	assert.Equal(t, conduit.DirectionDown, downResult.Direction)
 
-		// Arrange
-		_, conn := newConn(t)
-
-		r := newRegistry(t, map[string]string{
-			"20230603120000_create_c.up.sql":   "CREATE TABLE c_order (id INT);",
-			"20230603120000_create_c.down.sql": "DROP TABLE c_order;",
-			"20230601120000_create_a.up.sql":   "CREATE TABLE a_order (id INT);",
-			"20230601120000_create_a.down.sql": "DROP TABLE a_order;",
-			"20230602120000_create_b.up.sql":   "CREATE TABLE b_order (id INT);",
-			"20230602120000_create_b.down.sql": "DROP TABLE b_order;",
-		})
-		m := newTestMigrator(t, r)
-
-		// Act — up
-		upResult, err := m.Migrate(t.Context(), conduit.DirectionUp, conn, nil)
-		require.NoError(t, err)
-
-		// Assert — ascending order
-		require.Len(t, upResult.MigrationResults, 3)
-		assert.Equal(t, "create_a", upResult.MigrationResults[0].Name)
-		assert.Equal(t, "create_b", upResult.MigrationResults[1].Name)
-		assert.Equal(t, "create_c", upResult.MigrationResults[2].Name)
-
-		// Act — down all
-		downResult, err := m.Migrate(t.Context(), conduit.DirectionDown, conn, &conduit.MigrateOptions{
-			Steps: conduit.AllSteps,
-		})
-		require.NoError(t, err)
-
-		// Assert — descending order
-		require.Len(t, downResult.MigrationResults, 3)
-		assert.Equal(t, "create_c", downResult.MigrationResults[0].Name)
-		assert.Equal(t, "create_b", downResult.MigrationResults[1].Name)
-		assert.Equal(t, "create_a", downResult.MigrationResults[2].Name)
-	})
+	// Assert — descending order
+	require.Len(t, downResult.MigrationResults, 3)
+	assert.Equal(t, "create_c", downResult.MigrationResults[0].Name)
+	assert.Equal(t, "create_b", downResult.MigrationResults[1].Name)
+	assert.Equal(t, "create_a", downResult.MigrationResults[2].Name)
 }
 
 func TestMigrator_Migrate_Validation(t *testing.T) {
 	t.Parallel()
 
-	t.Run("invalid step returns error", func(t *testing.T) {
+	t.Run("should return error, when step count is zero", func(t *testing.T) {
 		t.Parallel()
 
 		// Arrange

@@ -17,7 +17,7 @@ import (
 func TestReadStmtsFromFile(t *testing.T) {
 	t.Parallel()
 
-	t.Run("reads and parses multiple statements", func(t *testing.T) {
+	t.Run("should parse all statements, when file contains multiple", func(t *testing.T) {
 		t.Parallel()
 
 		// Arrange
@@ -35,7 +35,7 @@ CREATE INDEX idx_posts ON posts (id);`).
 		snaps.MatchSnapshot(t, stmts)
 	})
 
-	t.Run("returns error when file does not exist", func(t *testing.T) {
+	t.Run("should return error, when file does not exist", func(t *testing.T) {
 		t.Parallel()
 
 		// Arrange
@@ -49,7 +49,7 @@ CREATE INDEX idx_posts ON posts (id);`).
 		assert.ErrorContains(t, err, "failed to read file")
 	})
 
-	t.Run("returns error on invalid SQL", func(t *testing.T) {
+	t.Run("should return error, when SQL is invalid", func(t *testing.T) {
 		t.Parallel()
 
 		// Arrange
@@ -65,7 +65,7 @@ CREATE INDEX idx_posts ON posts (id);`).
 		assert.ErrorContains(t, err, "unclosed string")
 	})
 
-	t.Run("returns empty slice for empty file", func(t *testing.T) {
+	t.Run("should return empty slice, when file is empty", func(t *testing.T) {
 		t.Parallel()
 
 		// Arrange
@@ -81,7 +81,7 @@ CREATE INDEX idx_posts ON posts (id);`).
 		assert.Empty(t, stmts)
 	})
 
-	t.Run("reads all statements from file", func(t *testing.T) {
+	t.Run("should read all statements, when file has two tables", func(t *testing.T) {
 		t.Parallel()
 
 		// Arrange
@@ -102,7 +102,7 @@ CREATE TABLE posts (id int);`).
 func TestGeneratePlan(t *testing.T) {
 	t.Parallel()
 
-	t.Run("generates plan with new table", func(t *testing.T) {
+	t.Run("should generate plan, when new table is added to schema", func(t *testing.T) {
 		t.Parallel()
 
 		// Arrange
@@ -133,7 +133,7 @@ CREATE TABLE posts (id int, user_id int);`).
 func TestReadStmtsFromMigrationsDir(t *testing.T) {
 	t.Parallel()
 
-	t.Run("sorts files by version timestamp", func(t *testing.T) {
+	t.Run("should sort files by version, when added out of order", func(t *testing.T) {
 		t.Parallel()
 
 		// Arrange
@@ -153,7 +153,7 @@ func TestReadStmtsFromMigrationsDir(t *testing.T) {
 		snaps.MatchSnapshot(t, stmts)
 	})
 
-	t.Run("skips non-sql files", func(t *testing.T) {
+	t.Run("should skip non-sql files, when directory contains mixed file types", func(t *testing.T) {
 		t.Parallel()
 
 		// Arrange
@@ -172,7 +172,7 @@ func TestReadStmtsFromMigrationsDir(t *testing.T) {
 		snaps.MatchSnapshot(t, stmts)
 	})
 
-	t.Run("skips subdirectories", func(t *testing.T) {
+	t.Run("should skip subdirectories, when directory name ends in .sql", func(t *testing.T) {
 		t.Parallel()
 
 		// Arrange
@@ -189,7 +189,7 @@ func TestReadStmtsFromMigrationsDir(t *testing.T) {
 		snaps.MatchSnapshot(t, stmts)
 	})
 
-	t.Run("returns error when directory does not exist", func(t *testing.T) {
+	t.Run("should return error, when directory does not exist", func(t *testing.T) {
 		t.Parallel()
 
 		// Arrange
@@ -203,7 +203,7 @@ func TestReadStmtsFromMigrationsDir(t *testing.T) {
 		assert.ErrorContains(t, err, "failed to read directory")
 	})
 
-	t.Run("returns error when file cannot be read", func(t *testing.T) {
+	t.Run("should return error, when file cannot be read", func(t *testing.T) {
 		t.Parallel()
 
 		// Arrange
@@ -220,7 +220,7 @@ func TestReadStmtsFromMigrationsDir(t *testing.T) {
 		assert.ErrorContains(t, err, "failed to read file")
 	})
 
-	t.Run("returns error on invalid SQL", func(t *testing.T) {
+	t.Run("should return error, when migration SQL is invalid", func(t *testing.T) {
 		t.Parallel()
 
 		// Arrange
@@ -236,7 +236,7 @@ func TestReadStmtsFromMigrationsDir(t *testing.T) {
 		assert.ErrorContains(t, err, "unclosed string")
 	})
 
-	t.Run("returns error on invalid migration filename", func(t *testing.T) {
+	t.Run("should return error, when migration filename is invalid", func(t *testing.T) {
 		t.Parallel()
 
 		// Arrange
@@ -252,7 +252,7 @@ func TestReadStmtsFromMigrationsDir(t *testing.T) {
 		assert.ErrorContains(t, err, "failed to parse migration filename")
 	})
 
-	t.Run("returns empty slice for empty directory", func(t *testing.T) {
+	t.Run("should return empty slice, when directory is empty", func(t *testing.T) {
 		t.Parallel()
 
 		// Arrange
@@ -266,7 +266,7 @@ func TestReadStmtsFromMigrationsDir(t *testing.T) {
 		assert.Empty(t, stmts)
 	})
 
-	t.Run("returns empty slice for directory with only non-sql files", func(t *testing.T) {
+	t.Run("should return empty slice, when directory contains only non-sql files", func(t *testing.T) {
 		t.Parallel()
 
 		// Arrange
@@ -282,7 +282,7 @@ func TestReadStmtsFromMigrationsDir(t *testing.T) {
 		assert.Empty(t, stmts)
 	})
 
-	t.Run("skips down migration files", func(t *testing.T) {
+	t.Run("should skip down files, when both up and down migrations exist", func(t *testing.T) {
 		t.Parallel()
 
 		// Arrange
@@ -299,7 +299,7 @@ func TestReadStmtsFromMigrationsDir(t *testing.T) {
 		snaps.MatchSnapshot(t, stmts)
 	})
 
-	t.Run("handles multiple statements per file", func(t *testing.T) {
+	t.Run("should parse all statements, when file contains multiple DDL", func(t *testing.T) {
 		t.Parallel()
 
 		// Arrange
@@ -317,7 +317,7 @@ CREATE INDEX idx_posts ON posts (id);`).
 		snaps.MatchSnapshot(t, stmts)
 	})
 
-	t.Run("aggregates statements from multiple files in order", func(t *testing.T) {
+	t.Run("should aggregate statements in order, when multiple files exist", func(t *testing.T) {
 		t.Parallel()
 
 		// Arrange
