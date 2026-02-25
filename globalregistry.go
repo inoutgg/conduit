@@ -13,5 +13,5 @@ var globalRegistry = conduitregistry.New()
 
 // FromFS registers SQL migrations from the provided filesystem in the global registry.
 func FromFS(fs fs.FS, root string) {
-	globalRegistry.FromFS(afero.FromIOFS{FS: fs}, root)
+	globalRegistry = conduitregistry.FromFS(afero.FromIOFS{FS: fs}, root)
 }
