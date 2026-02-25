@@ -13,7 +13,7 @@ import (
 func TestVersion_Compare(t *testing.T) {
 	t.Parallel()
 
-	t.Run("earlier version is less than later version", func(t *testing.T) {
+	t.Run("should return negative, when earlier version compared to later", func(t *testing.T) {
 		t.Parallel()
 
 		// Arrange
@@ -29,7 +29,7 @@ func TestVersion_Compare(t *testing.T) {
 		assert.Equal(t, 1, result2)
 	})
 
-	t.Run("equal versions compare as zero", func(t *testing.T) {
+	t.Run("should return zero, when versions are equal", func(t *testing.T) {
 		t.Parallel()
 
 		// Arrange
@@ -132,7 +132,7 @@ func TestParseMigrationFilename(t *testing.T) {
 func TestParsedMigrationFilename_Filename(t *testing.T) {
 	t.Parallel()
 
-	t.Run("returns original filename for parsed up migration", func(t *testing.T) {
+	t.Run("should return original filename, when parsed from up migration", func(t *testing.T) {
 		t.Parallel()
 
 		// Arrange
@@ -147,7 +147,7 @@ func TestParsedMigrationFilename_Filename(t *testing.T) {
 		assert.Equal(t, original, result)
 	})
 
-	t.Run("returns original filename for parsed down migration", func(t *testing.T) {
+	t.Run("should return original filename, when parsed from down migration", func(t *testing.T) {
 		t.Parallel()
 
 		// Arrange
@@ -162,7 +162,7 @@ func TestParsedMigrationFilename_Filename(t *testing.T) {
 		assert.Equal(t, original, result)
 	})
 
-	t.Run("strips path and returns only filename", func(t *testing.T) {
+	t.Run("should strip path, when filename includes directory prefix", func(t *testing.T) {
 		t.Parallel()
 
 		// Arrange

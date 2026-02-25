@@ -12,7 +12,7 @@ import (
 func TestMap(t *testing.T) {
 	t.Parallel()
 
-	t.Run("maps ints to strings", func(t *testing.T) {
+	t.Run("should convert ints to strings, when mapping with Itoa", func(t *testing.T) {
 		t.Parallel()
 
 		// Arrange
@@ -26,7 +26,7 @@ func TestMap(t *testing.T) {
 		assert.Equal(t, expected, result)
 	})
 
-	t.Run("returns empty slice for empty input", func(t *testing.T) {
+	t.Run("should return empty slice, when input is empty", func(t *testing.T) {
 		t.Parallel()
 
 		// Arrange
@@ -43,7 +43,7 @@ func TestMap(t *testing.T) {
 func TestFilter(t *testing.T) {
 	t.Parallel()
 
-	t.Run("filters even numbers", func(t *testing.T) {
+	t.Run("should keep even numbers, when filtering mixed input", func(t *testing.T) {
 		t.Parallel()
 
 		// Arrange
@@ -57,7 +57,7 @@ func TestFilter(t *testing.T) {
 		assert.Equal(t, expected, result)
 	})
 
-	t.Run("returns all elements when all match", func(t *testing.T) {
+	t.Run("should return all elements, when all match predicate", func(t *testing.T) {
 		t.Parallel()
 
 		// Arrange
@@ -71,7 +71,7 @@ func TestFilter(t *testing.T) {
 		assert.Equal(t, expected, result)
 	})
 
-	t.Run("returns empty slice when none match", func(t *testing.T) {
+	t.Run("should return empty slice, when no elements match", func(t *testing.T) {
 		t.Parallel()
 
 		// Arrange
@@ -84,7 +84,7 @@ func TestFilter(t *testing.T) {
 		assert.Empty(t, result)
 	})
 
-	t.Run("returns empty slice for empty input", func(t *testing.T) {
+	t.Run("should return empty slice, when input is empty", func(t *testing.T) {
 		t.Parallel()
 
 		// Arrange

@@ -12,3 +12,17 @@ conduit: failed to execute migration script: ERROR: syntax error at or near "INV
 2 | INVALID SQL STATEMENT;
 
 ---
+
+[TestMigration_Apply/should_return_error,_when_SQL_is_invalid - 1]
+conduit: failed to execute migration script: ERROR: syntax error at or near "INVALID" (SQLSTATE 42601)
+
+2 | INVALID SQL STATEMENT;
+
+---
+
+[TestMigration_ApplyTx/should_return_error,_when_SQL_in_transaction_is_invalid - 1]
+conduit: failed to execute migration script: ERROR: syntax error at or near "INVALID" (SQLSTATE 42601)
+
+1 | INVALID SQL;
+
+---

@@ -14,7 +14,7 @@ import (
 func TestMigration_Apply(t *testing.T) {
 	t.Parallel()
 
-	t.Run("applies up migration", func(t *testing.T) {
+	t.Run("should apply and rollback, when up and down SQL are valid", func(t *testing.T) {
 		t.Parallel()
 
 		// Arrange
@@ -55,7 +55,7 @@ DROP TABLE test_apply_up;`).
 			"table should not exist after down migration")
 	})
 
-	t.Run("returns error on invalid SQL", func(t *testing.T) {
+	t.Run("should return error, when SQL is invalid", func(t *testing.T) {
 		t.Parallel()
 
 		// Arrange
@@ -87,7 +87,7 @@ INVALID SQL STATEMENT;`).
 func TestMigration_ApplyTx(t *testing.T) {
 	t.Parallel()
 
-	t.Run("applies up migration in transaction", func(t *testing.T) {
+	t.Run("should apply migration, when executed within a transaction", func(t *testing.T) {
 		t.Parallel()
 
 		// Arrange
@@ -124,7 +124,7 @@ func TestMigration_ApplyTx(t *testing.T) {
 			"table should exist after committed tx migration")
 	})
 
-	t.Run("returns error on invalid SQL", func(t *testing.T) {
+	t.Run("should return error, when SQL in transaction is invalid", func(t *testing.T) {
 		t.Parallel()
 
 		// Arrange

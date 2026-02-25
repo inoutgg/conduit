@@ -154,3 +154,159 @@ edf1bb36a97d2d9e
     },
 }
 ---
+
+[TestReadStmtsFromFile/should_parse_all_statements,_when_file_contains_multiple - 1]
+[]sqlsplit.Stmt{
+    {
+        Content: "CREATE TABLE users (id int);",
+        Type:    "query",
+        Start:   sqlsplit.Location{Pos:0, Line:1, Col:1},
+        End:     sqlsplit.Location{Pos:28, Line:1, Col:29},
+    },
+    {
+        Content: "CREATE TABLE posts (id int);",
+        Type:    "query",
+        Start:   sqlsplit.Location{Pos:29, Line:2, Col:1},
+        End:     sqlsplit.Location{Pos:57, Line:2, Col:29},
+    },
+    {
+        Content: "CREATE INDEX idx_posts ON posts (id);",
+        Type:    "query",
+        Start:   sqlsplit.Location{Pos:58, Line:3, Col:1},
+        End:     sqlsplit.Location{Pos:95, Line:3, Col:38},
+    },
+}
+---
+
+[TestReadStmtsFromMigrationsDir/should_skip_subdirectories,_when_directory_name_ends_in_.sql - 1]
+[]sqlsplit.Stmt{
+    {
+        Content: "CREATE TABLE first (id int);",
+        Type:    "query",
+        Start:   sqlsplit.Location{Pos:0, Line:1, Col:1},
+        End:     sqlsplit.Location{Pos:28, Line:1, Col:29},
+    },
+}
+---
+
+[TestReadStmtsFromFile/should_read_all_statements,_when_file_has_two_tables - 1]
+[]sqlsplit.Stmt{
+    {
+        Content: "CREATE TABLE users (id int);",
+        Type:    "query",
+        Start:   sqlsplit.Location{Pos:0, Line:1, Col:1},
+        End:     sqlsplit.Location{Pos:28, Line:1, Col:29},
+    },
+    {
+        Content: "CREATE TABLE posts (id int);",
+        Type:    "query",
+        Start:   sqlsplit.Location{Pos:29, Line:2, Col:1},
+        End:     sqlsplit.Location{Pos:57, Line:2, Col:29},
+    },
+}
+---
+
+[TestReadStmtsFromMigrationsDir/should_sort_files_by_version,_when_added_out_of_order - 1]
+[]sqlsplit.Stmt{
+    {
+        Content: "CREATE TABLE first (id int);",
+        Type:    "query",
+        Start:   sqlsplit.Location{Pos:0, Line:1, Col:1},
+        End:     sqlsplit.Location{Pos:28, Line:1, Col:29},
+    },
+    {
+        Content: "CREATE TABLE second (id int);",
+        Type:    "query",
+        Start:   sqlsplit.Location{Pos:0, Line:1, Col:1},
+        End:     sqlsplit.Location{Pos:29, Line:1, Col:30},
+    },
+    {
+        Content: "CREATE TABLE third (id int);",
+        Type:    "query",
+        Start:   sqlsplit.Location{Pos:0, Line:1, Col:1},
+        End:     sqlsplit.Location{Pos:28, Line:1, Col:29},
+    },
+}
+---
+
+[TestReadStmtsFromMigrationsDir/should_parse_all_statements,_when_file_contains_multiple_DDL - 1]
+[]sqlsplit.Stmt{
+    {
+        Content: "CREATE TABLE users (id int);",
+        Type:    "query",
+        Start:   sqlsplit.Location{Pos:0, Line:1, Col:1},
+        End:     sqlsplit.Location{Pos:28, Line:1, Col:29},
+    },
+    {
+        Content: "CREATE TABLE posts (id int);",
+        Type:    "query",
+        Start:   sqlsplit.Location{Pos:29, Line:2, Col:1},
+        End:     sqlsplit.Location{Pos:57, Line:2, Col:29},
+    },
+    {
+        Content: "CREATE INDEX idx_posts ON posts (id);",
+        Type:    "query",
+        Start:   sqlsplit.Location{Pos:58, Line:3, Col:1},
+        End:     sqlsplit.Location{Pos:95, Line:3, Col:38},
+    },
+}
+---
+
+[TestReadStmtsFromMigrationsDir/should_skip_down_files,_when_both_up_and_down_migrations_exist - 1]
+[]sqlsplit.Stmt{
+    {
+        Content: "CREATE TABLE users (id int);",
+        Type:    "query",
+        Start:   sqlsplit.Location{Pos:0, Line:1, Col:1},
+        End:     sqlsplit.Location{Pos:28, Line:1, Col:29},
+    },
+}
+---
+
+[TestReadStmtsFromMigrationsDir/should_aggregate_statements_in_order,_when_multiple_files_exist - 1]
+[]sqlsplit.Stmt{
+    {
+        Content: "CREATE TABLE a (id int);",
+        Type:    "query",
+        Start:   sqlsplit.Location{Pos:0, Line:1, Col:1},
+        End:     sqlsplit.Location{Pos:24, Line:1, Col:25},
+    },
+    {
+        Content: "CREATE TABLE b (id int);",
+        Type:    "query",
+        Start:   sqlsplit.Location{Pos:25, Line:1, Col:26},
+        End:     sqlsplit.Location{Pos:49, Line:1, Col:50},
+    },
+    {
+        Content: "CREATE TABLE c (id int);",
+        Type:    "query",
+        Start:   sqlsplit.Location{Pos:0, Line:1, Col:1},
+        End:     sqlsplit.Location{Pos:24, Line:1, Col:25},
+    },
+}
+---
+
+[TestReadStmtsFromMigrationsDir/should_skip_non-sql_files,_when_directory_contains_mixed_file_types - 1]
+[]sqlsplit.Stmt{
+    {
+        Content: "CREATE TABLE first (id int);",
+        Type:    "query",
+        Start:   sqlsplit.Location{Pos:0, Line:1, Col:1},
+        End:     sqlsplit.Location{Pos:28, Line:1, Col:29},
+    },
+}
+---
+
+[TestGeneratePlan/should_generate_plan,_when_new_table_is_added_to_schema - 1]
+a1876bffea260abf
+edf1bb36a97d2d9e
+[]diff.Statement{
+    {
+        DDL:            "CREATE TABLE \"public\".\"posts\" (\n\t\"id\" integer,\n\t\"user_id\" integer\n)",
+        Timeout:        3000000000,
+        LockTimeout:    3000000000,
+        Hazards:        nil,
+        SkipValidation: false,
+    },
+}
+---
