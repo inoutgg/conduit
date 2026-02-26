@@ -1,6 +1,9 @@
 package testutil
 
 import (
+	"fmt"
+	"net"
+	"strconv"
 	"testing"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -22,6 +25,15 @@ func TableExists(tb testing.TB, pool *pgxpool.Pool, name string) bool {
 	require.NoError(tb, err)
 
 	return exists
+}
+
+func ConnString(pool *pgxpool.Pool) string {
+	cc := pool.Config().ConnConfig
+
+	return fmt.Sprintf(
+		"postgres://%s:%s@%s/%s?sslmode=disable",
+		cc.User, cc.Password, net.JoinHostPort(cc.Host, strconv.Itoa(int(cc.Port))), cc.Database,
+	)
 }
 
 func Exec(tb testing.TB, pool *pgxpool.Pool, sql string) {

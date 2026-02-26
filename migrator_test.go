@@ -10,8 +10,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"go.inout.gg/conduit"
-	"go.inout.gg/conduit/conduitregistry"
 	"go.inout.gg/conduit/internal/dbsqlc"
+	"go.inout.gg/conduit/internal/testregistry"
 	"go.inout.gg/conduit/internal/testutil"
 )
 
@@ -25,19 +25,6 @@ func newConn(t *testing.T) (*pgxpool.Pool, *pgx.Conn) {
 	t.Cleanup(conn.Release)
 
 	return pool, conn.Conn()
-}
-
-func newRegistry(t *testing.T, files map[string]string) *conduitregistry.Registry {
-	t.Helper()
-
-	builder := testutil.NewMigrationsDirBuilder(t)
-	for name, content := range files {
-		builder.WithFile(name, content)
-	}
-
-	fs, _, dir := builder.Build()
-
-	return conduitregistry.FromFS(fs, dir)
 }
 
 func appliedMigrations(t *testing.T, pool *pgxpool.Pool) []dbsqlc.TestAllMigrationsRow {
@@ -58,7 +45,7 @@ func TestMigrator_MigrateUp(t *testing.T) {
 		// Arrange
 		pool, conn := newConn(t)
 
-		r := newRegistry(t, map[string]string{
+		r := testregistry.NewRegistry(t, map[string]string{
 			"20230601120000_create_users.up.sql":   "CREATE TABLE users (id INT);",
 			"20230601120000_create_users.down.sql": "DROP TABLE users;",
 			"20230602120000_create_posts.up.sql":   "CREATE TABLE posts (id INT);",
@@ -94,7 +81,7 @@ func TestMigrator_MigrateUp(t *testing.T) {
 		// Arrange
 		_, conn := newConn(t)
 
-		r := newRegistry(t, map[string]string{
+		r := testregistry.NewRegistry(t, map[string]string{
 			"20230601120000_create_users.up.sql":   "CREATE TABLE users (id INT);",
 			"20230601120000_create_users.down.sql": "DROP TABLE users;",
 		})
@@ -132,7 +119,7 @@ func TestMigrator_MigrateUp(t *testing.T) {
 		// Arrange
 		pool, conn := newConn(t)
 
-		r := newRegistry(t, map[string]string{
+		r := testregistry.NewRegistry(t, map[string]string{
 			"20230601120000_create_a.up.sql": "CREATE TABLE a (id INT);",
 			"20230602120000_create_b.up.sql": "CREATE TABLE b (id INT);",
 			"20230603120000_create_c.up.sql": "CREATE TABLE c (id INT);",
@@ -157,7 +144,7 @@ func TestMigrator_MigrateUp(t *testing.T) {
 		// Arrange
 		pool, conn := newConn(t)
 
-		r := newRegistry(t, map[string]string{
+		r := testregistry.NewRegistry(t, map[string]string{
 			"20230601120000_create_nontx.up.sql":   "---- disable-tx ----\nCREATE TABLE nontx_test (id INT);",
 			"20230601120000_create_nontx.down.sql": "---- disable-tx ----\nDROP TABLE nontx_test;",
 		})
@@ -192,7 +179,7 @@ func TestMigrator_MigrateDown(t *testing.T) {
 		// Arrange
 		pool, conn := newConn(t)
 
-		r := newRegistry(t, map[string]string{
+		r := testregistry.NewRegistry(t, map[string]string{
 			"20230601120000_create_users.up.sql":   "CREATE TABLE users (id INT);",
 			"20230601120000_create_users.down.sql": "DROP TABLE users;",
 			"20230602120000_create_posts.up.sql":   "CREATE TABLE posts (id INT);",
@@ -237,7 +224,7 @@ func TestMigrator_MigrateDown(t *testing.T) {
 		// Arrange
 		pool, conn := newConn(t)
 
-		r := newRegistry(t, map[string]string{
+		r := testregistry.NewRegistry(t, map[string]string{
 			"20230601120000_create_users.up.sql":   "CREATE TABLE users (id INT);",
 			"20230601120000_create_users.down.sql": "DROP TABLE users;",
 			"20230602120000_create_posts.up.sql":   "CREATE TABLE posts (id INT);",
@@ -274,7 +261,7 @@ func TestMigrator_MigrateDown(t *testing.T) {
 		// Arrange
 		pool, conn := newConn(t)
 
-		r := newRegistry(t, map[string]string{
+		r := testregistry.NewRegistry(t, map[string]string{
 			"20230601120000_create_nontx.up.sql":   "---- disable-tx ----\nCREATE TABLE nontx_test (id INT);",
 			"20230601120000_create_nontx.down.sql": "---- disable-tx ----\nDROP TABLE nontx_test;",
 		})
@@ -317,7 +304,7 @@ func TestMigrator_Migrate_Hazards(t *testing.T) {
 		// Arrange
 		pool, conn := newConn(t)
 
-		r := newRegistry(t, map[string]string{
+		r := testregistry.NewRegistry(t, map[string]string{
 			"20230601120000_hazardous.up.sql":   "---- disable-tx ----\n---- hazard: INDEX_BUILD // rebuilds index ----\nCREATE TABLE hazard_test (id INT);",
 			"20230601120000_hazardous.down.sql": "---- disable-tx ----\nDROP TABLE hazard_test;",
 		})
@@ -344,7 +331,7 @@ func TestMigrator_Migrate_Hazards(t *testing.T) {
 		// Arrange
 		pool, conn := newConn(t)
 
-		r := newRegistry(t, map[string]string{
+		r := testregistry.NewRegistry(t, map[string]string{
 			"20230601120000_hazardous.up.sql":   "---- disable-tx ----\n---- hazard: INDEX_BUILD // rebuilds index ----\nCREATE TABLE hazard_allowed (id INT);",
 			"20230601120000_hazardous.down.sql": "---- disable-tx ----\nDROP TABLE hazard_allowed;",
 		})
@@ -374,7 +361,7 @@ func TestMigrator_Migrate_Result(t *testing.T) {
 	// Arrange
 	_, conn := newConn(t)
 
-	r := newRegistry(t, map[string]string{
+	r := testregistry.NewRegistry(t, map[string]string{
 		"20230603120000_create_c.up.sql":   "CREATE TABLE c_result (id INT);",
 		"20230603120000_create_c.down.sql": "DROP TABLE c_result;",
 		"20230601120000_create_a.up.sql":   "CREATE TABLE a_result (id INT);",

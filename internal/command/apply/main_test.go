@@ -1,4 +1,4 @@
-package conduitregistry
+package apply
 
 import (
 	"context"
@@ -22,7 +22,7 @@ func TestMain(m *testing.M) {
 	poolFactory, err = pgxephemeraltest.NewPoolFactoryFromConnString(
 		ctx,
 		os.Getenv("TEST_DATABASE_URL"),
-		testmigrator.NoopMigrator,
+		testmigrator.ConduitMigrator,
 	)
 	if err != nil {
 		panic(err)

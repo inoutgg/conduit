@@ -6,9 +6,11 @@ import (
 	"fmt"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/spf13/afero"
 	"github.com/urfave/cli/v3"
 
 	"go.inout.gg/conduit"
+	"go.inout.gg/conduit/conduitregistry"
 	"go.inout.gg/conduit/internal/command/flagname"
 	"go.inout.gg/conduit/internal/direction"
 )
@@ -74,7 +76,9 @@ func NewCommand() *cli.Command {
 				return fmt.Errorf("missing `%s' flag", flagname.DatabaseURL)
 			}
 
-			migrator := conduit.NewMigrator()
+			migrationsDir := cmd.String(flagname.MigrationsDir)
+			registry := conduitregistry.FromFS(afero.NewOsFs(), migrationsDir)
+			migrator := conduit.NewMigrator(conduit.WithRegistry(registry))
 
 			args := ApplyArgs{
 				DatabaseURL:          url,

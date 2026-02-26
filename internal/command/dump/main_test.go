@@ -8,7 +8,7 @@ import (
 	"go.segfaultmedaddy.com/pgxephemeraltest"
 	"go.uber.org/goleak"
 
-	"go.inout.gg/conduit/internal/testutil"
+	"go.inout.gg/conduit/internal/testmigrator"
 )
 
 //nolint:gochecknoglobals
@@ -22,7 +22,7 @@ func TestMain(m *testing.M) {
 	poolFactory, err = pgxephemeraltest.NewPoolFactoryFromConnString(
 		ctx,
 		os.Getenv("TEST_DATABASE_URL"),
-		testutil.NoopMigrator,
+		testmigrator.NoopMigrator,
 	)
 	if err != nil {
 		panic(err)

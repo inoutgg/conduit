@@ -2,9 +2,6 @@ package dump
 
 import (
 	"bytes"
-	"fmt"
-	"net"
-	"strconv"
 	"testing"
 
 	"github.com/gkampitakis/go-snaps/snaps"
@@ -48,15 +45,9 @@ CREATE TABLE posts (
 		pool := poolFactory.Pool(t)
 		testutil.Exec(t, pool, schema)
 
-		cc := pool.Config().ConnConfig
-		connString := fmt.Sprintf(
-			"postgres://%s:%s@%s/%s?sslmode=disable",
-			cc.User, cc.Password, net.JoinHostPort(cc.Host, strconv.Itoa(int(cc.Port))), cc.Database,
-		)
-
 		recorder := new(bytes.Buffer)
 		args := DumpArgs{
-			DatabaseURL: connString,
+			DatabaseURL: testutil.ConnString(pool),
 		}
 
 		err := dump(t.Context(), args, recorder)
