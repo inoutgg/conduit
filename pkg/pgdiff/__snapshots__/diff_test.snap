@@ -310,3 +310,64 @@ edf1bb36a97d2d9e
     },
 }
 ---
+
+[TestDumpSchema/should_dump_DDL_for_all_tables,_when_database_has_schema - 1]
+[]diff.Statement{
+    {
+        DDL:            "CREATE TABLE \"public\".\"posts\" (\n\t\"id\" bigint NOT NULL GENERATED ALWAYS AS IDENTITY (INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START WITH 1 CACHE 1 NO CYCLE),\n\t\"user_id\" bigint NOT NULL,\n\t\"title\" text COLLATE \"pg_catalog\".\"default\" NOT NULL\n)",
+        Timeout:        3000000000,
+        LockTimeout:    3000000000,
+        Hazards:        nil,
+        SkipValidation: false,
+    },
+    {
+        DDL:            "CREATE UNIQUE INDEX posts_pkey ON public.posts USING btree (id)",
+        Timeout:        3000000000,
+        LockTimeout:    3000000000,
+        Hazards:        nil,
+        SkipValidation: false,
+    },
+    {
+        DDL:            "ALTER TABLE \"public\".\"posts\" ADD CONSTRAINT \"posts_pkey\" PRIMARY KEY USING INDEX \"posts_pkey\"",
+        Timeout:        3000000000,
+        LockTimeout:    3000000000,
+        Hazards:        nil,
+        SkipValidation: false,
+    },
+    {
+        DDL:            "CREATE TABLE \"public\".\"users\" (\n\t\"id\" bigint NOT NULL GENERATED ALWAYS AS IDENTITY (INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START WITH 1 CACHE 1 NO CYCLE),\n\t\"name\" text COLLATE \"pg_catalog\".\"default\" NOT NULL\n)",
+        Timeout:        3000000000,
+        LockTimeout:    3000000000,
+        Hazards:        nil,
+        SkipValidation: false,
+    },
+    {
+        DDL:            "CREATE UNIQUE INDEX users_pkey ON public.users USING btree (id)",
+        Timeout:        3000000000,
+        LockTimeout:    3000000000,
+        Hazards:        nil,
+        SkipValidation: false,
+    },
+    {
+        DDL:            "ALTER TABLE \"public\".\"users\" ADD CONSTRAINT \"users_pkey\" PRIMARY KEY USING INDEX \"users_pkey\"",
+        Timeout:        3000000000,
+        LockTimeout:    3000000000,
+        Hazards:        nil,
+        SkipValidation: false,
+    },
+    {
+        DDL:            "ALTER TABLE \"public\".\"posts\" ADD CONSTRAINT \"posts_user_id_fkey\" FOREIGN KEY (user_id) REFERENCES users(id) NOT VALID",
+        Timeout:        3000000000,
+        LockTimeout:    3000000000,
+        Hazards:        nil,
+        SkipValidation: false,
+    },
+    {
+        DDL:            "ALTER TABLE \"public\".\"posts\" VALIDATE CONSTRAINT \"posts_user_id_fkey\"",
+        Timeout:        3000000000,
+        LockTimeout:    3000000000,
+        Hazards:        nil,
+        SkipValidation: false,
+    },
+}
+---

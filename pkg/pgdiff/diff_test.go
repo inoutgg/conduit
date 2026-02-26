@@ -130,6 +130,56 @@ CREATE TABLE posts (id int, user_id int);`).
 	})
 }
 
+func TestDumpSchema(t *testing.T) {
+	t.Parallel()
+
+	const schema = `
+CREATE TABLE users (
+    id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    name text NOT NULL
+);
+
+CREATE TABLE posts (
+    id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    user_id bigint NOT NULL REFERENCES users (id),
+    title text NOT NULL
+);
+`
+
+	t.Run("should dump DDL for all tables, when database has schema", func(t *testing.T) {
+		t.Parallel()
+
+		// Arrange
+		pool := poolFactory.Pool(t)
+		connConfig := pool.Config().ConnConfig.Copy()
+
+		testutil.Exec(t, pool, schema)
+
+		// Act
+		stmts, err := DumpSchema(t.Context(), connConfig)
+
+		// Assert
+		require.NoError(t, err)
+		require.NotEmpty(t, stmts)
+		snaps.MatchSnapshot(t, stmts)
+	})
+
+	t.Run("should return empty statements, when database has no user-defined objects", func(t *testing.T) {
+		t.Parallel()
+
+		// Arrange
+		pool := poolFactory.Pool(t)
+		connConfig := pool.Config().ConnConfig.Copy()
+
+		// Act — DumpSchema on the base TEST_DATABASE_URL which has no user tables.
+		stmts, err := DumpSchema(t.Context(), connConfig)
+
+		// Assert
+		require.NoError(t, err)
+		assert.Empty(t, stmts)
+	})
+}
+
 func TestReadStmtsFromMigrationsDir(t *testing.T) {
 	t.Parallel()
 

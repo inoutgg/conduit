@@ -1,18 +1,13 @@
 package testutil
 
 import (
-	"context"
 	"testing"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/stretchr/testify/require"
+
+	"go.inout.gg/conduit/pkg/sqlsplit"
 )
-
-type NoopMigrator struct{}
-
-func (NoopMigrator) Migrate(context.Context, *pgx.Conn) error { return nil }
-func (NoopMigrator) Hash() string                             { return "noop" }
 
 func TableExists(tb testing.TB, pool *pgxpool.Pool, name string) bool {
 	tb.Helper()
@@ -27,4 +22,20 @@ func TableExists(tb testing.TB, pool *pgxpool.Pool, name string) bool {
 	require.NoError(tb, err)
 
 	return exists
+}
+
+func Exec(tb testing.TB, pool *pgxpool.Pool, sql string) {
+	tb.Helper()
+
+	stmts, err := sqlsplit.Split([]byte(sql))
+	require.NoError(tb, err)
+
+	for _, s := range stmts {
+		if s.Type != sqlsplit.StmtTypeQuery {
+			continue
+		}
+
+		_, err := pool.Exec(tb.Context(), s.Content)
+		require.NoError(tb, err)
+	}
 }

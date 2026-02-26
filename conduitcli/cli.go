@@ -10,6 +10,7 @@ import (
 
 	"go.inout.gg/conduit/internal/command/apply"
 	"go.inout.gg/conduit/internal/command/create"
+	"go.inout.gg/conduit/internal/command/dump"
 	"go.inout.gg/conduit/internal/command/flagname"
 	"go.inout.gg/conduit/internal/command/initialise"
 	"go.inout.gg/conduit/internal/timegenerator"
@@ -49,6 +50,7 @@ func Execute(ctx context.Context) error {
 			initialise.NewCommand(fs, timeGen),
 			create.NewCommand(fs, timeGen),
 			apply.NewCommand(),
+			dump.NewCommand(),
 		},
 	}
 

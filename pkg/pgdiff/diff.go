@@ -132,6 +132,35 @@ func GenerateSchemaHash(
 	return hash, nil
 }
 
+// DumpSchema extracts the schema of a live Postgres database as DDL statements.
+func DumpSchema(
+	ctx context.Context,
+	connConfig *pgx.ConnConfig,
+) ([]schemadiff.Statement, error) {
+	remoteDB := stdlib.OpenDB(*connConfig)
+	defer remoteDB.Close()
+
+	factory, err := newTempDbFactory(ctx, connConfig)
+	if err != nil {
+		return nil, err
+	}
+	defer factory.Close()
+
+	plan, err := schemadiff.Generate(
+		ctx,
+		schemadiff.DDLSchemaSource([]string{}),
+		schemadiff.DBSchemaSource(remoteDB),
+		schemadiff.WithTempDbFactory(factory),
+		schemadiff.WithDoNotValidatePlan(),
+		schemadiff.WithNoConcurrentIndexOps(),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to dump schema: %w", err)
+	}
+
+	return plan.Statements, nil
+}
+
 func newTempDbFactory(ctx context.Context, connConfig *pgx.ConnConfig) (tempdb.Factory, error) {
 	factory, err := tempdb.NewOnInstanceFactory(
 		ctx,

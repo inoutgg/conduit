@@ -1,4 +1,4 @@
-package conduitregistry
+package dump
 
 import (
 	"context"
