@@ -53,71 +53,36 @@ type (
 	Migration = conduitregistry.Migration
 )
 
-// Config is the configuration for the Migrator.
+// config is the configuration for the Migrator.
 //
 // Use NewConfig to instantiate a new instance.
 //
 // Logger and Registry fields are optional.
 // If Registry is omitted, the global registry is used.
 // If Logger is omitted, slog.Default is used.
-type Config struct {
-	Logger               *slog.Logger              // optional
-	Registry             *conduitregistry.Registry // optional
-	SkipSchemaDriftCheck bool                      // optional
-	AllowHazards         bool                      // optional
+type config struct {
+	Logger   *slog.Logger              // optional
+	Registry *conduitregistry.Registry // optional
 }
 
 // Option is a function that configures a Config.
-type Option func(*Config)
+type Option func(*config)
 
 // WithLogger adds a logger to the Config.
 //
 // It's provided for convenience and intended to be used with NewConfig.
 func WithLogger(l *slog.Logger) Option {
-	return func(c *Config) { c.Logger = l }
+	return func(c *config) { c.Logger = l }
 }
 
 // WithRegistry adds a registry to the Config.
 //
 // It's provided for convenience and intended to be used with NewConfig.
 func WithRegistry(r *conduitregistry.Registry) Option {
-	return func(c *Config) { c.Registry = r }
+	return func(c *config) { c.Registry = r }
 }
 
-// WithSkipSchemaDriftCheck disables schema drift check.
-//
-// It's provided for convenience and intended to be used with NewConfig.
-func WithSkipSchemaDriftCheck() Option {
-	return func(c *Config) { c.SkipSchemaDriftCheck = true }
-}
-
-// WithAllowHazards allows applying migrations that contain hazardous operations.
-//
-// It's provided for convenience and intended to be used with NewConfig.
-func WithAllowHazards() Option {
-	return func(c *Config) { c.AllowHazards = true }
-}
-
-// NewConfig creates a new Config and applies the provided configurations.
-//
-// If Config.Registry is not provided, it falls back to the global registry.
-// If Config.Logger is not provided, it falls back to slog.Default.
-func NewConfig(opts ...Option) *Config {
-	//nolint:exhaustruct
-	config := &Config{}
-	for _, c := range opts {
-		c(config)
-	}
-
-	config.defaults()
-
-	debug.Assert(config.Logger != nil, "Logger is required")
-	debug.Assert(config.Registry != nil, "Registry is required")
-
-	return config
-}
-
-func (c *Config) defaults() {
+func (c *config) defaults() {
 	if c.Logger == nil {
 		c.Logger = slog.Default()
 	}
@@ -144,36 +109,44 @@ type MigrationResult struct {
 
 // MigrateOptions specifies options for a Migrator.Migrate operation.
 type MigrateOptions struct {
-	Steps int
+	Steps                int
+	SkipSchemaDriftCheck bool // optional
+	AllowHazards         bool // optional
 }
 
-func (m *MigrateOptions) validate() error {
-	if m.Steps != -1 && m.Steps <= 0 {
-		return ErrInvalidStep
+func (m *MigrateOptions) defaults(dir direction.Direction) {
+	if m.Steps == 0 {
+		if dir == direction.DirectionUp {
+			m.Steps = DefaultUpStep
+		} else {
+			m.Steps = DefaultDownStep
+		}
 	}
-
-	return nil
 }
 
 // Migrator is a database migration tool that can rolls up and down migrations
 // in order.
 type Migrator struct {
-	logger               *slog.Logger
-	registry             *conduitregistry.Registry
-	skipSchemaDriftCheck bool
-	allowHazards         bool
+	logger   *slog.Logger
+	registry *conduitregistry.Registry
 }
 
 // NewMigrator creates a new migrator with the given config.
-func NewMigrator(config *Config) *Migrator {
-	debug.Assert(config.Logger != nil, "config.Logger must be defined")
-	debug.Assert(config.Registry != nil, "config.Registry must be defined")
+func NewMigrator(opts ...Option) *Migrator {
+	//nolint:exhaustruct
+	cfg := &config{}
+	for _, c := range opts {
+		c(cfg)
+	}
+
+	cfg.defaults()
+
+	debug.Assert(cfg.Logger != nil, "config.Logger must be defined")
+	debug.Assert(cfg.Registry != nil, "config.Registry must be defined")
 
 	return &Migrator{
-		logger:               config.Logger,
-		registry:             config.Registry,
-		skipSchemaDriftCheck: config.SkipSchemaDriftCheck,
-		allowHazards:         config.AllowHazards,
+		logger:   cfg.Logger,
+		registry: cfg.Registry,
 	}
 }
 
@@ -198,17 +171,14 @@ func (m *Migrator) Migrate(
 	debug.Assert(conn != nil, "expected conn to be defined")
 
 	if opts == nil {
-		opts = &MigrateOptions{Steps: DefaultUpStep}
-		if dir == DirectionDown {
-			opts.Steps = DefaultDownStep
-		}
+		opts = new(MigrateOptions)
 
-		internaldebug.Log("opts is omitted, using the default one: %v", opts)
+		internaldebug.Log("opts is omitted, create a new one")
 	}
 
-	if err := opts.validate(); err != nil {
-		return nil, err
-	}
+	opts.defaults(dir)
+
+	debug.Assert(opts.Steps == -1 || opts.Steps > 0, "invalid steps")
 
 	lockNum := pgLockNum("conduit")
 
@@ -270,7 +240,7 @@ func (m *Migrator) migrateUp(
 		return nil, err
 	}
 
-	if !m.skipSchemaDriftCheck {
+	if !opts.SkipSchemaDriftCheck {
 		if err := m.detectSchemaDrift(ctx, conn); err != nil {
 			return nil, err
 		}
@@ -380,7 +350,7 @@ func (m *Migrator) applyMigrations(
 			dir,
 		)
 
-		if hazards := migration.Hazards(dir); !m.allowHazards && len(hazards) > 0 {
+		if hazards := migration.Hazards(dir); !opts.AllowHazards && len(hazards) > 0 {
 			msgs := make([]string, 0, len(hazards))
 			for _, h := range hazards {
 				msgs = append(msgs, fmt.Sprintf("%s: %s", h.Type, h.Message))

@@ -22,9 +22,11 @@ var (
 
 //nolint:revive // ignore naming convention.
 type ApplyArgs struct {
-	DatabaseURL string
-	Direction   direction.Direction
-	Steps       int
+	DatabaseURL          string
+	Direction            direction.Direction
+	SkipSchemaDriftCheck bool
+	AllowHazards         bool
+	Steps                int
 }
 
 func NewCommand() *cli.Command {
@@ -72,22 +74,14 @@ func NewCommand() *cli.Command {
 				return fmt.Errorf("missing `%s' flag", flagname.DatabaseURL)
 			}
 
-			var opts []conduit.Option
-			if cmd.Bool(allowHazardsFlag) {
-				opts = append(opts, conduit.WithAllowHazards())
-			}
-
-			if cmd.Bool(noSchemaDriftFlag) {
-				opts = append(opts, conduit.WithSkipSchemaDriftCheck())
-			}
-
-			config := conduit.NewConfig(opts...)
-			migrator := conduit.NewMigrator(config)
+			migrator := conduit.NewMigrator()
 
 			args := ApplyArgs{
-				DatabaseURL: url,
-				Direction:   dir,
-				Steps:       cmd.Int(stepsFlag),
+				DatabaseURL:          url,
+				Direction:            dir,
+				Steps:                cmd.Int(stepsFlag),
+				AllowHazards:         cmd.Bool(allowHazardsFlag),
+				SkipSchemaDriftCheck: cmd.Bool(noSchemaDriftFlag),
 			}
 
 			return apply(ctx, migrator, args)
@@ -106,7 +100,9 @@ func apply(
 	}
 
 	_, err = migrator.Migrate(ctx, args.Direction, conn, &conduit.MigrateOptions{
-		Steps: args.Steps,
+		Steps:                args.Steps,
+		AllowHazards:         args.AllowHazards,
+		SkipSchemaDriftCheck: args.SkipSchemaDriftCheck,
 	})
 	if err != nil {
 		if errors.Is(err, conduit.ErrHazardDetected) {

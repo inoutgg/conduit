@@ -15,17 +15,6 @@ import (
 	"go.inout.gg/conduit/internal/testutil"
 )
 
-func newTestMigrator(t *testing.T, registry *conduitregistry.Registry, opts ...conduit.Option) *conduit.Migrator {
-	t.Helper()
-
-	opts = append([]conduit.Option{
-		conduit.WithRegistry(registry),
-		conduit.WithSkipSchemaDriftCheck(),
-	}, opts...)
-
-	return conduit.NewMigrator(conduit.NewConfig(opts...))
-}
-
 func newConn(t *testing.T) (*pgxpool.Pool, *pgx.Conn) {
 	t.Helper()
 
@@ -75,10 +64,17 @@ func TestMigrator_MigrateUp(t *testing.T) {
 			"20230602120000_create_posts.up.sql":   "CREATE TABLE posts (id INT);",
 			"20230602120000_create_posts.down.sql": "DROP TABLE posts;",
 		})
-		m := newTestMigrator(t, r)
+		m := conduit.NewMigrator(conduit.WithRegistry(r))
 
 		// Act
-		result, err := m.Migrate(t.Context(), conduit.DirectionUp, conn, nil)
+		result, err := m.Migrate(
+			t.Context(),
+			conduit.DirectionUp,
+			conn,
+			&conduit.MigrateOptions{
+				SkipSchemaDriftCheck: true,
+			},
+		)
 
 		// Assert
 		require.NoError(t, err)
@@ -102,14 +98,28 @@ func TestMigrator_MigrateUp(t *testing.T) {
 			"20230601120000_create_users.up.sql":   "CREATE TABLE users (id INT);",
 			"20230601120000_create_users.down.sql": "DROP TABLE users;",
 		})
-		m := newTestMigrator(t, r)
+		m := conduit.NewMigrator(conduit.WithRegistry(r))
 
 		// Act
-		_, err := m.Migrate(t.Context(), conduit.DirectionUp, conn, nil)
+		_, err := m.Migrate(
+			t.Context(),
+			conduit.DirectionUp,
+			conn,
+			&conduit.MigrateOptions{
+				SkipSchemaDriftCheck: true,
+			},
+		)
 		require.NoError(t, err)
 
 		// Run migration again
-		result, err := m.Migrate(t.Context(), conduit.DirectionUp, conn, nil)
+		result, err := m.Migrate(
+			t.Context(),
+			conduit.DirectionUp,
+			conn,
+			&conduit.MigrateOptions{
+				SkipSchemaDriftCheck: true,
+			},
+		)
 
 		// Assert
 		require.NoError(t, err)
@@ -127,7 +137,7 @@ func TestMigrator_MigrateUp(t *testing.T) {
 			"20230602120000_create_b.up.sql": "CREATE TABLE b (id INT);",
 			"20230603120000_create_c.up.sql": "CREATE TABLE c (id INT);",
 		})
-		m := newTestMigrator(t, r)
+		m := conduit.NewMigrator(conduit.WithRegistry(r))
 
 		// Act
 		result, err := m.Migrate(t.Context(), conduit.DirectionUp, conn, &conduit.MigrateOptions{Steps: 1})
@@ -151,10 +161,17 @@ func TestMigrator_MigrateUp(t *testing.T) {
 			"20230601120000_create_nontx.up.sql":   "---- disable-tx ----\nCREATE TABLE nontx_test (id INT);",
 			"20230601120000_create_nontx.down.sql": "---- disable-tx ----\nDROP TABLE nontx_test;",
 		})
-		m := newTestMigrator(t, r)
+		m := conduit.NewMigrator(conduit.WithRegistry(r))
 
 		// Act
-		result, err := m.Migrate(t.Context(), conduit.DirectionUp, conn, nil)
+		result, err := m.Migrate(
+			t.Context(),
+			conduit.DirectionUp,
+			conn,
+			&conduit.MigrateOptions{
+				SkipSchemaDriftCheck: true,
+			},
+		)
 
 		// Assert
 		require.NoError(t, err)
@@ -181,13 +198,27 @@ func TestMigrator_MigrateDown(t *testing.T) {
 			"20230602120000_create_posts.up.sql":   "CREATE TABLE posts (id INT);",
 			"20230602120000_create_posts.down.sql": "DROP TABLE posts;",
 		})
-		m := newTestMigrator(t, r)
+		m := conduit.NewMigrator(conduit.WithRegistry(r))
 
-		_, err := m.Migrate(t.Context(), conduit.DirectionUp, conn, nil)
+		_, err := m.Migrate(
+			t.Context(),
+			conduit.DirectionUp,
+			conn,
+			&conduit.MigrateOptions{
+				SkipSchemaDriftCheck: true,
+			},
+		)
 		require.NoError(t, err)
 
 		// Act
-		result, err := m.Migrate(t.Context(), conduit.DirectionDown, conn, nil)
+		result, err := m.Migrate(
+			t.Context(),
+			conduit.DirectionDown,
+			conn,
+			&conduit.MigrateOptions{
+				SkipSchemaDriftCheck: true,
+			},
+		)
 
 		// Assert
 		require.NoError(t, err)
@@ -212,9 +243,16 @@ func TestMigrator_MigrateDown(t *testing.T) {
 			"20230602120000_create_posts.up.sql":   "CREATE TABLE posts (id INT);",
 			"20230602120000_create_posts.down.sql": "DROP TABLE posts;",
 		})
-		m := newTestMigrator(t, r)
+		m := conduit.NewMigrator(conduit.WithRegistry(r))
 
-		_, err := m.Migrate(t.Context(), conduit.DirectionUp, conn, nil)
+		_, err := m.Migrate(
+			t.Context(),
+			conduit.DirectionUp,
+			conn,
+			&conduit.MigrateOptions{
+				SkipSchemaDriftCheck: true,
+			},
+		)
 		require.NoError(t, err)
 
 		// Act
@@ -240,13 +278,27 @@ func TestMigrator_MigrateDown(t *testing.T) {
 			"20230601120000_create_nontx.up.sql":   "---- disable-tx ----\nCREATE TABLE nontx_test (id INT);",
 			"20230601120000_create_nontx.down.sql": "---- disable-tx ----\nDROP TABLE nontx_test;",
 		})
-		m := newTestMigrator(t, r)
+		m := conduit.NewMigrator(conduit.WithRegistry(r))
 
-		_, err := m.Migrate(t.Context(), conduit.DirectionUp, conn, nil)
+		_, err := m.Migrate(
+			t.Context(),
+			conduit.DirectionUp,
+			conn,
+			&conduit.MigrateOptions{
+				SkipSchemaDriftCheck: true,
+			},
+		)
 		require.NoError(t, err)
 
 		// Act
-		result, err := m.Migrate(t.Context(), conduit.DirectionDown, conn, nil)
+		result, err := m.Migrate(
+			t.Context(),
+			conduit.DirectionDown,
+			conn,
+			&conduit.MigrateOptions{
+				SkipSchemaDriftCheck: true,
+			},
+		)
 
 		// Assert
 		require.NoError(t, err)
@@ -269,17 +321,24 @@ func TestMigrator_Migrate_Hazards(t *testing.T) {
 			"20230601120000_hazardous.up.sql":   "---- disable-tx ----\n---- hazard: INDEX_BUILD // rebuilds index ----\nCREATE TABLE hazard_test (id INT);",
 			"20230601120000_hazardous.down.sql": "---- disable-tx ----\nDROP TABLE hazard_test;",
 		})
-		m := newTestMigrator(t, r)
+		m := conduit.NewMigrator(conduit.WithRegistry(r))
 
 		// Act
-		_, err := m.Migrate(t.Context(), conduit.DirectionUp, conn, nil)
+		_, err := m.Migrate(
+			t.Context(),
+			conduit.DirectionUp,
+			conn,
+			&conduit.MigrateOptions{
+				SkipSchemaDriftCheck: true,
+			},
+		)
 
 		// Assert
 		require.ErrorIs(t, err, conduit.ErrHazardDetected)
 		assert.False(t, testutil.TableExists(t, pool, "hazard_test"))
 	})
 
-	t.Run("should allow migration, when WithAllowHazards is set", func(t *testing.T) {
+	t.Run("should allow migration, when AllowHazards is set", func(t *testing.T) {
 		t.Parallel()
 
 		// Arrange
@@ -289,10 +348,18 @@ func TestMigrator_Migrate_Hazards(t *testing.T) {
 			"20230601120000_hazardous.up.sql":   "---- disable-tx ----\n---- hazard: INDEX_BUILD // rebuilds index ----\nCREATE TABLE hazard_allowed (id INT);",
 			"20230601120000_hazardous.down.sql": "---- disable-tx ----\nDROP TABLE hazard_allowed;",
 		})
-		m := newTestMigrator(t, r, conduit.WithAllowHazards())
+		m := conduit.NewMigrator(conduit.WithRegistry(r))
 
 		// Act
-		result, err := m.Migrate(t.Context(), conduit.DirectionUp, conn, nil)
+		result, err := m.Migrate(
+			t.Context(),
+			conduit.DirectionUp,
+			conn,
+			&conduit.MigrateOptions{
+				SkipSchemaDriftCheck: true,
+				AllowHazards:         true,
+			},
+		)
 
 		// Assert
 		require.NoError(t, err)
@@ -315,10 +382,17 @@ func TestMigrator_Migrate_Result(t *testing.T) {
 		"20230602120000_create_b.up.sql":   "CREATE TABLE b_result (id INT);",
 		"20230602120000_create_b.down.sql": "DROP TABLE b_result;",
 	})
-	m := newTestMigrator(t, r)
+	m := conduit.NewMigrator(conduit.WithRegistry(r))
 
 	// Act — up
-	upResult, err := m.Migrate(t.Context(), conduit.DirectionUp, conn, nil)
+	upResult, err := m.Migrate(
+		t.Context(),
+		conduit.DirectionUp,
+		conn,
+		&conduit.MigrateOptions{
+			SkipSchemaDriftCheck: true,
+		},
+	)
 	require.NoError(t, err)
 
 	// Assert — direction
@@ -349,26 +423,4 @@ func TestMigrator_Migrate_Result(t *testing.T) {
 	assert.Equal(t, "create_c", downResult.MigrationResults[0].Name)
 	assert.Equal(t, "create_b", downResult.MigrationResults[1].Name)
 	assert.Equal(t, "create_a", downResult.MigrationResults[2].Name)
-}
-
-func TestMigrator_Migrate_Validation(t *testing.T) {
-	t.Parallel()
-
-	t.Run("should return error, when step count is zero", func(t *testing.T) {
-		t.Parallel()
-
-		// Arrange
-		_, conn := newConn(t)
-
-		r := newRegistry(t, map[string]string{
-			"20230601120000_create_users.up.sql": "CREATE TABLE users (id INT);",
-		})
-		m := newTestMigrator(t, r)
-
-		// Act
-		_, err := m.Migrate(t.Context(), conduit.DirectionUp, conn, &conduit.MigrateOptions{Steps: 0})
-
-		// Assert
-		require.ErrorIs(t, err, conduit.ErrInvalidStep)
-	})
 }
