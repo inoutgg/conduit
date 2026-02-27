@@ -4,15 +4,20 @@ import (
 	"context"
 	"os"
 	"testing"
+	"time"
 
 	"go.segfaultmedaddy.com/pgxephemeraltest"
 	"go.uber.org/goleak"
 
 	"go.inout.gg/conduit/internal/testmigrator"
+	"go.inout.gg/conduit/pkg/timegenerator"
 )
 
 //nolint:gochecknoglobals
-var poolFactory *pgxephemeraltest.PoolFactory
+var (
+	poolFactory *pgxephemeraltest.PoolFactory
+	timeGen     = timegenerator.Stub{T: time.Date(2024, 1, 15, 12, 30, 45, 0, time.UTC)}
+)
 
 func TestMain(m *testing.M) {
 	ctx := context.Background()
