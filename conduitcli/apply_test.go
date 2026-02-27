@@ -1,4 +1,4 @@
-package apply
+package conduitcli
 
 import (
 	"testing"
@@ -32,7 +32,7 @@ func TestApply(t *testing.T) {
 			SkipSchemaDriftCheck: true,
 		}
 
-		err := apply(t.Context(), m, args)
+		err := Apply(t.Context(), m, args)
 
 		require.NoError(t, err)
 		assert.True(t, testutil.TableExists(t, pool, "users"))
@@ -50,7 +50,7 @@ func TestApply(t *testing.T) {
 		m := conduit.NewMigrator(conduit.WithRegistry(r))
 
 		// First apply up.
-		err := apply(t.Context(), m, ApplyArgs{
+		err := Apply(t.Context(), m, ApplyArgs{
 			DatabaseURL:          testutil.ConnString(pool),
 			Direction:            direction.DirectionUp,
 			SkipSchemaDriftCheck: true,
@@ -59,7 +59,7 @@ func TestApply(t *testing.T) {
 		require.True(t, testutil.TableExists(t, pool, "users"))
 
 		// Then apply down.
-		err = apply(t.Context(), m, ApplyArgs{
+		err = Apply(t.Context(), m, ApplyArgs{
 			DatabaseURL:          testutil.ConnString(pool),
 			Direction:            direction.DirectionDown,
 			SkipSchemaDriftCheck: true,
@@ -82,13 +82,13 @@ func TestApply(t *testing.T) {
 			Direction:   direction.DirectionUp,
 		}
 
-		err := apply(t.Context(), m, args)
+		err := Apply(t.Context(), m, args)
 
 		require.Error(t, err)
 		assert.ErrorContains(t, err, "failed to connect to database")
 	})
 
-	t.Run("should return error with hint, when hazard is detected", func(t *testing.T) {
+	t.Run("should return error, when hazard is detected", func(t *testing.T) {
 		t.Parallel()
 
 		pool := poolFactory.Pool(t)
@@ -104,10 +104,9 @@ func TestApply(t *testing.T) {
 			SkipSchemaDriftCheck: true,
 		}
 
-		err := apply(t.Context(), m, args)
+		err := Apply(t.Context(), m, args)
 
 		require.Error(t, err)
-		require.ErrorIs(t, err, conduit.ErrHazardDetected)
-		assert.ErrorContains(t, err, "use --allow-hazards to proceed")
+		assert.ErrorIs(t, err, conduit.ErrHazardDetected)
 	})
 }

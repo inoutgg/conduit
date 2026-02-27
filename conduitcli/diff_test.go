@@ -1,4 +1,4 @@
-package create
+package conduitcli
 
 import (
 	"os"
@@ -12,11 +12,11 @@ import (
 	schemadiff "github.com/stripe/pg-schema-diff/pkg/diff"
 
 	"go.inout.gg/conduit/internal/testutil"
-	"go.inout.gg/conduit/internal/timegenerator"
+	"go.inout.gg/conduit/pkg/timegenerator"
 )
 
 //nolint:gochecknoglobals
-var timeGen = timegenerator.Stub{T: time.Date(2024, 1, 15, 12, 30, 45, 0, time.UTC)}
+var diffTimeGen = timegenerator.Stub{T: time.Date(2024, 1, 15, 12, 30, 45, 0, time.UTC)}
 
 func TestDiff(t *testing.T) {
 	t.Parallel()
@@ -24,7 +24,6 @@ func TestDiff(t *testing.T) {
 	t.Run("should return error, when migrations directory does not exist", func(t *testing.T) {
 		t.Parallel()
 
-		// Arrange
 		fs := afero.NewMemMapFs()
 		args := DiffArgs{
 			Dir:         "/nonexistent",
@@ -33,10 +32,8 @@ func TestDiff(t *testing.T) {
 			DatabaseURL: "postgres://localhost:5432/testdb",
 		}
 
-		// Act
-		err := diff(t.Context(), fs, timeGen, args)
+		err := Diff(t.Context(), fs, diffTimeGen, args)
 
-		// Assert
 		require.Error(t, err)
 		assert.ErrorContains(t, err, "migrations directory does not exist")
 	})
@@ -44,7 +41,6 @@ func TestDiff(t *testing.T) {
 	t.Run("should return error, when database URL is invalid", func(t *testing.T) {
 		t.Parallel()
 
-		// Arrange
 		fs, _, dir := testutil.NewMigrationsDirBuilder(t).Build()
 		args := DiffArgs{
 			Dir:         dir,
@@ -53,10 +49,8 @@ func TestDiff(t *testing.T) {
 			DatabaseURL: "://invalid",
 		}
 
-		// Act
-		err := diff(t.Context(), fs, timeGen, args)
+		err := Diff(t.Context(), fs, diffTimeGen, args)
 
-		// Assert
 		require.Error(t, err)
 		assert.ErrorContains(t, err, "failed to parse database URL")
 	})
@@ -64,7 +58,6 @@ func TestDiff(t *testing.T) {
 	t.Run("should create migration file, when schema has new table", func(t *testing.T) {
 		t.Parallel()
 
-		// Arrange
 		databaseURL := os.Getenv("TEST_DATABASE_URL")
 		fs, baseDir, dir := testutil.NewMigrationsDirBuilder(t).
 			WithFile("20230601120000_init.up.sql", "CREATE TABLE users (id int);").
@@ -79,10 +72,8 @@ CREATE TABLE posts (id int, user_id int);`).
 			DatabaseURL: databaseURL,
 		}
 
-		// Act
-		err := diff(t.Context(), fs, timeGen, args)
+		err := Diff(t.Context(), fs, diffTimeGen, args)
 
-		// Assert
 		require.NoError(t, err)
 		testutil.SnapshotFS(t, fs, dir)
 	})
@@ -90,7 +81,6 @@ CREATE TABLE posts (id int, user_id int);`).
 	t.Run("should return error, when source schema hash does not match conduit.sum", func(t *testing.T) {
 		t.Parallel()
 
-		// Arrange
 		databaseURL := os.Getenv("TEST_DATABASE_URL")
 		fs, baseDir, dir := testutil.NewMigrationsDirBuilder(t).
 			WithFile("20230601120000_init.up.sql", "CREATE TABLE users (id int);").
@@ -106,10 +96,8 @@ CREATE TABLE posts (id int, user_id int);`).
 			DatabaseURL: databaseURL,
 		}
 
-		// Act
-		err := diff(t.Context(), fs, timeGen, args)
+		err := Diff(t.Context(), fs, diffTimeGen, args)
 
-		// Assert
 		require.Error(t, err)
 		require.ErrorContains(t, err, "source schema drift detected")
 
@@ -124,7 +112,6 @@ CREATE TABLE posts (id int, user_id int);`).
 	t.Run("should succeed, when source schema hash matches conduit.sum", func(t *testing.T) {
 		t.Parallel()
 
-		// Arrange
 		databaseURL := os.Getenv("TEST_DATABASE_URL")
 		fs, baseDir, dir := testutil.NewMigrationsDirBuilder(t).
 			WithFile("20230601120000_init.up.sql", "CREATE TABLE users (id int);").
@@ -139,7 +126,7 @@ CREATE TABLE posts (id int, user_id int);`).
 			SchemaPath:  filepath.Join(baseDir, "schema.sql"),
 			DatabaseURL: databaseURL,
 		}
-		require.NoError(t, diff(t.Context(), fs, timeGen, args))
+		require.NoError(t, Diff(t.Context(), fs, diffTimeGen, args))
 
 		// Update schema to trigger a new diff, using the existing conduit.sum
 		// which now contains the correct target hash from the first run.
@@ -158,18 +145,16 @@ CREATE TABLE comments (id int, post_id int);`), 0o644),
 		}
 
 		// Act — second diff should succeed because the source hash matches conduit.sum.
-		err := diff(t.Context(), fs, timegenerator.Stub{
+		err := Diff(t.Context(), fs, timegenerator.Stub{
 			T: time.Date(2024, 2, 15, 12, 30, 45, 0, time.UTC),
 		}, args2)
 
-		// Assert
 		require.NoError(t, err)
 	})
 
 	t.Run("should include disable-tx directive, when diff contains concurrent index", func(t *testing.T) {
 		t.Parallel()
 
-		// Arrange
 		databaseURL := os.Getenv("TEST_DATABASE_URL")
 		fs, baseDir, dir := testutil.NewMigrationsDirBuilder(t).
 			WithFile("20230601120000_init.up.sql", "CREATE TABLE users (id int);").
@@ -184,10 +169,8 @@ CREATE INDEX idx_users_id ON users (id);`).
 			DatabaseURL: databaseURL,
 		}
 
-		// Act
-		err := diff(t.Context(), fs, timeGen, args)
+		err := Diff(t.Context(), fs, diffTimeGen, args)
 
-		// Assert
 		require.NoError(t, err)
 
 		migrationFile := filepath.Join(dir, "20240115123045_add_index.up.sql")
@@ -199,7 +182,6 @@ CREATE INDEX idx_users_id ON users (id);`).
 	t.Run("should omit disable-tx directive, when diff has no concurrent DDL", func(t *testing.T) {
 		t.Parallel()
 
-		// Arrange
 		databaseURL := os.Getenv("TEST_DATABASE_URL")
 		fs, baseDir, dir := testutil.NewMigrationsDirBuilder(t).
 			WithFile("20230601120000_init.up.sql", "CREATE TABLE users (id int);").
@@ -214,10 +196,8 @@ CREATE TABLE posts (id int);`).
 			DatabaseURL: databaseURL,
 		}
 
-		// Act
-		err := diff(t.Context(), fs, timeGen, args)
+		err := Diff(t.Context(), fs, diffTimeGen, args)
 
-		// Assert
 		require.NoError(t, err)
 
 		migrationFile := filepath.Join(dir, "20240115123045_add_posts.up.sql")
@@ -229,7 +209,6 @@ CREATE TABLE posts (id int);`).
 	t.Run("should return error, when no schema changes detected", func(t *testing.T) {
 		t.Parallel()
 
-		// Arrange
 		databaseURL := os.Getenv("TEST_DATABASE_URL")
 		fs, baseDir, dir := testutil.NewMigrationsDirBuilder(t).
 			WithFile("20230601120000_init.up.sql", "CREATE TABLE users (id int);").
@@ -243,10 +222,8 @@ CREATE TABLE posts (id int);`).
 			DatabaseURL: databaseURL,
 		}
 
-		// Act
-		err := diff(t.Context(), fs, timeGen, args)
+		err := Diff(t.Context(), fs, diffTimeGen, args)
 
-		// Assert
 		require.Error(t, err)
 		assert.ErrorContains(t, err, "no schema changes detected")
 	})
@@ -330,7 +307,6 @@ func TestDiffSplitsMigrations(t *testing.T) {
 	t.Run("should split into tx and non-tx files, when diff contains mixed DDL", func(t *testing.T) {
 		t.Parallel()
 
-		// Arrange
 		databaseURL := os.Getenv("TEST_DATABASE_URL")
 		fs, baseDir, dir := testutil.NewMigrationsDirBuilder(t).
 			WithFile("20230601120000_init.up.sql", "CREATE TABLE users (id int);").
@@ -346,10 +322,8 @@ CREATE INDEX idx_posts_user_id ON posts (user_id);`).
 			DatabaseURL: databaseURL,
 		}
 
-		// Act
-		err := diff(t.Context(), fs, timeGen, args)
+		err := Diff(t.Context(), fs, diffTimeGen, args)
 
-		// Assert
 		require.NoError(t, err)
 		testutil.SnapshotFS(t, fs, dir)
 	})

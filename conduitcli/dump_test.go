@@ -1,4 +1,4 @@
-package dump
+package conduitcli
 
 import (
 	"bytes"
@@ -30,10 +30,10 @@ CREATE TABLE posts (
 	t.Run("should return error, when database URL is invalid", func(t *testing.T) {
 		t.Parallel()
 
-		recorder := new(bytes.Buffer)
 		args := DumpArgs{DatabaseURL: "://invalid"}
+		recorder := new(bytes.Buffer)
 
-		err := dump(t.Context(), args, recorder)
+		err := Dump(t.Context(), args, recorder)
 
 		require.Error(t, err)
 		assert.ErrorContains(t, err, "failed to parse database URL")
@@ -45,12 +45,10 @@ CREATE TABLE posts (
 		pool := poolFactory.Pool(t)
 		testutil.Exec(t, pool, schema)
 
+		args := DumpArgs{DatabaseURL: testutil.ConnString(pool)}
 		recorder := new(bytes.Buffer)
-		args := DumpArgs{
-			DatabaseURL: testutil.ConnString(pool),
-		}
 
-		err := dump(t.Context(), args, recorder)
+		err := Dump(t.Context(), args, recorder)
 		require.NoError(t, err)
 
 		output := recorder.String()

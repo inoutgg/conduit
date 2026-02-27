@@ -1,4 +1,4 @@
-package initialise
+package conduitcli
 
 import (
 	"os"
@@ -8,30 +8,27 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"go.inout.gg/conduit/internal/testutil"
-	"go.inout.gg/conduit/internal/timegenerator"
+	"go.inout.gg/conduit/pkg/timegenerator"
 )
 
 //nolint:gochecknoglobals
-var timeGen = timegenerator.Stub{T: time.Date(2024, 1, 15, 12, 30, 45, 0, time.UTC)}
+var initTimeGen = timegenerator.Stub{T: time.Date(2024, 1, 15, 12, 30, 45, 0, time.UTC)}
 
-func TestInitialise(t *testing.T) {
+func TestInit(t *testing.T) {
 	t.Parallel()
 
 	t.Run("should create migration directory and schema file, when initialising fresh project", func(t *testing.T) {
 		t.Parallel()
 
-		// Arrange
 		databaseURL := os.Getenv("TEST_DATABASE_URL")
 		fs, _, dir := testutil.NewMigrationsDirBuilder(t).Build()
-		args := InitialiseArgs{
+		args := InitArgs{
 			Dir:         dir,
 			DatabaseURL: databaseURL,
 		}
 
-		// Act
-		err := initialise(t.Context(), fs, timeGen, args)
+		err := Init(t.Context(), fs, initTimeGen, args)
 
-		// Assert
 		require.NoError(t, err)
 		testutil.SnapshotFS(t, fs, dir)
 	})

@@ -1,0 +1,51 @@
+
+[TestDump/should_write_DDL_to_writer,_when_database_has_schema - 1]
+CREATE SEQUENCE "public"."conduit_migrations_id_seq"
+    AS bigint
+    INCREMENT BY 1
+    MINVALUE 1 MAXVALUE 9223372036854775807
+    START WITH 1 CACHE 1 NO CYCLE
+;
+
+CREATE TABLE "public"."conduit_migrations" (
+    "id" bigint DEFAULT nextval('conduit_migrations_id_seq'::regclass) NOT NULL,
+    "created_at" timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    "version" character varying(255) COLLATE "pg_catalog"."default" NOT NULL,
+    "name" character varying(4095) COLLATE "pg_catalog"."default" NOT NULL,
+    "hash" character varying(64) COLLATE "pg_catalog"."default" DEFAULT ''::character varying NOT NULL
+);
+
+CREATE UNIQUE INDEX conduit_migrations_pkey ON public.conduit_migrations USING btree (id);
+
+ALTER TABLE "public"."conduit_migrations" ADD CONSTRAINT "conduit_migrations_pkey" PRIMARY KEY USING INDEX "conduit_migrations_pkey";
+
+CREATE UNIQUE INDEX conduit_migrations_version_name_key ON public.conduit_migrations USING btree (version, name);
+
+ALTER TABLE "public"."conduit_migrations" ADD CONSTRAINT "conduit_migrations_version_name_key" UNIQUE USING INDEX "conduit_migrations_version_name_key";
+
+ALTER SEQUENCE "public"."conduit_migrations_id_seq" OWNED BY "public"."conduit_migrations"."id";
+
+CREATE TABLE "public"."posts" (
+    "id" bigint NOT NULL GENERATED ALWAYS AS IDENTITY (INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START WITH 1 CACHE 1 NO CYCLE),
+    "user_id" bigint NOT NULL,
+    "title" text COLLATE "pg_catalog"."default" NOT NULL
+);
+
+CREATE UNIQUE INDEX posts_pkey ON public.posts USING btree (id);
+
+ALTER TABLE "public"."posts" ADD CONSTRAINT "posts_pkey" PRIMARY KEY USING INDEX "posts_pkey";
+
+CREATE TABLE "public"."users" (
+    "id" bigint NOT NULL GENERATED ALWAYS AS IDENTITY (INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START WITH 1 CACHE 1 NO CYCLE),
+    "name" text COLLATE "pg_catalog"."default" NOT NULL
+);
+
+CREATE UNIQUE INDEX users_pkey ON public.users USING btree (id);
+
+ALTER TABLE "public"."users" ADD CONSTRAINT "users_pkey" PRIMARY KEY USING INDEX "users_pkey";
+
+ALTER TABLE "public"."posts" ADD CONSTRAINT "posts_user_id_fkey" FOREIGN KEY (user_id) REFERENCES users(id) NOT VALID;
+
+ALTER TABLE "public"."posts" VALIDATE CONSTRAINT "posts_user_id_fkey";
+
+---

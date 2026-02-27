@@ -1,63 +1,26 @@
-package initialise
+package conduitcli
 
 import (
 	"context"
 	"fmt"
-	"path/filepath"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/spf13/afero"
-	"github.com/urfave/cli/v3"
 
-	"go.inout.gg/conduit/internal/command/flagname"
-	"go.inout.gg/conduit/internal/conduitsum"
 	"go.inout.gg/conduit/internal/migrations"
-	"go.inout.gg/conduit/internal/timegenerator"
+	"go.inout.gg/conduit/pkg/conduitsum"
 	"go.inout.gg/conduit/pkg/pgdiff"
 	"go.inout.gg/conduit/pkg/sqlsplit"
+	"go.inout.gg/conduit/pkg/timegenerator"
 	"go.inout.gg/conduit/pkg/version"
 )
 
-//nolint:revive // ignore naming convention.
-type InitialiseArgs struct {
+type InitArgs struct {
 	Dir         string
 	DatabaseURL string
 }
 
-func NewCommand(fs afero.Fs, timeGen timegenerator.Generator) *cli.Command {
-	//nolint:exhaustruct
-	return &cli.Command{
-		Name:    "init",
-		Aliases: []string{"i"},
-		Usage:   "initialise migration directory",
-		Flags: []cli.Flag{
-			//nolint:exhaustruct
-			&cli.StringFlag{
-				Name:    flagname.MigrationsDir,
-				Usage:   "directory with migration files",
-				Value:   "./migrations",
-				Sources: cli.EnvVars("CONDUIT_MIGRATION_DIR"),
-			},
-			//nolint:exhaustruct
-			&cli.StringFlag{
-				Name:    flagname.DatabaseURL,
-				Usage:   "database connection URL",
-				Sources: cli.EnvVars("CONDUIT_DATABASE_URL"),
-			},
-		},
-
-		Action: func(ctx context.Context, cmd *cli.Command) error {
-			args := InitialiseArgs{
-				Dir:         filepath.Clean(cmd.String(flagname.MigrationsDir)),
-				DatabaseURL: cmd.String(flagname.DatabaseURL),
-			}
-
-			return initialise(ctx, fs, timeGen, args)
-		},
-	}
-}
-
-func initialise(ctx context.Context, fs afero.Fs, timeGen timegenerator.Generator, args InitialiseArgs) error {
+func Init(ctx context.Context, fs afero.Fs, timeGen timegenerator.Generator, args InitArgs) error {
 	if err := createMigrationDir(fs, args.Dir); err != nil {
 		return err
 	}

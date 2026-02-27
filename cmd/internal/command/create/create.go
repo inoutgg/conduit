@@ -8,8 +8,9 @@ import (
 	"github.com/spf13/afero"
 	"github.com/urfave/cli/v3"
 
-	"go.inout.gg/conduit/internal/command/flagname"
-	"go.inout.gg/conduit/internal/timegenerator"
+	"go.inout.gg/conduit/cmd/internal/command/flagname"
+	"go.inout.gg/conduit/conduitcli"
+	"go.inout.gg/conduit/pkg/timegenerator"
 )
 
 func NewCommand(fs afero.Fs, timeGen timegenerator.Generator) *cli.Command {
@@ -42,21 +43,16 @@ func NewCommand(fs afero.Fs, timeGen timegenerator.Generator) *cli.Command {
 						return errors.New("missing `name` argument")
 					}
 
-					args := DiffArgs{
+					args := conduitcli.DiffArgs{
 						Dir:         filepath.Clean(cmd.String(flagname.MigrationsDir)),
 						Name:        name,
 						SchemaPath:  cmd.String("schema"),
 						DatabaseURL: cmd.String(flagname.DatabaseURL),
 					}
 
-					return diff(ctx, fs, timeGen, args)
+					return conduitcli.Diff(ctx, fs, timeGen, args)
 				},
 			},
 		},
 	}
-}
-
-func exists(afs afero.Fs, path string) bool {
-	_, err := afs.Stat(path)
-	return !errors.Is(err, afero.ErrFileNotFound)
 }

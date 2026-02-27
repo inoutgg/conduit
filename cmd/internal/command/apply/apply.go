@@ -1,3 +1,4 @@
+//nolint:wrapcheck
 package apply
 
 import (
@@ -5,31 +6,21 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/spf13/afero"
 	"github.com/urfave/cli/v3"
 
 	"go.inout.gg/conduit"
+	"go.inout.gg/conduit/cmd/internal/command/flagname"
+	"go.inout.gg/conduit/conduitcli"
 	"go.inout.gg/conduit/conduitregistry"
-	"go.inout.gg/conduit/internal/command/flagname"
 	"go.inout.gg/conduit/internal/direction"
 )
 
-//nolint:gochecknoglobals
-var (
+const (
 	stepsFlag         = "steps"
 	allowHazardsFlag  = "allow-hazards"
 	noSchemaDriftFlag = "no-check-schema-drift"
 )
-
-//nolint:revive // ignore naming convention.
-type ApplyArgs struct {
-	DatabaseURL          string
-	Direction            direction.Direction
-	SkipSchemaDriftCheck bool
-	AllowHazards         bool
-	Steps                int
-}
 
 func NewCommand() *cli.Command {
 	//nolint:exhaustruct
@@ -80,7 +71,7 @@ func NewCommand() *cli.Command {
 			registry := conduitregistry.FromFS(afero.NewOsFs(), migrationsDir)
 			migrator := conduit.NewMigrator(conduit.WithRegistry(registry))
 
-			args := ApplyArgs{
+			args := conduitcli.ApplyArgs{
 				DatabaseURL:          url,
 				Direction:            dir,
 				Steps:                cmd.Int(stepsFlag),
@@ -88,33 +79,12 @@ func NewCommand() *cli.Command {
 				SkipSchemaDriftCheck: cmd.Bool(noSchemaDriftFlag),
 			}
 
-			return apply(ctx, migrator, args)
+			err = conduitcli.Apply(ctx, migrator, args)
+			if err != nil && errors.Is(err, conduit.ErrHazardDetected) {
+				return fmt.Errorf("%w\n\nuse --%s to proceed", err, allowHazardsFlag)
+			}
+
+			return err
 		},
 	}
-}
-
-func apply(
-	ctx context.Context,
-	migrator *conduit.Migrator,
-	args ApplyArgs,
-) error {
-	conn, err := pgx.Connect(ctx, args.DatabaseURL)
-	if err != nil {
-		return fmt.Errorf("failed to connect to database: %w", err)
-	}
-
-	_, err = migrator.Migrate(ctx, args.Direction, conn, &conduit.MigrateOptions{
-		Steps:                args.Steps,
-		AllowHazards:         args.AllowHazards,
-		SkipSchemaDriftCheck: args.SkipSchemaDriftCheck,
-	})
-	if err != nil {
-		if errors.Is(err, conduit.ErrHazardDetected) {
-			return fmt.Errorf("%w\n\nuse --%s to proceed", err, allowHazardsFlag)
-		}
-
-		return fmt.Errorf("failed to apply migrations: %w", err)
-	}
-
-	return nil
 }

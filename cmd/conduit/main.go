@@ -8,7 +8,7 @@ import (
 
 	dotenv "github.com/joho/godotenv"
 
-	"go.inout.gg/conduit/conduitcli"
+	"go.inout.gg/conduit/cmd/internal/command"
 )
 
 func main() {
@@ -16,7 +16,7 @@ func main() {
 
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM)
 
-	err := conduitcli.Execute(ctx)
+	err := command.Execute(ctx)
 	if err != nil {
 		cancel()
 		log.Fatal(err)

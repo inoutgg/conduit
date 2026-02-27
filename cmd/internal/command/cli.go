@@ -1,4 +1,4 @@
-package conduitcli
+package command
 
 import (
 	"context"
@@ -8,12 +8,12 @@ import (
 	"github.com/spf13/afero"
 	"github.com/urfave/cli/v3"
 
-	"go.inout.gg/conduit/internal/command/apply"
-	"go.inout.gg/conduit/internal/command/create"
-	"go.inout.gg/conduit/internal/command/dump"
-	"go.inout.gg/conduit/internal/command/flagname"
-	"go.inout.gg/conduit/internal/command/initialise"
-	"go.inout.gg/conduit/internal/timegenerator"
+	"go.inout.gg/conduit/cmd/internal/command/apply"
+	"go.inout.gg/conduit/cmd/internal/command/create"
+	"go.inout.gg/conduit/cmd/internal/command/dump"
+	"go.inout.gg/conduit/cmd/internal/command/flagname"
+	"go.inout.gg/conduit/cmd/internal/command/initialise"
+	"go.inout.gg/conduit/pkg/timegenerator"
 )
 
 // Execute evaluates given os.Args and executes a matched command.

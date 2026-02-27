@@ -1,4 +1,4 @@
-package create
+package conduitcli
 
 import (
 	"context"
@@ -14,10 +14,10 @@ import (
 	schemadiff "github.com/stripe/pg-schema-diff/pkg/diff"
 
 	"go.inout.gg/conduit/internal/buildinfo"
-	"go.inout.gg/conduit/internal/conduitsum"
 	internaltpl "go.inout.gg/conduit/internal/template"
-	"go.inout.gg/conduit/internal/timegenerator"
+	"go.inout.gg/conduit/pkg/conduitsum"
 	"go.inout.gg/conduit/pkg/pgdiff"
+	"go.inout.gg/conduit/pkg/timegenerator"
 	"go.inout.gg/conduit/pkg/version"
 )
 
@@ -36,7 +36,7 @@ type DiffArgs struct {
 	DatabaseURL string
 }
 
-func diff(ctx context.Context, fs afero.Fs, timeGen timegenerator.Generator, args DiffArgs) error {
+func Diff(ctx context.Context, fs afero.Fs, timeGen timegenerator.Generator, args DiffArgs) error {
 	if !exists(fs, args.Dir) {
 		return errors.New("migrations directory does not exist, try to initialise it first")
 	}
@@ -195,4 +195,9 @@ func writeMigration(fs afero.Fs, path string, tpl *template.Template, data any) 
 	}
 
 	return nil
+}
+
+func exists(afs afero.Fs, path string) bool {
+	_, err := afs.Stat(path)
+	return !errors.Is(err, afero.ErrFileNotFound)
 }
