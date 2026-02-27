@@ -9,9 +9,9 @@ import (
 	"github.com/urfave/cli/v3"
 
 	"go.inout.gg/conduit/cmd/internal/command/apply"
+	"go.inout.gg/conduit/cmd/internal/command/commandutil"
 	"go.inout.gg/conduit/cmd/internal/command/create"
 	"go.inout.gg/conduit/cmd/internal/command/dump"
-	"go.inout.gg/conduit/cmd/internal/command/flagname"
 	"go.inout.gg/conduit/cmd/internal/command/initialise"
 	"go.inout.gg/conduit/pkg/timegenerator"
 )
@@ -33,15 +33,8 @@ func Execute(ctx context.Context) error {
 		Usage: "An SQL migrator that is easy to embed.",
 		Flags: []cli.Flag{
 			//nolint:exhaustruct
-			&cli.StringFlag{
-				Name:    flagname.MigrationsDir,
-				Usage:   "directory with migration files",
-				Value:   "./migrations",
-				Sources: cli.EnvVars("CONDUIT_MIGRATION_DIR"),
-			},
-			//nolint:exhaustruct
 			&cli.BoolFlag{
-				Name:  flagname.Verbose,
+				Name:  commandutil.Verbose,
 				Usage: "verbose mode",
 				Value: false,
 			},
@@ -49,7 +42,7 @@ func Execute(ctx context.Context) error {
 		Commands: []*cli.Command{
 			initialise.NewCommand(fs, timeGen),
 			create.NewCommand(fs, timeGen),
-			apply.NewCommand(),
+			apply.NewCommand(fs),
 			dump.NewCommand(),
 		},
 	}

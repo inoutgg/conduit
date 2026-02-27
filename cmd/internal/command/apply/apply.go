@@ -10,7 +10,7 @@ import (
 	"github.com/urfave/cli/v3"
 
 	"go.inout.gg/conduit"
-	"go.inout.gg/conduit/cmd/internal/command/flagname"
+	"go.inout.gg/conduit/cmd/internal/command/commandutil"
 	"go.inout.gg/conduit/conduitcli"
 	"go.inout.gg/conduit/conduitregistry"
 	"go.inout.gg/conduit/internal/direction"
@@ -22,19 +22,14 @@ const (
 	noSchemaDriftFlag = "no-check-schema-drift"
 )
 
-func NewCommand() *cli.Command {
+func NewCommand(fs afero.Fs) *cli.Command {
 	//nolint:exhaustruct
 	return &cli.Command{
 		Name:  "apply",
 		Usage: "apply migrations in the given direction",
 		Flags: []cli.Flag{
-			//nolint:exhaustruct
-			&cli.StringFlag{
-				Name:     flagname.DatabaseURL,
-				Usage:    "database connection URL",
-				Sources:  cli.EnvVars("CONDUIT_DATABASE_URL"),
-				Required: true,
-			},
+			commandutil.DatabaseURLFlag(true),
+			commandutil.MigrationsDirFlag(),
 
 			//nolint:exhaustruct
 			&cli.IntFlag{
@@ -62,13 +57,13 @@ func NewCommand() *cli.Command {
 				return fmt.Errorf("failed to parse direction: %w", err)
 			}
 
-			url := cmd.String(flagname.DatabaseURL)
+			url := cmd.String(commandutil.DatabaseURL)
 			if url == "" {
-				return fmt.Errorf("missing `%s' flag", flagname.DatabaseURL)
+				return fmt.Errorf("missing `%s' flag", commandutil.DatabaseURL)
 			}
 
-			migrationsDir := cmd.String(flagname.MigrationsDir)
-			registry := conduitregistry.FromFS(afero.NewOsFs(), migrationsDir)
+			migrationsDir := cmd.String(commandutil.MigrationsDir)
+			registry := conduitregistry.FromFS(fs, migrationsDir)
 			migrator := conduit.NewMigrator(conduit.WithRegistry(registry))
 
 			args := conduitcli.ApplyArgs{

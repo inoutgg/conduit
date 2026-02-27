@@ -8,7 +8,7 @@ import (
 	"github.com/spf13/afero"
 	"github.com/urfave/cli/v3"
 
-	"go.inout.gg/conduit/cmd/internal/command/flagname"
+	"go.inout.gg/conduit/cmd/internal/command/commandutil"
 	"go.inout.gg/conduit/conduitcli"
 	"go.inout.gg/conduit/pkg/timegenerator"
 )
@@ -30,12 +30,8 @@ func NewCommand(fs afero.Fs, timeGen timegenerator.Generator) *cli.Command {
 						Usage:    "path to the target schema SQL file",
 						Required: true,
 					},
-					//nolint:exhaustruct
-					&cli.StringFlag{
-						Name:    flagname.DatabaseURL,
-						Usage:   "database connection URL",
-						Sources: cli.EnvVars("CONDUIT_DATABASE_URL"),
-					},
+					commandutil.DatabaseURLFlag(false),
+					commandutil.MigrationsDirFlag(),
 				},
 				Action: func(ctx context.Context, cmd *cli.Command) error {
 					name := cmd.Args().First()
@@ -44,10 +40,10 @@ func NewCommand(fs afero.Fs, timeGen timegenerator.Generator) *cli.Command {
 					}
 
 					args := conduitcli.DiffArgs{
-						Dir:         filepath.Clean(cmd.String(flagname.MigrationsDir)),
+						Dir:         filepath.Clean(cmd.String(commandutil.MigrationsDir)),
 						Name:        name,
 						SchemaPath:  cmd.String("schema"),
-						DatabaseURL: cmd.String(flagname.DatabaseURL),
+						DatabaseURL: cmd.String(commandutil.DatabaseURL),
 					}
 
 					return conduitcli.Diff(ctx, fs, timeGen, args)
