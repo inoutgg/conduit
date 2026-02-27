@@ -23,7 +23,7 @@ func NewCommand() *cli.Command {
 				DatabaseURL: cmd.String(commandutil.DatabaseURL),
 			}
 
-			return conduitcli.Dump(ctx, args, os.Stdout)
+			return conduitcli.Dump(ctx, os.Stdout, args)
 		},
 	}
 }

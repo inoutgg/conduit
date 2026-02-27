@@ -15,7 +15,7 @@ type DumpArgs struct {
 	DatabaseURL string
 }
 
-func Dump(ctx context.Context, args DumpArgs, w io.Writer) error {
+func Dump(ctx context.Context, w io.Writer, args DumpArgs) error {
 	connConfig, err := pgx.ParseConfig(args.DatabaseURL)
 	if err != nil {
 		return fmt.Errorf("failed to parse database URL: %w", err)
