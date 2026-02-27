@@ -8,9 +8,10 @@ import (
 
 	"go.inout.gg/conduit/cmd/internal/command/commandutil"
 	"go.inout.gg/conduit/conduitcli"
+	"go.inout.gg/conduit/pkg/buildinfo"
 )
 
-func NewCommand() *cli.Command {
+func NewCommand(bi buildinfo.BuildInfo) *cli.Command {
 	//nolint:exhaustruct
 	return &cli.Command{
 		Name:  "dump",
@@ -23,7 +24,7 @@ func NewCommand() *cli.Command {
 				DatabaseURL: cmd.String(commandutil.DatabaseURL),
 			}
 
-			return conduitcli.Dump(ctx, os.Stdout, args)
+			return conduitcli.Dump(ctx, os.Stdout, bi, args)
 		},
 	}
 }

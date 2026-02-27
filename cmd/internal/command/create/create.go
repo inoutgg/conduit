@@ -10,10 +10,11 @@ import (
 
 	"go.inout.gg/conduit/cmd/internal/command/commandutil"
 	"go.inout.gg/conduit/conduitcli"
+	"go.inout.gg/conduit/pkg/buildinfo"
 	"go.inout.gg/conduit/pkg/timegenerator"
 )
 
-func NewCommand(fs afero.Fs, timeGen timegenerator.Generator) *cli.Command {
+func NewCommand(fs afero.Fs, timeGen timegenerator.Generator, bi buildinfo.BuildInfo) *cli.Command {
 	//nolint:exhaustruct
 	return &cli.Command{
 		Name:  "create",
@@ -46,7 +47,7 @@ func NewCommand(fs afero.Fs, timeGen timegenerator.Generator) *cli.Command {
 						DatabaseURL: cmd.String(commandutil.DatabaseURL),
 					}
 
-					return conduitcli.Diff(ctx, fs, timeGen, args)
+					return conduitcli.Diff(ctx, fs, timeGen, bi, args)
 				},
 			},
 		},

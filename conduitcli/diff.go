@@ -13,8 +13,8 @@ import (
 	"github.com/spf13/afero"
 	schemadiff "github.com/stripe/pg-schema-diff/pkg/diff"
 
-	"go.inout.gg/conduit/internal/buildinfo"
 	internaltpl "go.inout.gg/conduit/internal/template"
+	"go.inout.gg/conduit/pkg/buildinfo"
 	"go.inout.gg/conduit/pkg/conduitsum"
 	"go.inout.gg/conduit/pkg/pgdiff"
 	"go.inout.gg/conduit/pkg/timegenerator"
@@ -36,7 +36,13 @@ type DiffArgs struct {
 	DatabaseURL string
 }
 
-func Diff(ctx context.Context, fs afero.Fs, timeGen timegenerator.Generator, args DiffArgs) error {
+func Diff(
+	ctx context.Context,
+	fs afero.Fs,
+	timeGen timegenerator.Generator,
+	bi buildinfo.BuildInfo,
+	args DiffArgs,
+) error {
 	if !exists(fs, args.Dir) {
 		return errors.New("migrations directory does not exist, try to initialise it first")
 	}
@@ -118,10 +124,11 @@ func Diff(ctx context.Context, fs afero.Fs, timeGen timegenerator.Generator, arg
 			filename,
 			internaltpl.SQLUpMigrationTemplate,
 			map[string]any{
-				"SchemaPath":     args.SchemaPath,
-				"ConduitVersion": buildinfo.Version(),
-				"UpStmts":        upStmts.String(),
-				"DisableTx":      m.isNonTx,
+				"SchemaPath":          args.SchemaPath,
+				"ConduitVersion":      bi.Version(),
+				"PGSchemaDiffVersion": bi.PGSchemaDiffVersion(),
+				"UpStmts":             upStmts.String(),
+				"DisableTx":           m.isNonTx,
 			},
 		); err != nil {
 			return err

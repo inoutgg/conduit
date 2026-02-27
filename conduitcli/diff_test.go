@@ -29,7 +29,7 @@ func TestDiff(t *testing.T) {
 			DatabaseURL: "postgres://localhost:5432/testdb",
 		}
 
-		err := Diff(t.Context(), fs, timeGen, args)
+		err := Diff(t.Context(), fs, timeGen, bi, args)
 
 		require.Error(t, err)
 		assert.ErrorContains(t, err, "migrations directory does not exist")
@@ -46,7 +46,7 @@ func TestDiff(t *testing.T) {
 			DatabaseURL: "://invalid",
 		}
 
-		err := Diff(t.Context(), fs, timeGen, args)
+		err := Diff(t.Context(), fs, timeGen, bi, args)
 
 		require.Error(t, err)
 		assert.ErrorContains(t, err, "failed to parse database URL")
@@ -69,7 +69,7 @@ CREATE TABLE posts (id int, user_id int);`).
 			DatabaseURL: databaseURL,
 		}
 
-		err := Diff(t.Context(), fs, timeGen, args)
+		err := Diff(t.Context(), fs, timeGen, bi, args)
 
 		require.NoError(t, err)
 		testutil.SnapshotFS(t, fs, dir)
@@ -93,7 +93,7 @@ CREATE TABLE posts (id int, user_id int);`).
 			DatabaseURL: databaseURL,
 		}
 
-		err := Diff(t.Context(), fs, timeGen, args)
+		err := Diff(t.Context(), fs, timeGen, bi, args)
 
 		require.Error(t, err)
 		require.ErrorContains(t, err, "source schema drift detected")
@@ -123,7 +123,7 @@ CREATE TABLE posts (id int, user_id int);`).
 			SchemaPath:  filepath.Join(baseDir, "schema.sql"),
 			DatabaseURL: databaseURL,
 		}
-		require.NoError(t, Diff(t.Context(), fs, timeGen, args))
+		require.NoError(t, Diff(t.Context(), fs, timeGen, bi, args))
 
 		// Update schema to trigger a new diff, using the existing conduit.sum
 		// which now contains the correct target hash from the first run.
@@ -144,7 +144,7 @@ CREATE TABLE comments (id int, post_id int);`), 0o644),
 		// Act — second diff should succeed because the source hash matches conduit.sum.
 		err := Diff(t.Context(), fs, timegenerator.Stub{
 			T: time.Date(2024, 2, 15, 12, 30, 45, 0, time.UTC),
-		}, args2)
+		}, bi, args2)
 
 		require.NoError(t, err)
 	})
@@ -166,7 +166,7 @@ CREATE INDEX idx_users_id ON users (id);`).
 			DatabaseURL: databaseURL,
 		}
 
-		err := Diff(t.Context(), fs, timeGen, args)
+		err := Diff(t.Context(), fs, timeGen, bi, args)
 
 		require.NoError(t, err)
 
@@ -193,7 +193,7 @@ CREATE TABLE posts (id int);`).
 			DatabaseURL: databaseURL,
 		}
 
-		err := Diff(t.Context(), fs, timeGen, args)
+		err := Diff(t.Context(), fs, timeGen, bi, args)
 
 		require.NoError(t, err)
 
@@ -219,7 +219,7 @@ CREATE TABLE posts (id int);`).
 			DatabaseURL: databaseURL,
 		}
 
-		err := Diff(t.Context(), fs, timeGen, args)
+		err := Diff(t.Context(), fs, timeGen, bi, args)
 
 		require.Error(t, err)
 		assert.ErrorContains(t, err, "no schema changes detected")
@@ -319,7 +319,7 @@ CREATE INDEX idx_posts_user_id ON posts (user_id);`).
 			DatabaseURL: databaseURL,
 		}
 
-		err := Diff(t.Context(), fs, timeGen, args)
+		err := Diff(t.Context(), fs, timeGen, bi, args)
 
 		require.NoError(t, err)
 		testutil.SnapshotFS(t, fs, dir)

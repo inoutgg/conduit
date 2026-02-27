@@ -69,6 +69,14 @@ let
       '';
       listen_addresses = "localhost";
       port = 5432;
+
+      settings = {
+        fsync = "off";
+        full_page_writes = "off";
+        synchronous_commit = "off";
+        shared_buffers = "128MB";
+        max_connections = "10000";
+      };
     };
   };
 

@@ -10,13 +10,21 @@ import (
 	"go.uber.org/goleak"
 
 	"go.inout.gg/conduit/internal/testmigrator"
+	"go.inout.gg/conduit/pkg/buildinfo"
 	"go.inout.gg/conduit/pkg/timegenerator"
 )
+
+// buildInfoStub is a test implementation of buildinfo.BuildInfo.
+type buildInfoStub struct{}
+
+func (buildInfoStub) Version() string             { return "devel" }
+func (buildInfoStub) PGSchemaDiffVersion() string { return "unknown" }
 
 //nolint:gochecknoglobals
 var (
 	poolFactory *pgxephemeraltest.PoolFactory
-	timeGen     = timegenerator.Stub{T: time.Date(2024, 1, 15, 12, 30, 45, 0, time.UTC)}
+	timeGen                         = timegenerator.Stub{T: time.Date(2024, 1, 15, 12, 30, 45, 0, time.UTC)}
+	bi          buildinfo.BuildInfo = buildInfoStub{}
 )
 
 func TestMain(m *testing.M) {

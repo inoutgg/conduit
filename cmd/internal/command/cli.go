@@ -13,6 +13,7 @@ import (
 	"go.inout.gg/conduit/cmd/internal/command/create"
 	"go.inout.gg/conduit/cmd/internal/command/dump"
 	"go.inout.gg/conduit/cmd/internal/command/initialise"
+	"go.inout.gg/conduit/pkg/buildinfo"
 	"go.inout.gg/conduit/pkg/timegenerator"
 )
 
@@ -25,7 +26,10 @@ func Execute(ctx context.Context) error {
 
 	fs := afero.NewBasePathFs(afero.NewOsFs(), cwd)
 
-	var timeGen timegenerator.Standard
+	var (
+		timeGen timegenerator.Standard
+		bi      buildinfo.Standard
+	)
 
 	//nolint:exhaustruct
 	cmd := &cli.Command{
@@ -41,9 +45,9 @@ func Execute(ctx context.Context) error {
 		},
 		Commands: []*cli.Command{
 			initialise.NewCommand(fs, timeGen),
-			create.NewCommand(fs, timeGen),
+			create.NewCommand(fs, timeGen, bi),
 			apply.NewCommand(fs),
-			dump.NewCommand(),
+			dump.NewCommand(bi),
 		},
 	}
 

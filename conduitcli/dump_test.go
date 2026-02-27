@@ -33,7 +33,7 @@ CREATE TABLE posts (
 		args := DumpArgs{DatabaseURL: "://invalid"}
 		recorder := new(bytes.Buffer)
 
-		err := Dump(t.Context(), recorder, args)
+		err := Dump(t.Context(), recorder, bi, args)
 
 		require.Error(t, err)
 		assert.ErrorContains(t, err, "failed to parse database URL")
@@ -48,7 +48,7 @@ CREATE TABLE posts (
 		args := DumpArgs{DatabaseURL: testutil.ConnString(pool)}
 		recorder := new(bytes.Buffer)
 
-		err := Dump(t.Context(), recorder, args)
+		err := Dump(t.Context(), recorder, bi, args)
 		require.NoError(t, err)
 
 		output := recorder.String()
