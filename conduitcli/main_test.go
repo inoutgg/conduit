@@ -17,8 +17,7 @@ import (
 // buildInfoStub is a test implementation of buildinfo.BuildInfo.
 type buildInfoStub struct{}
 
-func (buildInfoStub) Version() string             { return "devel" }
-func (buildInfoStub) PGSchemaDiffVersion() string { return "unknown" }
+func (buildInfoStub) Version() string { return "devel" }
 
 //nolint:gochecknoglobals
 var (

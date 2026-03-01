@@ -5,7 +5,6 @@ import "runtime/debug"
 // BuildInfo exposes build-time metadata about the conduit binary.
 type BuildInfo interface {
 	Version() string
-	PGSchemaDiffVersion() string
 }
 
 // Standard is the default BuildInfo implementation that reads version
@@ -31,18 +30,4 @@ func (Standard) Version() string {
 	}
 
 	return "devel"
-}
-
-// PGSchemaDiffVersion returns the version of pg-schema-diff linked into the
-// binary, as recorded in Go module build info. Returns "unknown" if not found.
-func (Standard) PGSchemaDiffVersion() string {
-	if bi, ok := debug.ReadBuildInfo(); ok {
-		for _, dep := range bi.Deps {
-			if dep.Path == "github.com/stripe/pg-schema-diff" {
-				return dep.Version
-			}
-		}
-	}
-
-	return "unknown"
 }

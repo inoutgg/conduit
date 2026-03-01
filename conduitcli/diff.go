@@ -124,11 +124,10 @@ func Diff(
 			filename,
 			internaltpl.SQLUpMigrationTemplate,
 			map[string]any{
-				"SchemaPath":          args.SchemaPath,
-				"ConduitVersion":      bi.Version(),
-				"PGSchemaDiffVersion": bi.PGSchemaDiffVersion(),
-				"UpStmts":             upStmts.String(),
-				"DisableTx":           m.isNonTx,
+				"SchemaPath":     args.SchemaPath,
+				"ConduitVersion": bi.Version(),
+				"UpStmts":        upStmts.String(),
+				"DisableTx":      m.isNonTx,
 			},
 		); err != nil {
 			return err
