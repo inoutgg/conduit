@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 
 	"github.com/spf13/afero"
 	"github.com/urfave/cli/v3"
@@ -20,6 +21,7 @@ const (
 	stepsFlag         = "steps"
 	allowHazardsFlag  = "allow-hazards"
 	noSchemaDriftFlag = "no-check-schema-drift"
+	dryRunFlag        = "dry-run"
 )
 
 func NewCommand(fs afero.Fs) *cli.Command {
@@ -50,6 +52,21 @@ func NewCommand(fs afero.Fs) *cli.Command {
 				Usage: "skip check for schema drift before applying migrations",
 				Value: false,
 			},
+
+			//nolint:exhaustruct
+			&cli.BoolFlag{
+				Name:  dryRunFlag,
+				Usage: "preview migrations without applying them",
+				Value: false,
+			},
+
+			//nolint:exhaustruct
+			&cli.BoolFlag{
+				Name:    commandutil.Verbose,
+				Aliases: []string{"v"},
+				Usage:   "show migration SQL content in dry-run output",
+				Value:   false,
+			},
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			dir, err := direction.FromString(cmd.Args().First())
@@ -64,7 +81,15 @@ func NewCommand(fs afero.Fs) *cli.Command {
 
 			migrationsDir := cmd.String(commandutil.MigrationsDir)
 			registry := conduitregistry.FromFS(fs, migrationsDir)
-			migrator := conduit.NewMigrator(conduit.WithRegistry(registry))
+
+			opts := []conduit.Option{conduit.WithRegistry(registry)}
+			if cmd.Bool(dryRunFlag) {
+				opts = append(opts, conduit.WithExecutor(
+					conduit.NewDryRunExecutor(os.Stdout, cmd.Bool(commandutil.Verbose)),
+				))
+			}
+
+			migrator := conduit.NewMigrator(opts...)
 
 			args := conduitcli.ApplyArgs{
 				DatabaseURL:          url,

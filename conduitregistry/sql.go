@@ -148,7 +148,14 @@ func sqlMigrateFunc(stmts []sqlsplit.Stmt) *migrateFunc {
 		return stmt.Type == sqlsplit.StmtTypeQuery
 	})
 
-	migration := &migrateFunc{useTx: useTx, hazards: hazards, fn: nil, fnx: nil}
+	contents := sliceutil.Map(queryStmts, func(stmt sqlsplit.Stmt) string {
+		return stmt.Content
+	})
+
+	migration := &migrateFunc{
+		useTx: useTx, hazards: hazards,
+		content: strings.Join(contents, "\n"), fn: nil, fnx: nil,
+	}
 
 	if useTx {
 		migration.fnx = func(ctx context.Context, tx pgx.Tx) error {

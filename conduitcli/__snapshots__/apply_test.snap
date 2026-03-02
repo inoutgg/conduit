@@ -1,0 +1,21 @@
+
+[TestApply/should_log_all_pending_migrations_without_applying,_when_dry-run_is_enabled - 1]
+20230601120000_create_users
+20230602120000_create_orders
+20230603120000_create_items
+
+---
+
+[TestApply/should_list_all_applied_migrations_for_rollback_without_dropping,_when_dry-run_is_enabled_with_direction_down - 1]
+20230602120000_create_orders
+
+---
+
+[TestApply/should_include_SQL_content,_when_dry-run_is_enabled_with_verbose - 1]
+20230601120000_create_users
+CREATE TABLE users (id INT);
+20230602120000_create_orders
+CREATE TABLE orders (id INT);
+CREATE INDEX idx_orders_id ON orders (id);
+
+---

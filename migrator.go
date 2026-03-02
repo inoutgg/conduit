@@ -16,7 +16,6 @@ import (
 	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/stripe/pg-schema-diff/pkg/schema"
 	"go.inout.gg/foundations/debug"
-	"go.inout.gg/foundations/must"
 
 	"go.inout.gg/conduit/conduitregistry"
 	"go.inout.gg/conduit/internal/dbsqlc"
@@ -43,7 +42,6 @@ var (
 	ErrInvalidStep = errors.New(
 		"conduit: invalid migration step. Expected: -1 (all) or positive integer",
 	)
-
 	ErrSchemaDrift    = errors.New("conduit: schema drift detected")
 	ErrHazardDetected = errors.New("conduit: hazardous migration detected")
 )
@@ -61,6 +59,7 @@ type (
 type config struct {
 	Logger   *slog.Logger              // optional
 	Registry *conduitregistry.Registry // optional
+	Executor MigrationExecutor         // optional
 }
 
 // Option configures a Migrator.
@@ -77,12 +76,22 @@ func WithRegistry(r *conduitregistry.Registry) Option {
 	return func(c *config) { c.Registry = r }
 }
 
+// WithExecutor sets the migration executor. When omitted, a live executor
+// that applies migrations to the database is used.
+func WithExecutor(e MigrationExecutor) Option {
+	return func(c *config) { c.Executor = e }
+}
+
 func (c *config) defaults() {
 	if c.Logger == nil {
 		c.Logger = slog.Default()
 	}
 
 	c.Registry = cmp.Or(c.Registry, globalRegistry)
+
+	if c.Executor == nil {
+		c.Executor = NewLiveExecutor(c.Logger)
+	}
 }
 
 // MigrateResult represents the outcome of an applied migrations batch.
@@ -123,6 +132,7 @@ func (m *MigrateOptions) defaults(dir direction.Direction) {
 type Migrator struct {
 	logger   *slog.Logger
 	registry *conduitregistry.Registry
+	executor MigrationExecutor
 }
 
 // NewMigrator creates a Migrator configured with the given options.
@@ -141,6 +151,7 @@ func NewMigrator(opts ...Option) *Migrator {
 	return &Migrator{
 		logger:   cfg.Logger,
 		registry: cfg.Registry,
+		executor: cfg.Executor,
 	}
 }
 
@@ -359,75 +370,13 @@ func (m *Migrator) applyMigrations(
 			)
 		}
 
-		inTx := must.Must(migration.UseTx(dir))
-
-		m.logger.DebugContext(
-			ctx,
-			"applying migration",
-			slog.String("direction", string(dir)),
-			slog.Group(
-				"migration",
-				slog.String("version", migration.Version().String()),
-				slog.String("name", migration.Name()),
-			),
-			slog.Bool("transacting", inTx),
-		)
-
-		start := time.Now()
-
-		if inTx {
-			err = m.applyMigrationTx(ctx, migration, dir, conn)
-		} else {
-			err = migration.Apply(ctx, dir, conn)
-		}
-
+		migrationResult, err := m.executor.Execute(ctx, migration, dir, conn)
 		if err != nil {
-			return nil, fmt.Errorf(
-				"conduit: failed to apply migration %s: %w",
-				migration.Version().String(),
-				err,
-			)
+			//nolint:wrapcheck
+			return nil, err
 		}
 
-		duration := time.Since(start)
-		migrationResult := MigrationResult{
-			DurationTotal: duration,
-			Version:       migration.Version(),
-			Name:          migration.Name(),
-		}
 		results[i] = migrationResult
-
-		switch dir {
-		case DirectionDown:
-			err = dbsqlc.New().RollbackMigration(ctx, conn, dbsqlc.RollbackMigrationParams{
-				Version: migrationResult.Version.String(),
-				Name:    migrationResult.Name,
-			})
-
-		case DirectionUp:
-			var schemaHash string
-
-			schemaHash, err = m.computeSchemaHash(ctx, conn)
-			if err != nil {
-				return nil, fmt.Errorf(
-					"conduit: failed to compute schema hash after migration %s: %w",
-					migration.Version().String(),
-					err,
-				)
-			}
-
-			err = dbsqlc.New().ApplyMigration(ctx, conn, dbsqlc.ApplyMigrationParams{
-				Version: migrationResult.Version.String(),
-				Name:    migrationResult.Name,
-				Hash:    schemaHash,
-			})
-		}
-
-		if err != nil {
-			return nil, fmt.Errorf("conduit: failed to update migrations table %v: %w", dir, err)
-		}
-
-		_ = dbsqlc.New().ResetConn(ctx, conn)
 	}
 
 	result = &MigrateResult{
@@ -436,43 +385,6 @@ func (m *Migrator) applyMigrations(
 	}
 
 	return result, nil
-}
-
-func (m *Migrator) computeSchemaHash(ctx context.Context, conn *pgx.Conn) (string, error) {
-	db := stdlib.OpenDB(*conn.Config())
-	defer db.Close()
-
-	hash, err := schema.GetSchemaHash(ctx, db)
-	if err != nil {
-		return "", fmt.Errorf("conduit: failed to compute schema hash: %w", err)
-	}
-
-	return hash, nil
-}
-
-func (m *Migrator) applyMigrationTx(
-	ctx context.Context,
-	migration *conduitregistry.Migration,
-	dir Direction,
-	conn *pgx.Conn,
-) error {
-	tx, err := conn.Begin(ctx)
-	if err != nil {
-		return fmt.Errorf("conduit: failed to open transaction: %w", err)
-	}
-
-	defer func() { _ = tx.Rollback(ctx) }()
-
-	if err := migration.ApplyTx(ctx, dir, tx); err != nil {
-		//nolint:wrapcheck
-		return err
-	}
-
-	if err := tx.Commit(ctx); err != nil {
-		return fmt.Errorf("conduit: failed to commit transaction: %w", err)
-	}
-
-	return nil
 }
 
 func compareMigrations(a, b *conduitregistry.Migration) int {

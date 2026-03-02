@@ -15,6 +15,7 @@ var emptyMigrateFunc = &migrateFunc{
 	fn:      func(_ context.Context, _ *pgx.Conn) error { return nil },
 	fnx:     func(_ context.Context, _ pgx.Tx) error { return nil },
 	hazards: nil,
+	content: "",
 	useTx:   false,
 }
 
@@ -27,6 +28,7 @@ type Hazard struct {
 type migrateFunc struct {
 	fn      applyFunc
 	fnx     applyFuncTx
+	content string
 	hazards []Hazard
 	useTx   bool
 }
@@ -55,6 +57,18 @@ func (m *Migration) UseTx(dir direction.Direction) (bool, error) {
 func (m *Migration) Version() version.Version { return m.version }
 
 func (m *Migration) Name() string { return m.name }
+
+// Content returns the raw SQL content for the given direction.
+func (m *Migration) Content(dir direction.Direction) string {
+	switch dir {
+	case direction.DirectionUp:
+		return m.up.content
+	case direction.DirectionDown:
+		return m.down.content
+	}
+
+	return ""
+}
 
 // Hazards returns the hazardous operations detected in the migration
 // for the given direction. Returns nil when no hazards are present.

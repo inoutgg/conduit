@@ -1,8 +1,10 @@
 package conduitcli
 
 import (
+	"bytes"
 	"testing"
 
+	"github.com/gkampitakis/go-snaps/snaps"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -108,5 +110,117 @@ func TestApply(t *testing.T) {
 
 		require.Error(t, err)
 		assert.ErrorIs(t, err, conduit.ErrHazardDetected)
+	})
+
+	t.Run("should log all pending migrations without applying, when dry-run is enabled", func(t *testing.T) {
+		t.Parallel()
+
+		pool := poolFactory.Pool(t)
+
+		r := testregistry.NewRegistry(t, map[string]string{
+			"20230601120000_create_users.up.sql":    "CREATE TABLE users (id INT);",
+			"20230601120000_create_users.down.sql":  "DROP TABLE users;",
+			"20230602120000_create_orders.up.sql":   "CREATE TABLE orders (id INT);",
+			"20230602120000_create_orders.down.sql": "DROP TABLE orders;",
+			"20230603120000_create_items.up.sql":    "CREATE TABLE items (id INT);",
+			"20230603120000_create_items.down.sql":  "DROP TABLE items;",
+		})
+
+		var buf bytes.Buffer
+
+		m := conduit.NewMigrator(
+			conduit.WithRegistry(r),
+			conduit.WithExecutor(conduit.NewDryRunExecutor(&buf, false)),
+		)
+
+		err := Apply(t.Context(), m, ApplyArgs{
+			DatabaseURL:          testutil.ConnString(pool),
+			Direction:            direction.DirectionUp,
+			SkipSchemaDriftCheck: true,
+		})
+
+		require.NoError(t, err)
+		assert.False(t, testutil.TableExists(t, pool, "users"))
+		assert.False(t, testutil.TableExists(t, pool, "orders"))
+		assert.False(t, testutil.TableExists(t, pool, "items"))
+		snaps.MatchSnapshot(t, buf.String())
+	})
+
+	t.Run(
+		"should list all applied migrations for rollback without dropping, when dry-run is enabled with direction down",
+		func(t *testing.T) {
+			t.Parallel()
+
+			pool := poolFactory.Pool(t)
+
+			r := testregistry.NewRegistry(t, map[string]string{
+				"20230601120000_create_users.up.sql":    "CREATE TABLE users (id INT);",
+				"20230601120000_create_users.down.sql":  "DROP TABLE users;",
+				"20230602120000_create_orders.up.sql":   "CREATE TABLE orders (id INT);",
+				"20230602120000_create_orders.down.sql": "DROP TABLE orders;",
+			})
+
+			// First apply all up for real.
+			m := conduit.NewMigrator(conduit.WithRegistry(r))
+
+			err := Apply(t.Context(), m, ApplyArgs{
+				DatabaseURL:          testutil.ConnString(pool),
+				Direction:            direction.DirectionUp,
+				SkipSchemaDriftCheck: true,
+			})
+			require.NoError(t, err)
+			require.True(t, testutil.TableExists(t, pool, "users"))
+			require.True(t, testutil.TableExists(t, pool, "orders"))
+
+			// Dry-run down should list migration but not drop the tables.
+			// Default down step is 1, so only the latest migration should be listed.
+			var buf bytes.Buffer
+
+			dryRunMigrator := conduit.NewMigrator(
+				conduit.WithRegistry(r),
+				conduit.WithExecutor(conduit.NewDryRunExecutor(&buf, false)),
+			)
+
+			err = Apply(t.Context(), dryRunMigrator, ApplyArgs{
+				DatabaseURL:          testutil.ConnString(pool),
+				Direction:            direction.DirectionDown,
+				SkipSchemaDriftCheck: true,
+			})
+
+			require.NoError(t, err)
+			assert.True(t, testutil.TableExists(t, pool, "users"))
+			assert.True(t, testutil.TableExists(t, pool, "orders"))
+			snaps.MatchSnapshot(t, buf.String())
+		},
+	)
+
+	t.Run("should include SQL content, when dry-run is enabled with verbose", func(t *testing.T) {
+		t.Parallel()
+
+		pool := poolFactory.Pool(t)
+
+		r := testregistry.NewRegistry(t, map[string]string{
+			"20230601120000_create_users.up.sql":   "CREATE TABLE users (id INT);",
+			"20230601120000_create_users.down.sql": "DROP TABLE users;",
+			"20230602120000_create_orders.up.sql":  "CREATE TABLE orders (id INT);\nCREATE INDEX idx_orders_id ON orders (id);",
+		})
+
+		var buf bytes.Buffer
+
+		m := conduit.NewMigrator(
+			conduit.WithRegistry(r),
+			conduit.WithExecutor(conduit.NewDryRunExecutor(&buf, true)),
+		)
+
+		err := Apply(t.Context(), m, ApplyArgs{
+			DatabaseURL:          testutil.ConnString(pool),
+			Direction:            direction.DirectionUp,
+			SkipSchemaDriftCheck: true,
+		})
+
+		require.NoError(t, err)
+		assert.False(t, testutil.TableExists(t, pool, "users"))
+		assert.False(t, testutil.TableExists(t, pool, "orders"))
+		snaps.MatchSnapshot(t, buf.String())
 	})
 }
