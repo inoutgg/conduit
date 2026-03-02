@@ -9,12 +9,17 @@ import (
 	"github.com/urfave/cli/v3"
 
 	"go.inout.gg/conduit/cmd/internal/command/commandutil"
+	"go.inout.gg/conduit/cmd/internal/config"
 	"go.inout.gg/conduit/conduitcli"
 	"go.inout.gg/conduit/pkg/buildinfo"
 	"go.inout.gg/conduit/pkg/timegenerator"
 )
 
-func NewCommand(fs afero.Fs, timeGen timegenerator.Generator, bi buildinfo.BuildInfo) *cli.Command {
+const (
+	schemaFlag = "schema"
+)
+
+func NewCommand(fs afero.Fs, timeGen timegenerator.Generator, bi buildinfo.BuildInfo, cfg *config.Config) *cli.Command {
 	//nolint:exhaustruct
 	return &cli.Command{
 		Name:  "create",
@@ -27,11 +32,11 @@ func NewCommand(fs afero.Fs, timeGen timegenerator.Generator, bi buildinfo.Build
 				Flags: []cli.Flag{
 					//nolint:exhaustruct
 					&cli.StringFlag{
-						Name:     "schema",
-						Usage:    "path to the target schema SQL file",
-						Required: true,
+						Name:    schemaFlag,
+						Usage:   "path to the target schema SQL file",
+						Sources: cli.EnvVars("CONDUIT_SCHEMA"),
 					},
-					commandutil.DatabaseURLFlag(false),
+					commandutil.DatabaseURLFlag(),
 					commandutil.MigrationsDirFlag(),
 				},
 				Action: func(ctx context.Context, cmd *cli.Command) error {
@@ -40,11 +45,22 @@ func NewCommand(fs afero.Fs, timeGen timegenerator.Generator, bi buildinfo.Build
 						return errors.New("missing `name` argument")
 					}
 
+					schemaPath, _ := config.FilePath(cfg.Migrations.Schema)
+
+					schema := commandutil.StringOr(cmd, schemaFlag, schemaPath)
+					if schema == "" {
+						return errors.New("missing `--schema` flag")
+					}
+
+					dirPath, _ := config.FilePath(cfg.Migrations.Dir)
+					migrationsDir := commandutil.StringOr(cmd, commandutil.MigrationsDir, dirPath)
+					dbURL := commandutil.StringOr(cmd, commandutil.DatabaseURL, cfg.Database.URL)
+
 					args := conduitcli.DiffArgs{
-						Dir:         filepath.Clean(cmd.String(commandutil.MigrationsDir)),
+						Dir:         filepath.Clean(migrationsDir),
 						Name:        name,
-						SchemaPath:  cmd.String("schema"),
-						DatabaseURL: cmd.String(commandutil.DatabaseURL),
+						SchemaPath:  schema,
+						DatabaseURL: dbURL,
 					}
 
 					return conduitcli.Diff(ctx, fs, timeGen, bi, args)

@@ -8,11 +8,12 @@ import (
 	"github.com/urfave/cli/v3"
 
 	"go.inout.gg/conduit/cmd/internal/command/commandutil"
+	"go.inout.gg/conduit/cmd/internal/config"
 	"go.inout.gg/conduit/conduitcli"
 	"go.inout.gg/conduit/pkg/timegenerator"
 )
 
-func NewCommand(fs afero.Fs, timeGen timegenerator.Generator) *cli.Command {
+func NewCommand(fs afero.Fs, timeGen timegenerator.Generator, cfg *config.Config) *cli.Command {
 	//nolint:exhaustruct
 	return &cli.Command{
 		Name:    "init",
@@ -20,13 +21,16 @@ func NewCommand(fs afero.Fs, timeGen timegenerator.Generator) *cli.Command {
 		Usage:   "initialise migration directory",
 		Flags: []cli.Flag{
 			commandutil.MigrationsDirFlag(),
-			commandutil.DatabaseURLFlag(false),
+			commandutil.DatabaseURLFlag(),
 		},
-
 		Action: func(ctx context.Context, cmd *cli.Command) error {
+			dirPath, _ := config.FilePath(cfg.Migrations.Dir)
+			migrationsDir := commandutil.StringOr(cmd, commandutil.MigrationsDir, dirPath)
+			dbURL := commandutil.StringOr(cmd, commandutil.DatabaseURL, cfg.Database.URL)
+
 			args := conduitcli.InitArgs{
-				Dir:         filepath.Clean(cmd.String(commandutil.MigrationsDir)),
-				DatabaseURL: cmd.String(commandutil.DatabaseURL),
+				Dir:         filepath.Clean(migrationsDir),
+				DatabaseURL: dbURL,
 			}
 
 			return conduitcli.Init(ctx, fs, timeGen, args)

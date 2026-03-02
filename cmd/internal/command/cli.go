@@ -13,6 +13,7 @@ import (
 	"go.inout.gg/conduit/cmd/internal/command/create"
 	"go.inout.gg/conduit/cmd/internal/command/dump"
 	"go.inout.gg/conduit/cmd/internal/command/initialise"
+	"go.inout.gg/conduit/cmd/internal/config"
 	"go.inout.gg/conduit/pkg/buildinfo"
 	"go.inout.gg/conduit/pkg/timegenerator"
 )
@@ -29,25 +30,37 @@ func Execute(ctx context.Context) error {
 	var (
 		timeGen timegenerator.Standard
 		bi      buildinfo.Standard
+		cfg     config.Config
 	)
 
 	//nolint:exhaustruct
 	cmd := &cli.Command{
 		Name:  "conduit",
 		Usage: "An SQL migrator that is easy to embed.",
+		Before: func(ctx context.Context, cmd *cli.Command) (context.Context, error) {
+			var err error
+
+			cfg, err = config.FromFS(afero.NewOsFs(), cmd.String("config"))
+			if err != nil {
+				return ctx, fmt.Errorf("failed to load config: %w", err)
+			}
+
+			return ctx, nil
+		},
 		Flags: []cli.Flag{
 			//nolint:exhaustruct
-			&cli.BoolFlag{
-				Name:  commandutil.Verbose,
-				Usage: "verbose mode",
-				Value: false,
+			&cli.StringFlag{
+				Name:    "config",
+				Usage:   "path to config file (default: conduit.yaml or .conduit.yaml)",
+				Sources: cli.EnvVars("CONDUIT_CONFIG"),
 			},
+			commandutil.VerboseFlag("verbose mode"),
 		},
 		Commands: []*cli.Command{
-			initialise.NewCommand(fs, timeGen),
-			create.NewCommand(fs, timeGen, bi),
-			apply.NewCommand(fs),
-			dump.NewCommand(bi),
+			initialise.NewCommand(fs, timeGen, &cfg),
+			create.NewCommand(fs, timeGen, bi, &cfg),
+			apply.NewCommand(fs, &cfg),
+			dump.NewCommand(bi, &cfg),
 		},
 	}
 

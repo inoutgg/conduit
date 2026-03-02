@@ -6,7 +6,6 @@ const (
 	Verbose       = "verbose"
 	DatabaseURL   = "database-url"
 	MigrationsDir = "migrations-dir"
-	PackageName   = "package-name"
 )
 
 func MigrationsDirFlag() *cli.StringFlag {
@@ -15,16 +14,24 @@ func MigrationsDirFlag() *cli.StringFlag {
 		Name:    MigrationsDir,
 		Usage:   "directory with migration files",
 		Value:   "./migrations",
-		Sources: cli.EnvVars("CONDUIT_MIGRATION_DIR"),
+		Sources: cli.EnvVars("CONDUIT_MIGRATIONS_DIR"),
 	}
 }
 
-func DatabaseURLFlag(required bool) *cli.StringFlag {
+func DatabaseURLFlag() *cli.StringFlag {
 	//nolint:exhaustruct
 	return &cli.StringFlag{
-		Name:     DatabaseURL,
-		Usage:    "database connection URL",
-		Sources:  cli.EnvVars("CONDUIT_DATABASE_URL"),
-		Required: required,
+		Name:    DatabaseURL,
+		Usage:   "database connection URL",
+		Sources: cli.EnvVars("CONDUIT_DATABASE_URL"),
+	}
+}
+
+func VerboseFlag(usage string) *cli.BoolFlag {
+	//nolint:exhaustruct
+	return &cli.BoolFlag{
+		Name:    Verbose,
+		Usage:   usage,
+		Sources: cli.EnvVars("CONDUIT_VERBOSE"),
 	}
 }
