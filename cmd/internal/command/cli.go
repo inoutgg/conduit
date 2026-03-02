@@ -9,11 +9,11 @@ import (
 	"github.com/urfave/cli/v3"
 
 	"go.inout.gg/conduit/cmd/internal/command/apply"
-	"go.inout.gg/conduit/cmd/internal/command/commandutil"
 	"go.inout.gg/conduit/cmd/internal/command/diff"
 	"go.inout.gg/conduit/cmd/internal/command/dump"
 	"go.inout.gg/conduit/cmd/internal/command/initialise"
 	"go.inout.gg/conduit/cmd/internal/config"
+	"go.inout.gg/conduit/internal/cmdutil"
 	"go.inout.gg/conduit/pkg/buildinfo"
 	"go.inout.gg/conduit/pkg/timegenerator"
 )
@@ -54,7 +54,7 @@ func Execute(ctx context.Context) error {
 				Usage:   "path to config file (default: conduit.yaml or .conduit.yaml)",
 				Sources: cli.EnvVars("CONDUIT_CONFIG"),
 			},
-			commandutil.VerboseFlag("verbose mode"),
+			cmdutil.VerboseFlag("verbose mode"),
 		},
 		Commands: []*cli.Command{
 			initialise.NewCommand(fs, timeGen, &cfg),

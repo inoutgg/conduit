@@ -8,9 +8,9 @@ import (
 	"github.com/spf13/afero"
 	"github.com/urfave/cli/v3"
 
-	"go.inout.gg/conduit/cmd/internal/command/commandutil"
 	"go.inout.gg/conduit/cmd/internal/config"
 	"go.inout.gg/conduit/conduitcli"
+	"go.inout.gg/conduit/internal/cmdutil"
 	"go.inout.gg/conduit/pkg/buildinfo"
 	"go.inout.gg/conduit/pkg/timegenerator"
 )
@@ -29,8 +29,8 @@ func NewCommand(fs afero.Fs, timeGen timegenerator.Generator, bi buildinfo.Build
 				Usage:   "path to the target schema SQL file",
 				Sources: cli.EnvVars("CONDUIT_SCHEMA"),
 			},
-			commandutil.DatabaseURLFlag(),
-			commandutil.MigrationsDirFlag(),
+			cmdutil.DatabaseURLFlag(),
+			cmdutil.MigrationsDirFlag(),
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			name := cmd.Args().First()
@@ -40,14 +40,14 @@ func NewCommand(fs afero.Fs, timeGen timegenerator.Generator, bi buildinfo.Build
 
 			schemaPath, _ := config.FilePath(cfg.Migrations.Schema)
 
-			schema := commandutil.StringOr(cmd, schemaFlag, schemaPath)
+			schema := cmdutil.StringOr(cmd, schemaFlag, schemaPath)
 			if schema == "" {
 				return errors.New("missing `--schema` flag")
 			}
 
 			dirPath, _ := config.FilePath(cfg.Migrations.Dir)
-			migrationsDir := commandutil.StringOr(cmd, commandutil.MigrationsDir, dirPath)
-			dbURL := commandutil.StringOr(cmd, commandutil.DatabaseURL, cfg.Database.URL)
+			migrationsDir := cmdutil.StringOr(cmd, cmdutil.MigrationsDir, dirPath)
+			dbURL := cmdutil.StringOr(cmd, cmdutil.DatabaseURL, cfg.Database.URL)
 
 			args := conduitcli.DiffArgs{
 				Dir:         filepath.Clean(migrationsDir),
