@@ -10,7 +10,7 @@ import (
 
 	"go.inout.gg/conduit/cmd/internal/command/apply"
 	"go.inout.gg/conduit/cmd/internal/command/commandutil"
-	"go.inout.gg/conduit/cmd/internal/command/create"
+	"go.inout.gg/conduit/cmd/internal/command/diff"
 	"go.inout.gg/conduit/cmd/internal/command/dump"
 	"go.inout.gg/conduit/cmd/internal/command/initialise"
 	"go.inout.gg/conduit/cmd/internal/config"
@@ -58,7 +58,7 @@ func Execute(ctx context.Context) error {
 		},
 		Commands: []*cli.Command{
 			initialise.NewCommand(fs, timeGen, &cfg),
-			create.NewCommand(fs, timeGen, bi, &cfg),
+			diff.NewCommand(fs, timeGen, bi, &cfg),
 			apply.NewCommand(fs, &cfg),
 			dump.NewCommand(bi, &cfg),
 		},
