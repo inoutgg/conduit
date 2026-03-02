@@ -75,21 +75,24 @@ migrator := conduit.NewMigrator(conduit.WithRegistry(registry))
 | `WithRegistry(r)`             | Use a specific registry instead of the global one  |
 | `WithLogger(l)`               | Use a custom `*slog.Logger` for debug output       |
 | `WithExecutor(e)`             | Use a custom `MigrationExecutor`; defaults to `NewLiveExecutor` which applies migrations to the database. Use `NewDryRunExecutor` to preview migrations without applying them. |
+| `WithSkipSchemaDriftCheck()`  | Skip the schema drift check before applying up migrations. |
 
 ## Migrate options
 
 `Migrate` accepts a `*MigrateOptions` struct (pass `nil` for defaults):
 
-| Field                | Default (up) | Default (down) | Description                                   |
-| -------------------- | ------------ | -------------- | --------------------------------------------- |
-| `Steps`              | `-1` (all)   | `1`            | Number of migrations to apply; `-1` means all |
-| `SkipSchemaDriftCheck` | `false`    | `false`        | Skip the schema drift check before migrating  |
-| `AllowHazards`       | `false`      | `false`        | Apply migrations that contain hazardous ops   |
+| Field          | Default (up) | Default (down) | Description                                   |
+| -------------- | ------------ | -------------- | --------------------------------------------- |
+| `Steps`        | `-1` (all)   | `1`            | Number of migrations to apply; `-1` means all |
+| `AllowHazards` | `nil`        | `nil`          | Hazard types to permit; use `HazardType*` constants. Migrations with unlisted hazard types are blocked. |
 
 ```go
 result, err := migrator.Migrate(ctx, conduit.DirectionUp, conn, &conduit.MigrateOptions{
-	Steps:        5,
-	AllowHazards: true,
+	Steps: 5,
+	AllowHazards: []conduit.MigrationHazardType{
+		conduit.HazardTypeIndexBuild,
+		conduit.HazardTypeDeletesData,
+	},
 })
 ```
 

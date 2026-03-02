@@ -26,12 +26,11 @@ func TestApply(t *testing.T) {
 			"20230601120000_create_users.up.sql":   "CREATE TABLE users (id INT);",
 			"20230601120000_create_users.down.sql": "DROP TABLE users;",
 		})
-		m := conduit.NewMigrator(conduit.WithRegistry(r))
+		m := conduit.NewMigrator(conduit.WithRegistry(r), conduit.WithSkipSchemaDriftCheck())
 
 		args := ApplyArgs{
-			DatabaseURL:          testutil.ConnString(pool),
-			Direction:            direction.DirectionUp,
-			SkipSchemaDriftCheck: true,
+			DatabaseURL: testutil.ConnString(pool),
+			Direction:   direction.DirectionUp,
 		}
 
 		err := Apply(t.Context(), m, args)
@@ -49,22 +48,20 @@ func TestApply(t *testing.T) {
 			"20230601120000_create_users.up.sql":   "CREATE TABLE users (id INT);",
 			"20230601120000_create_users.down.sql": "DROP TABLE users;",
 		})
-		m := conduit.NewMigrator(conduit.WithRegistry(r))
+		m := conduit.NewMigrator(conduit.WithRegistry(r), conduit.WithSkipSchemaDriftCheck())
 
 		// First apply up.
 		err := Apply(t.Context(), m, ApplyArgs{
-			DatabaseURL:          testutil.ConnString(pool),
-			Direction:            direction.DirectionUp,
-			SkipSchemaDriftCheck: true,
+			DatabaseURL: testutil.ConnString(pool),
+			Direction:   direction.DirectionUp,
 		})
 		require.NoError(t, err)
 		require.True(t, testutil.TableExists(t, pool, "users"))
 
 		// Then apply down.
 		err = Apply(t.Context(), m, ApplyArgs{
-			DatabaseURL:          testutil.ConnString(pool),
-			Direction:            direction.DirectionDown,
-			SkipSchemaDriftCheck: true,
+			DatabaseURL: testutil.ConnString(pool),
+			Direction:   direction.DirectionDown,
 		})
 
 		require.NoError(t, err)
@@ -98,12 +95,11 @@ func TestApply(t *testing.T) {
 		r := testregistry.NewRegistry(t, map[string]string{
 			"20230601120000_hazardous.up.sql": "---- disable-tx ----\n---- hazard: INDEX_BUILD // rebuilds index ----\nCREATE TABLE hazard_test (id INT);",
 		})
-		m := conduit.NewMigrator(conduit.WithRegistry(r))
+		m := conduit.NewMigrator(conduit.WithRegistry(r), conduit.WithSkipSchemaDriftCheck())
 
 		args := ApplyArgs{
-			DatabaseURL:          testutil.ConnString(pool),
-			Direction:            direction.DirectionUp,
-			SkipSchemaDriftCheck: true,
+			DatabaseURL: testutil.ConnString(pool),
+			Direction:   direction.DirectionUp,
 		}
 
 		err := Apply(t.Context(), m, args)
@@ -131,12 +127,12 @@ func TestApply(t *testing.T) {
 		m := conduit.NewMigrator(
 			conduit.WithRegistry(r),
 			conduit.WithExecutor(conduit.NewDryRunExecutor(&buf, false)),
+			conduit.WithSkipSchemaDriftCheck(),
 		)
 
 		err := Apply(t.Context(), m, ApplyArgs{
-			DatabaseURL:          testutil.ConnString(pool),
-			Direction:            direction.DirectionUp,
-			SkipSchemaDriftCheck: true,
+			DatabaseURL: testutil.ConnString(pool),
+			Direction:   direction.DirectionUp,
 		})
 
 		require.NoError(t, err)
@@ -161,12 +157,11 @@ func TestApply(t *testing.T) {
 			})
 
 			// First apply all up for real.
-			m := conduit.NewMigrator(conduit.WithRegistry(r))
+			m := conduit.NewMigrator(conduit.WithRegistry(r), conduit.WithSkipSchemaDriftCheck())
 
 			err := Apply(t.Context(), m, ApplyArgs{
-				DatabaseURL:          testutil.ConnString(pool),
-				Direction:            direction.DirectionUp,
-				SkipSchemaDriftCheck: true,
+				DatabaseURL: testutil.ConnString(pool),
+				Direction:   direction.DirectionUp,
 			})
 			require.NoError(t, err)
 			require.True(t, testutil.TableExists(t, pool, "users"))
@@ -179,12 +174,12 @@ func TestApply(t *testing.T) {
 			dryRunMigrator := conduit.NewMigrator(
 				conduit.WithRegistry(r),
 				conduit.WithExecutor(conduit.NewDryRunExecutor(&buf, false)),
+				conduit.WithSkipSchemaDriftCheck(),
 			)
 
 			err = Apply(t.Context(), dryRunMigrator, ApplyArgs{
-				DatabaseURL:          testutil.ConnString(pool),
-				Direction:            direction.DirectionDown,
-				SkipSchemaDriftCheck: true,
+				DatabaseURL: testutil.ConnString(pool),
+				Direction:   direction.DirectionDown,
 			})
 
 			require.NoError(t, err)
@@ -210,12 +205,12 @@ func TestApply(t *testing.T) {
 		m := conduit.NewMigrator(
 			conduit.WithRegistry(r),
 			conduit.WithExecutor(conduit.NewDryRunExecutor(&buf, true)),
+			conduit.WithSkipSchemaDriftCheck(),
 		)
 
 		err := Apply(t.Context(), m, ApplyArgs{
-			DatabaseURL:          testutil.ConnString(pool),
-			Direction:            direction.DirectionUp,
-			SkipSchemaDriftCheck: true,
+			DatabaseURL: testutil.ConnString(pool),
+			Direction:   direction.DirectionUp,
 		})
 
 		require.NoError(t, err)

@@ -40,10 +40,9 @@ func NewCommand(fs afero.Fs) *cli.Command {
 			},
 
 			//nolint:exhaustruct
-			&cli.BoolFlag{
+			&cli.StringSliceFlag{
 				Name:  allowHazardsFlag,
-				Usage: "allow applying migrations that contain hazardous operations",
-				Value: false,
+				Usage: "hazardous operation types to allow (e.g. INDEX_BUILD, DELETES_DATA); may be repeated",
 			},
 
 			//nolint:exhaustruct
@@ -83,6 +82,10 @@ func NewCommand(fs afero.Fs) *cli.Command {
 			registry := conduitregistry.FromFS(fs, migrationsDir)
 
 			opts := []conduit.Option{conduit.WithRegistry(registry)}
+			if cmd.Bool(noSchemaDriftFlag) {
+				opts = append(opts, conduit.WithSkipSchemaDriftCheck())
+			}
+
 			if cmd.Bool(dryRunFlag) {
 				opts = append(opts, conduit.WithExecutor(
 					conduit.NewDryRunExecutor(os.Stdout, cmd.Bool(commandutil.Verbose)),
@@ -92,16 +95,19 @@ func NewCommand(fs afero.Fs) *cli.Command {
 			migrator := conduit.NewMigrator(opts...)
 
 			args := conduitcli.ApplyArgs{
-				DatabaseURL:          url,
-				Direction:            dir,
-				Steps:                cmd.Int(stepsFlag),
-				AllowHazards:         cmd.Bool(allowHazardsFlag),
-				SkipSchemaDriftCheck: cmd.Bool(noSchemaDriftFlag),
+				DatabaseURL:  url,
+				Direction:    dir,
+				Steps:        cmd.Int(stepsFlag),
+				AllowHazards: cmd.StringSlice(allowHazardsFlag),
 			}
 
 			err = conduitcli.Apply(ctx, migrator, args)
 			if err != nil && errors.Is(err, conduit.ErrHazardDetected) {
-				return fmt.Errorf("%w\n\nuse --%s to proceed", err, allowHazardsFlag)
+				return fmt.Errorf(
+					"%w\n\nuse --%s <HAZARD_TYPE>... to allow specific hazard types",
+					err,
+					allowHazardsFlag,
+				)
 			}
 
 			return err

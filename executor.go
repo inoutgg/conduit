@@ -19,10 +19,10 @@ import (
 // MigrationExecutor executes a single migration.
 type MigrationExecutor interface {
 	Execute(
-		ctx context.Context,
-		migration *conduitregistry.Migration,
-		dir Direction,
-		conn *pgx.Conn,
+		context.Context,
+		*conduitregistry.Migration,
+		Direction,
+		*pgx.Conn,
 	) (MigrationResult, error)
 }
 

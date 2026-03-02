@@ -57,9 +57,10 @@ type (
 // If Registry is omitted, the global registry is used.
 // If Logger is omitted, slog.Default is used.
 type config struct {
-	Logger   *slog.Logger              // optional
-	Registry *conduitregistry.Registry // optional
-	Executor MigrationExecutor         // optional
+	Logger               *slog.Logger              // optional
+	Registry             *conduitregistry.Registry // optional
+	Executor             MigrationExecutor         // optional
+	SkipSchemaDriftCheck bool                      // optional
 }
 
 // Option configures a Migrator.
@@ -80,6 +81,12 @@ func WithRegistry(r *conduitregistry.Registry) Option {
 // that applies migrations to the database is used.
 func WithExecutor(e MigrationExecutor) Option {
 	return func(c *config) { c.Executor = e }
+}
+
+// WithSkipSchemaDriftCheck disables the schema drift check that runs before
+// applying up migrations.
+func WithSkipSchemaDriftCheck() Option {
+	return func(c *config) { c.SkipSchemaDriftCheck = true }
 }
 
 func (c *config) defaults() {
@@ -113,9 +120,8 @@ type MigrationResult struct {
 
 // MigrateOptions specifies options for a Migrator.Migrate operation.
 type MigrateOptions struct {
-	Steps                int
-	SkipSchemaDriftCheck bool // optional
-	AllowHazards         bool // optional
+	AllowHazards []HazardType
+	Steps        int
 }
 
 func (m *MigrateOptions) defaults(dir direction.Direction) {
@@ -130,9 +136,10 @@ func (m *MigrateOptions) defaults(dir direction.Direction) {
 
 // Migrator rolls migrations up and down in version order.
 type Migrator struct {
-	logger   *slog.Logger
-	registry *conduitregistry.Registry
-	executor MigrationExecutor
+	logger               *slog.Logger
+	registry             *conduitregistry.Registry
+	executor             MigrationExecutor
+	skipSchemaDriftCheck bool
 }
 
 // NewMigrator creates a Migrator configured with the given options.
@@ -149,9 +156,10 @@ func NewMigrator(opts ...Option) *Migrator {
 	debug.Assert(cfg.Registry != nil, "config.Registry must be defined")
 
 	return &Migrator{
-		logger:   cfg.Logger,
-		registry: cfg.Registry,
-		executor: cfg.Executor,
+		logger:               cfg.Logger,
+		registry:             cfg.Registry,
+		executor:             cfg.Executor,
+		skipSchemaDriftCheck: cfg.SkipSchemaDriftCheck,
 	}
 }
 
@@ -245,7 +253,7 @@ func (m *Migrator) migrateUp(
 		return nil, err
 	}
 
-	if !opts.SkipSchemaDriftCheck {
+	if !m.skipSchemaDriftCheck {
 		if err := m.detectSchemaDrift(ctx, conn); err != nil {
 			return nil, err
 		}
@@ -355,19 +363,24 @@ func (m *Migrator) applyMigrations(
 			dir,
 		)
 
-		if hazards := migration.Hazards(dir); !opts.AllowHazards && len(hazards) > 0 {
-			msgs := make([]string, 0, len(hazards))
+		if hazards := migration.Hazards(dir); len(hazards) > 0 {
+			var blocked []string
+
 			for _, h := range hazards {
-				msgs = append(msgs, fmt.Sprintf("%s: %s", h.Type, h.Message))
+				if !slices.Contains(opts.AllowHazards, h.Type) {
+					blocked = append(blocked, fmt.Sprintf("%s: %s", h.Type, h.Message))
+				}
 			}
 
-			return nil, fmt.Errorf(
-				"%w: migration %s_%s contains hazards:\n  - %s",
-				ErrHazardDetected,
-				migration.Version().String(),
-				migration.Name(),
-				strings.Join(msgs, "\n  - "),
-			)
+			if len(blocked) > 0 {
+				return nil, fmt.Errorf(
+					"%w: migration %s_%s contains hazards:\n  - %s",
+					ErrHazardDetected,
+					migration.Version().String(),
+					migration.Name(),
+					strings.Join(blocked, "\n  - "),
+				)
+			}
 		}
 
 		migrationResult, err := m.executor.Execute(ctx, migration, dir, conn)

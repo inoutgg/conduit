@@ -18,11 +18,10 @@ import (
 
 // ApplyArgs configures a migration apply operation.
 type ApplyArgs struct {
-	DatabaseURL          string
-	Direction            direction.Direction
-	SkipSchemaDriftCheck bool
-	AllowHazards         bool
-	Steps                int
+	DatabaseURL  string
+	Direction    direction.Direction
+	AllowHazards []conduit.HazardType
+	Steps        int
 }
 
 // Apply connects to the database and runs pending migrations in the given direction.
@@ -37,9 +36,8 @@ func Apply(
 	}
 
 	_, err = migrator.Migrate(ctx, args.Direction, conn, &conduit.MigrateOptions{
-		Steps:                args.Steps,
-		AllowHazards:         args.AllowHazards,
-		SkipSchemaDriftCheck: args.SkipSchemaDriftCheck,
+		Steps:        args.Steps,
+		AllowHazards: args.AllowHazards,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to apply migrations: %w", err)
