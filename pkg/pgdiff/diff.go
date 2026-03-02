@@ -1,3 +1,5 @@
+// Package pgdiff compares PostgreSQL schemas using temporary databases
+// and generates migration plans via pg-schema-diff.
 package pgdiff
 
 import (

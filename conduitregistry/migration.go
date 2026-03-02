@@ -39,6 +39,8 @@ type Migration struct {
 	name    string
 }
 
+// UseTx reports whether the migration should run inside a transaction
+// for the given direction.
 func (m *Migration) UseTx(dir direction.Direction) (bool, error) {
 	switch dir {
 	case direction.DirectionUp:
@@ -54,6 +56,8 @@ func (m *Migration) Version() version.Version { return m.version }
 
 func (m *Migration) Name() string { return m.name }
 
+// Hazards returns the hazardous operations detected in the migration
+// for the given direction. Returns nil when no hazards are present.
 func (m *Migration) Hazards(dir direction.Direction) []Hazard {
 	switch dir {
 	case direction.DirectionUp:
@@ -65,6 +69,9 @@ func (m *Migration) Hazards(dir direction.Direction) []Hazard {
 	return nil
 }
 
+// Apply executes the migration on a bare connection without a transaction.
+// Use this for migrations that cannot run inside a transaction
+// (e.g. CREATE INDEX CONCURRENTLY).
 func (m *Migration) Apply(ctx context.Context, dir direction.Direction, conn *pgx.Conn) error {
 	debug.Assert(conn != nil, "expected conn to be defined")
 
@@ -78,6 +85,7 @@ func (m *Migration) Apply(ctx context.Context, dir direction.Direction, conn *pg
 	return direction.ErrUnknownDirection
 }
 
+// ApplyTx executes the migration within the provided transaction.
 func (m *Migration) ApplyTx(ctx context.Context, dir direction.Direction, tx pgx.Tx) error {
 	debug.Assert(tx != nil, "expected tx to be defined")
 

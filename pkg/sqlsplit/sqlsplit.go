@@ -1,3 +1,7 @@
+// Package sqlsplit splits SQL files into individual statements, handling
+// PostgreSQL syntax such as dollar-quoted strings, block comments, and
+// quoted identifiers. Top-level comments are emitted as separate
+// statements so they can carry directives (e.g. disable-tx).
 package sqlsplit
 
 import (

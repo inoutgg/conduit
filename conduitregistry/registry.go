@@ -47,6 +47,8 @@ func FromFS(fs afero.Fs, root string) *Registry {
 	return r
 }
 
+// CloneMigrations returns a shallow copy of the registered migrations map.
+// The keys are composite strings of "<version>_<name>".
 func (r *Registry) CloneMigrations() map[string]*Migration {
 	return maps.Clone(r.migrations)
 }

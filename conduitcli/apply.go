@@ -1,3 +1,9 @@
+// Package conduitcli provides high-level operations for the conduit CLI.
+//
+// Each function connects to a Postgres database and performs a single
+// migration operation (apply, diff, dump, or init). They are intended
+// to be called from CLI command handlers but can also be used
+// programmatically.
 package conduitcli
 
 import (
@@ -10,6 +16,7 @@ import (
 	"go.inout.gg/conduit/internal/direction"
 )
 
+// ApplyArgs configures a migration apply operation.
 type ApplyArgs struct {
 	DatabaseURL          string
 	Direction            direction.Direction
@@ -18,6 +25,7 @@ type ApplyArgs struct {
 	Steps                int
 }
 
+// Apply connects to the database and runs pending migrations in the given direction.
 func Apply(
 	ctx context.Context,
 	migrator *conduit.Migrator,

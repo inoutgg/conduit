@@ -8,6 +8,8 @@ import (
 	"github.com/spf13/afero"
 )
 
+// Filename is the name of the checksum file that tracks the expected schema hash
+// in a migrations directory.
 const Filename = "conduit.sum"
 
 // ReadFile reads and parses a conduit.sum file from the given filesystem.

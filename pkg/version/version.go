@@ -12,10 +12,13 @@ import (
 
 const format = "20060102150405" // YYYYMMDDHHMMSS
 
+// Version is a timestamp-based migration version using YYYYMMDDHHMMSS format.
 type Version struct{ t time.Time }
 
+// NewFromTime creates a Version from the given time, truncating to second precision.
 func NewFromTime(t time.Time) Version { return Version{t: t} }
 
+// String formats the version as a YYYYMMDDHHMMSS string.
 func (v Version) String() string { return v.t.Format(format) }
 
 // Compare compares current version and the other one,
@@ -57,6 +60,7 @@ func (f ParsedMigrationFilename) Compare(other ParsedMigrationFilename) int {
 	return cmp.Compare(f.Name, other.Name)
 }
 
+// Filename reconstructs the migration filename from its parsed components.
 func (f ParsedMigrationFilename) Filename() string {
 	return MigrationFilename(f.Version, f.Name, f.Direction)
 }

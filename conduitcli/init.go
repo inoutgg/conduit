@@ -15,11 +15,14 @@ import (
 	"go.inout.gg/conduit/pkg/version"
 )
 
+// InitArgs configures a project initialization operation.
 type InitArgs struct {
 	Dir         string
 	DatabaseURL string
 }
 
+// Init creates a new migrations directory with the initial conduit schema
+// migration and generates a conduit.sum file with the baseline schema hash.
 func Init(ctx context.Context, fs afero.Fs, timeGen timegenerator.Generator, args InitArgs) error {
 	if err := createMigrationDir(fs, args.Dir); err != nil {
 		return err

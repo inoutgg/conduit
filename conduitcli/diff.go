@@ -29,6 +29,7 @@ var nonTxPatterns = []*regexp.Regexp{
 	regexp.MustCompile(`(?i)ALTER\s+TYPE\s+.*ADD\s+VALUE`),
 }
 
+// DiffArgs configures a schema diff operation.
 type DiffArgs struct {
 	Dir         string
 	Name        string
@@ -36,6 +37,12 @@ type DiffArgs struct {
 	DatabaseURL string
 }
 
+// Diff compares the current migrations directory against a target schema file
+// and generates new migration files for any detected differences.
+//
+// Statements that require non-transactional execution (e.g. CREATE INDEX
+// CONCURRENTLY) are automatically split into separate migration files.
+// Schema drift is detected by comparing the conduit.sum hash.
 func Diff(
 	ctx context.Context,
 	fs afero.Fs,

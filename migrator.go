@@ -55,8 +55,6 @@ type (
 
 // config is the configuration for the Migrator.
 //
-// Use NewConfig to instantiate a new instance.
-//
 // Logger and Registry fields are optional.
 // If Registry is omitted, the global registry is used.
 // If Logger is omitted, slog.Default is used.
@@ -65,19 +63,16 @@ type config struct {
 	Registry *conduitregistry.Registry // optional
 }
 
-// Option is a function that configures a Config.
+// Option configures a Migrator.
 type Option func(*config)
 
-// WithLogger adds a logger to the Config.
-//
-// It's provided for convenience and intended to be used with NewConfig.
+// WithLogger sets the logger used by the Migrator for debug output.
 func WithLogger(l *slog.Logger) Option {
 	return func(c *config) { c.Logger = l }
 }
 
-// WithRegistry adds a registry to the Config.
-//
-// It's provided for convenience and intended to be used with NewConfig.
+// WithRegistry sets the migration registry. When omitted, the global
+// registry populated by [FromFS] is used.
 func WithRegistry(r *conduitregistry.Registry) Option {
 	return func(c *config) { c.Registry = r }
 }
@@ -90,7 +85,7 @@ func (c *config) defaults() {
 	c.Registry = cmp.Or(c.Registry, globalRegistry)
 }
 
-// MigrateResult represents the outcome of applied migrations batch.
+// MigrateResult represents the outcome of an applied migrations batch.
 type MigrateResult struct {
 	// Direction of the applied migrations.
 	Direction direction.Direction
@@ -124,14 +119,13 @@ func (m *MigrateOptions) defaults(dir direction.Direction) {
 	}
 }
 
-// Migrator is a database migration tool that can rolls up and down migrations
-// in order.
+// Migrator rolls migrations up and down in version order.
 type Migrator struct {
 	logger   *slog.Logger
 	registry *conduitregistry.Registry
 }
 
-// NewMigrator creates a new migrator with the given config.
+// NewMigrator creates a Migrator configured with the given options.
 func NewMigrator(opts ...Option) *Migrator {
 	//nolint:exhaustruct
 	cfg := &config{}

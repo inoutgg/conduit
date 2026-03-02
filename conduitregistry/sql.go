@@ -17,7 +17,14 @@ import (
 )
 
 const (
-	DisableTxDirective    = "---- disable-tx ----"
+	// DisableTxDirective is a SQL comment directive that, when present in a
+	// migration file, causes the migration to run outside a transaction.
+	DisableTxDirective = "---- disable-tx ----"
+
+	// HazardDirectivePrefix is the prefix for SQL comment directives that mark
+	// hazardous operations. The full format is:
+	//
+	//   ---- hazard: TYPE // message ----
 	HazardDirectivePrefix = "---- hazard:"
 )
 

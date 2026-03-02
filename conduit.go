@@ -1,5 +1,6 @@
-// Package conduit implements an SQL migration functionality fully designed
-// to be used via embedding in Go application, somewhat similar to Goose.
+// Package conduit provides embeddable SQL migrations for Go applications.
 //
-// The package doesn't support any SQL drivers other than pgx v5.
+// Only pgx v5 is supported as a database driver.
+//
+// See examples/ for a complete usage example.
 package conduit
