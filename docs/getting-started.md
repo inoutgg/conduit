@@ -61,8 +61,11 @@ and writes a new `.up.sql` file into `migrations/`. Statements that cannot run
 inside a transaction (e.g. `CREATE INDEX CONCURRENTLY`) are automatically split
 into separate migration files.
 
-If the generated migration contains hazardous operations, they are annotated
-with `---- hazard: ... ----` comments so you can review them before applying.
+If the generated migration contains hazardous operations (e.g. acquiring an
+access-exclusive lock or deleting data), they are annotated with
+`---- hazard: <TYPE> // <reason> ----` comments so you can review them before
+applying. Conduit will refuse to run such a migration unless you explicitly
+allow the relevant hazard types — see [Hazardous operations](#hazardous-operations).
 
 ## 4. Apply migrations
 
@@ -86,11 +89,30 @@ conduit apply down
 
 ### Options
 
-| Flag                      | Description                            |
-| ------------------------- | -------------------------------------- |
-| `--steps N`               | Limit the number of migrations to run  |
-| `--allow-hazards`         | Apply migrations with hazardous ops    |
-| `--no-check-schema-drift` | Skip schema drift detection            |
+| Flag                         | Description                                             |
+| ---------------------------- | ------------------------------------------------------- |
+| `--steps N`                  | Limit the number of migrations to run                   |
+| `--allow-hazards HAZARD_TYPE` | Allow a specific hazard type; may be repeated           |
+| `--no-check-schema-drift`    | Skip schema drift detection                             |
+
+## Hazardous operations
+
+Some schema changes carry operational risk — for example, adding a column with a
+non-constant default rewrites every row and holds an access-exclusive lock for
+the duration. Conduit blocks such migrations by default and requires you to
+explicitly opt in to each hazard type you want to allow.
+
+Hazard types are defined and documented by
+[pg-schema-diff](https://github.com/stripe/pg-schema-diff). Pass the string
+value of the type to `--allow-hazards` (the flag may be repeated):
+
+```sh
+conduit apply up --allow-hazards ACQUIRES_ACCESS_EXCLUSIVE_LOCK
+conduit apply up --allow-hazards INDEX_BUILD --allow-hazards DELETES_DATA
+```
+
+See [embedding.md](embedding.md#hazard-types) for the full list of constants
+available when embedding conduit in a Go application.
 
 ## 5. Embed migrations in your Go application
 

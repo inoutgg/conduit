@@ -70,31 +70,38 @@ migrator := conduit.NewMigrator(conduit.WithRegistry(registry))
 
 `NewMigrator` accepts functional options:
 
-| Option                        | Description                                        |
-| ----------------------------- | -------------------------------------------------- |
-| `WithRegistry(r)`             | Use a specific registry instead of the global one  |
-| `WithLogger(l)`               | Use a custom `*slog.Logger` for debug output       |
-| `WithExecutor(e)`             | Use a custom `MigrationExecutor`; defaults to `NewLiveExecutor` which applies migrations to the database. Use `NewDryRunExecutor` to preview migrations without applying them. |
-| `WithSkipSchemaDriftCheck()`  | Skip the schema drift check before applying up migrations. |
+| Option                       | Description                                                                                                                                                                    |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `WithRegistry(r)`            | Use a specific registry instead of the global one                                                                                                                              |
+| `WithLogger(l)`              | Use a custom `*slog.Logger` for debug output                                                                                                                                   |
+| `WithExecutor(e)`            | Use a custom `MigrationExecutor`; defaults to `NewLiveExecutor` which applies migrations to the database. Use `NewDryRunExecutor` to preview migrations without applying them. |
+| `WithSkipSchemaDriftCheck()` | Skip the schema drift check before applying up migrations.                                                                                                                     |
 
 ## Migrate options
 
 `Migrate` accepts a `*MigrateOptions` struct (pass `nil` for defaults):
 
-| Field          | Default (up) | Default (down) | Description                                   |
-| -------------- | ------------ | -------------- | --------------------------------------------- |
-| `Steps`        | `-1` (all)   | `1`            | Number of migrations to apply; `-1` means all |
+| Field          | Default (up) | Default (down) | Description                                                                                             |
+| -------------- | ------------ | -------------- | ------------------------------------------------------------------------------------------------------- |
+| `Steps`        | `-1` (all)   | `1`            | Number of migrations to apply; `-1` means all                                                           |
 | `AllowHazards` | `nil`        | `nil`          | Hazard types to permit; use `HazardType*` constants. Migrations with unlisted hazard types are blocked. |
 
 ```go
 result, err := migrator.Migrate(ctx, conduit.DirectionUp, conn, &conduit.MigrateOptions{
 	Steps: 5,
-	AllowHazards: []conduit.MigrationHazardType{
+	AllowHazards: []conduit.HazardType{
 		conduit.HazardTypeIndexBuild,
 		conduit.HazardTypeDeletesData,
 	},
 })
 ```
+
+### Hazard types
+
+Hazard types are defined by [pg-schema-diff](https://github.com/stripe/pg-schema-diff),
+the library conduit uses to detect risky SQL operations. Consult the pg-schema-diff
+documentation for the full list and the conditions under which each type is raised.
+Conduit re-exports them as `HazardType*` constants for convenience.
 
 ## Reading migration results
 
