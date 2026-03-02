@@ -74,6 +74,7 @@ migrator := conduit.NewMigrator(conduit.WithRegistry(registry))
 | ----------------------------- | -------------------------------------------------- |
 | `WithRegistry(r)`             | Use a specific registry instead of the global one  |
 | `WithLogger(l)`               | Use a custom `*slog.Logger` for debug output       |
+| `WithExecutor(e)`             | Use a custom `MigrationExecutor`; defaults to `NewLiveExecutor` which applies migrations to the database. Use `NewDryRunExecutor` to preview migrations without applying them. |
 
 ## Migrate options
 
