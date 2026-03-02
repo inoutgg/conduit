@@ -11,10 +11,10 @@ import (
 	"github.com/urfave/cli/v3"
 
 	"go.inout.gg/conduit"
-	"go.inout.gg/conduit/cmd/internal/command/commandutil"
 	"go.inout.gg/conduit/cmd/internal/config"
 	"go.inout.gg/conduit/conduitcli"
 	"go.inout.gg/conduit/conduitregistry"
+	"go.inout.gg/conduit/internal/cmdutil"
 	"go.inout.gg/conduit/internal/direction"
 )
 
@@ -31,8 +31,8 @@ func NewCommand(fs afero.Fs, cfg *config.Config) *cli.Command {
 		Name:  "apply",
 		Usage: "apply migrations in the given direction",
 		Flags: []cli.Flag{
-			commandutil.DatabaseURLFlag(),
-			commandutil.MigrationsDirFlag(),
+			cmdutil.DatabaseURLFlag(),
+			cmdutil.MigrationsDirFlag(),
 
 			//nolint:exhaustruct
 			&cli.IntFlag{
@@ -62,7 +62,7 @@ func NewCommand(fs afero.Fs, cfg *config.Config) *cli.Command {
 				Sources: cli.EnvVars("CONDUIT_DRY_RUN"),
 			},
 
-			commandutil.VerboseFlag("show migration SQL content in dry-run output"),
+			cmdutil.VerboseFlag("show migration SQL content in dry-run output"),
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			dir, err := direction.FromString(cmd.Args().First())
@@ -70,16 +70,16 @@ func NewCommand(fs afero.Fs, cfg *config.Config) *cli.Command {
 				return fmt.Errorf("failed to parse direction: %w", err)
 			}
 
-			url := commandutil.StringOr(cmd, commandutil.DatabaseURL, cfg.Database.URL)
+			url := cmdutil.StringOr(cmd, cmdutil.DatabaseURL, cfg.Database.URL)
 			if url == "" {
-				return fmt.Errorf("missing `%s' flag", commandutil.DatabaseURL)
+				return fmt.Errorf("missing `%s' flag", cmdutil.DatabaseURL)
 			}
 
 			dirPath, _ := config.FilePath(cfg.Migrations.Dir)
-			migrationsDir := commandutil.StringOr(cmd, commandutil.MigrationsDir, dirPath)
-			allowHazards := commandutil.StringSliceOr(cmd, allowHazardsFlag, cfg.Apply.AllowHazards)
-			skipSchemaDrift := commandutil.BoolOr(cmd, skipSchemaDriftFlag, cfg.Apply.SkipSchemaDriftCheck)
-			verbose := commandutil.BoolOr(cmd, commandutil.Verbose, cfg.Verbose)
+			migrationsDir := cmdutil.StringOr(cmd, cmdutil.MigrationsDir, dirPath)
+			allowHazards := cmdutil.StringSliceOr(cmd, allowHazardsFlag, cfg.Apply.AllowHazards)
+			skipSchemaDrift := cmdutil.BoolOr(cmd, skipSchemaDriftFlag, cfg.Apply.SkipSchemaDriftCheck)
+			verbose := cmdutil.BoolOr(cmd, cmdutil.Verbose, cfg.Verbose)
 
 			opts := []conduit.Option{conduit.WithRegistry(
 				conduitregistry.FromFS(fs, migrationsDir),

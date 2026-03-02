@@ -1,4 +1,4 @@
-package commandutil
+package cmdutil
 
 import "github.com/urfave/cli/v3"
 

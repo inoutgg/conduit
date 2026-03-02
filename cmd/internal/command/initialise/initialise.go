@@ -7,9 +7,9 @@ import (
 	"github.com/spf13/afero"
 	"github.com/urfave/cli/v3"
 
-	"go.inout.gg/conduit/cmd/internal/command/commandutil"
 	"go.inout.gg/conduit/cmd/internal/config"
 	"go.inout.gg/conduit/conduitcli"
+	"go.inout.gg/conduit/internal/cmdutil"
 	"go.inout.gg/conduit/pkg/timegenerator"
 )
 
@@ -20,13 +20,13 @@ func NewCommand(fs afero.Fs, timeGen timegenerator.Generator, cfg *config.Config
 		Aliases: []string{"i"},
 		Usage:   "initialise migration directory",
 		Flags: []cli.Flag{
-			commandutil.MigrationsDirFlag(),
-			commandutil.DatabaseURLFlag(),
+			cmdutil.MigrationsDirFlag(),
+			cmdutil.DatabaseURLFlag(),
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			dirPath, _ := config.FilePath(cfg.Migrations.Dir)
-			migrationsDir := commandutil.StringOr(cmd, commandutil.MigrationsDir, dirPath)
-			dbURL := commandutil.StringOr(cmd, commandutil.DatabaseURL, cfg.Database.URL)
+			migrationsDir := cmdutil.StringOr(cmd, cmdutil.MigrationsDir, dirPath)
+			dbURL := cmdutil.StringOr(cmd, cmdutil.DatabaseURL, cfg.Database.URL)
 
 			args := conduitcli.InitArgs{
 				Dir:         filepath.Clean(migrationsDir),
