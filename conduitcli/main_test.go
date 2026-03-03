@@ -14,7 +14,6 @@ import (
 	"go.inout.gg/conduit/pkg/timegenerator"
 )
 
-// buildInfoStub is a test implementation of buildinfo.BuildInfo.
 type buildInfoStub struct{}
 
 func (buildInfoStub) Version() string { return "devel" }
