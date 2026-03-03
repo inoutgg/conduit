@@ -42,7 +42,6 @@ type DiffArgs struct {
 //
 // Statements that require non-transactional execution (e.g. CREATE INDEX
 // CONCURRENTLY) are automatically split into separate migration files.
-// Schema drift is detected by comparing the conduit.sum hash.
 func Diff(
 	ctx context.Context,
 	fs afero.Fs,
@@ -153,8 +152,6 @@ type migration struct {
 	isNonTx bool
 }
 
-// splitMigrations splits statements into contiguous groups based on whether
-// they require non-transactional execution.
 func splitMigrations(stmts []schemadiff.Statement) []migration {
 	if len(stmts) == 0 {
 		return nil

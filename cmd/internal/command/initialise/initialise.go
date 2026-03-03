@@ -2,6 +2,8 @@ package initialise
 
 import (
 	"context"
+	"fmt"
+	"net/url"
 	"path/filepath"
 
 	"github.com/spf13/afero"
@@ -33,7 +35,24 @@ func NewCommand(fs afero.Fs, timeGen timegenerator.Generator, cfg *config.Config
 				DatabaseURL: dbURL,
 			}
 
-			return conduitcli.Init(ctx, fs, timeGen, args)
+			if err := conduitcli.Init(ctx, fs, timeGen, args); err != nil {
+				return fmt.Errorf("conduit: init: %w", err)
+			}
+
+			defaultCfg := config.Config{
+				Migrations: config.MigrationsConfig{
+					Dir: &url.URL{Scheme: "file", Path: args.Dir},
+				},
+				Database: config.DatabaseConfig{
+					URL: args.DatabaseURL,
+				},
+			}
+
+			if err := config.WriteFile(fs, config.DefaultFilename, defaultCfg); err != nil {
+				return fmt.Errorf("conduit: failed to create config file: %w", err)
+			}
+
+			return nil
 		},
 	}
 }

@@ -9,21 +9,22 @@ import (
 
 	"github.com/spf13/afero"
 	"sigs.k8s.io/yaml"
+	"sigs.k8s.io/yaml/kyaml"
 )
 
+const DefaultFilename = "conduit.yaml"
+
 // FilePath resolves a file:// URL to its local filesystem path.
-// A nil or scheme-less URL returns an empty string without error.
-// An unsupported scheme returns an error.
-func FilePath(url *url.URL) (string, error) {
-	if url == nil || url.Scheme == "" {
+func FilePath(uri *url.URL) (string, error) {
+	if uri == nil {
 		return "", nil
 	}
 
-	if url.Scheme != "file" {
-		return "", fmt.Errorf("unsupported URL scheme %q (only file:// is supported)", url.Scheme)
+	if uri.Scheme != "file" {
+		return "", fmt.Errorf("unsupported URL scheme %q (only file:// is supported)", uri.Scheme)
 	}
 
-	return url.Host + url.Path, nil
+	return uri.Path, nil
 }
 
 type DatabaseConfig struct {
@@ -106,6 +107,19 @@ func (cfg *Config) validate() error {
 
 	if _, err := FilePath(cfg.Migrations.Schema); err != nil {
 		return fmt.Errorf("migrations.schema: %w", err)
+	}
+
+	return nil
+}
+
+func WriteFile(fs afero.Fs, path string, cfg Config) error {
+	data, err := new(kyaml.Encoder).Marshal(cfg)
+	if err != nil {
+		return fmt.Errorf("marshalling config: %w", err)
+	}
+
+	if err := afero.WriteFile(fs, path, data, 0o644); err != nil {
+		return fmt.Errorf("writing config file %q: %w", path, err)
 	}
 
 	return nil
