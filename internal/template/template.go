@@ -8,17 +8,24 @@ import (
 	_ "embed"
 )
 
+//nolint:gochecknoglobals
 var (
 	//go:embed migration.up.sql.tmpl
 	sqlUpMigrationTemplate string
 
-	//nolint:gochecknoglobals
+	//go:embed conduit.yaml.tmpl
+	conduitYAMLTemplate string
+
 	SQLUpMigrationTemplate *template.Template
+	ConduitYAMLTemplate    *template.Template
 )
 
 //nolint:gochecknoinits
 func init() {
 	SQLUpMigrationTemplate = must.Must(
 		template.New("conduit: SQL Up Migration Template").Parse(sqlUpMigrationTemplate),
+	)
+	ConduitYAMLTemplate = must.Must(
+		template.New("conduit: YAML Config Template").Parse(conduitYAMLTemplate),
 	)
 }

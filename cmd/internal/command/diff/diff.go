@@ -6,9 +6,10 @@ import (
 	"path/filepath"
 
 	"github.com/spf13/afero"
+	altsrc "github.com/urfave/cli-altsrc/v3"
+	yamlsrc "github.com/urfave/cli-altsrc/v3/yaml"
 	"github.com/urfave/cli/v3"
 
-	"go.inout.gg/conduit/cmd/internal/config"
 	"go.inout.gg/conduit/conduitcli"
 	"go.inout.gg/conduit/internal/cmdutil"
 	"go.inout.gg/conduit/pkg/buildinfo"
@@ -17,7 +18,7 @@ import (
 
 const schemaFlag = "schema"
 
-func NewCommand(fs afero.Fs, timeGen timegenerator.Generator, bi buildinfo.BuildInfo, cfg *config.Config) *cli.Command {
+func NewCommand(fs afero.Fs, timeGen timegenerator.Generator, bi buildinfo.BuildInfo, src altsrc.Sourcer) *cli.Command {
 	//nolint:exhaustruct
 	return &cli.Command{
 		Name:  "diff",
@@ -25,12 +26,15 @@ func NewCommand(fs afero.Fs, timeGen timegenerator.Generator, bi buildinfo.Build
 		Flags: []cli.Flag{
 			//nolint:exhaustruct
 			&cli.StringFlag{
-				Name:    schemaFlag,
-				Usage:   "path to the target schema SQL file",
-				Sources: cli.EnvVars("CONDUIT_SCHEMA"),
+				Name:  schemaFlag,
+				Usage: "path to the target schema SQL file",
+				Sources: cli.NewValueSourceChain(
+					cli.EnvVar("CONDUIT_SCHEMA"),
+					yamlsrc.YAML("migrations.schema", src),
+				),
 			},
-			cmdutil.DatabaseURLFlag(),
-			cmdutil.MigrationsDirFlag(),
+			cmdutil.DatabaseURLFlag(src),
+			cmdutil.MigrationsDirFlag(src),
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			name := cmd.Args().First()
@@ -38,22 +42,16 @@ func NewCommand(fs afero.Fs, timeGen timegenerator.Generator, bi buildinfo.Build
 				return errors.New("missing `name` argument")
 			}
 
-			schemaPath, _ := config.FilePath(cfg.Migrations.Schema)
-
-			schema := cmdutil.StringOr(cmd, schemaFlag, schemaPath)
+			schema := cmd.String(schemaFlag)
 			if schema == "" {
 				return errors.New("missing `--schema` flag")
 			}
 
-			dirPath, _ := config.FilePath(cfg.Migrations.Dir)
-			migrationsDir := cmdutil.StringOr(cmd, cmdutil.MigrationsDir, dirPath)
-			dbURL := cmdutil.StringOr(cmd, cmdutil.DatabaseURL, cfg.Database.URL)
-
 			args := conduitcli.DiffArgs{
-				Dir:         filepath.Clean(migrationsDir),
+				Dir:         filepath.Clean(cmd.String(cmdutil.MigrationsDir)),
 				Name:        name,
 				SchemaPath:  schema,
-				DatabaseURL: dbURL,
+				DatabaseURL: cmd.String(cmdutil.DatabaseURL),
 			}
 
 			return conduitcli.Diff(ctx, fs, timeGen, bi, args)

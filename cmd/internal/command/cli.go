@@ -6,13 +6,13 @@ import (
 	"os"
 
 	"github.com/spf13/afero"
+	altsrc "github.com/urfave/cli-altsrc/v3"
 	"github.com/urfave/cli/v3"
 
 	"go.inout.gg/conduit/cmd/internal/command/apply"
 	"go.inout.gg/conduit/cmd/internal/command/diff"
 	"go.inout.gg/conduit/cmd/internal/command/dump"
 	"go.inout.gg/conduit/cmd/internal/command/initialise"
-	"go.inout.gg/conduit/cmd/internal/config"
 	"go.inout.gg/conduit/internal/cmdutil"
 	"go.inout.gg/conduit/pkg/buildinfo"
 	"go.inout.gg/conduit/pkg/timegenerator"
@@ -28,39 +28,33 @@ func Execute(ctx context.Context) error {
 	fs := afero.NewBasePathFs(afero.NewOsFs(), cwd)
 
 	var (
-		timeGen timegenerator.Standard
-		bi      buildinfo.Standard
-		cfg     config.Config
+		timeGen    timegenerator.Standard
+		bi         buildinfo.Standard
+		configPath = "conduit.yaml"
 	)
+
+	configSrc := altsrc.NewStringPtrSourcer(&configPath)
 
 	//nolint:exhaustruct
 	cmd := &cli.Command{
 		Name:  "conduit",
 		Usage: "An SQL migrator that is easy to embed.",
-		Before: func(ctx context.Context, cmd *cli.Command) (context.Context, error) {
-			var err error
-
-			cfg, err = config.FromFS(afero.NewOsFs(), cmd.String("config"))
-			if err != nil {
-				return ctx, fmt.Errorf("failed to load config: %w", err)
-			}
-
-			return ctx, nil
-		},
 		Flags: []cli.Flag{
 			//nolint:exhaustruct
 			&cli.StringFlag{
-				Name:    "config",
-				Usage:   "path to config file (default: conduit.yaml or .conduit.yaml)",
-				Sources: cli.EnvVars("CONDUIT_CONFIG"),
+				Name:        "config",
+				Usage:       "path to config file",
+				Value:       "conduit.yaml",
+				Destination: &configPath,
+				Sources:     cli.EnvVars("CONDUIT_CONFIG"),
 			},
-			cmdutil.VerboseFlag("verbose mode"),
+			cmdutil.VerboseFlag(configSrc),
 		},
 		Commands: []*cli.Command{
-			initialise.NewCommand(fs, timeGen, &cfg),
-			diff.NewCommand(fs, timeGen, bi, &cfg),
-			apply.NewCommand(fs, &cfg),
-			dump.NewCommand(bi, &cfg),
+			initialise.NewCommand(fs, timeGen, configSrc),
+			diff.NewCommand(fs, timeGen, bi, configSrc),
+			apply.NewCommand(fs, configSrc),
+			dump.NewCommand(bi, configSrc),
 		},
 	}
 

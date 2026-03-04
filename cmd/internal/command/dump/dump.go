@@ -5,29 +5,29 @@ import (
 	"fmt"
 	"os"
 
+	altsrc "github.com/urfave/cli-altsrc/v3"
 	"github.com/urfave/cli/v3"
 
-	"go.inout.gg/conduit/cmd/internal/config"
 	"go.inout.gg/conduit/conduitcli"
 	"go.inout.gg/conduit/internal/cmdutil"
 	"go.inout.gg/conduit/pkg/buildinfo"
 )
 
-func NewCommand(bi buildinfo.BuildInfo, cfg *config.Config) *cli.Command {
+func NewCommand(bi buildinfo.BuildInfo, src altsrc.Sourcer) *cli.Command {
 	//nolint:exhaustruct
 	return &cli.Command{
 		Name:  "dump",
 		Usage: "dump schema DDL from a remote Postgres database",
 		Flags: []cli.Flag{
-			cmdutil.DatabaseURLFlag(),
+			cmdutil.DatabaseURLFlag(src),
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
-			url := cmdutil.StringOr(cmd, cmdutil.DatabaseURL, cfg.Database.URL)
-			if url == "" {
+			dbURL := cmd.String(cmdutil.DatabaseURL)
+			if dbURL == "" {
 				return fmt.Errorf("missing `%s' flag", cmdutil.DatabaseURL)
 			}
 
-			return conduitcli.Dump(ctx, os.Stdout, bi, conduitcli.DumpArgs{DatabaseURL: url})
+			return conduitcli.Dump(ctx, os.Stdout, bi, conduitcli.DumpArgs{DatabaseURL: dbURL})
 		},
 	}
 }

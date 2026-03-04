@@ -1,6 +1,10 @@
 package cmdutil
 
-import "github.com/urfave/cli/v3"
+import (
+	altsrc "github.com/urfave/cli-altsrc/v3"
+	yamlsrc "github.com/urfave/cli-altsrc/v3/yaml"
+	"github.com/urfave/cli/v3"
+)
 
 const (
 	Verbose       = "verbose"
@@ -8,30 +12,39 @@ const (
 	MigrationsDir = "migrations-dir"
 )
 
-func MigrationsDirFlag() *cli.StringFlag {
+func MigrationsDirFlag(src altsrc.Sourcer) *cli.StringFlag {
 	//nolint:exhaustruct
 	return &cli.StringFlag{
-		Name:    MigrationsDir,
-		Usage:   "directory with migration files",
-		Value:   "./migrations",
-		Sources: cli.EnvVars("CONDUIT_MIGRATIONS_DIR"),
+		Name:  MigrationsDir,
+		Usage: "directory with migration files",
+		Value: "./migrations",
+		Sources: cli.NewValueSourceChain(
+			cli.EnvVar("CONDUIT_MIGRATIONS_DIR"),
+			yamlsrc.YAML("migrations.dir", src),
+		),
 	}
 }
 
-func DatabaseURLFlag() *cli.StringFlag {
+func DatabaseURLFlag(src altsrc.Sourcer) *cli.StringFlag {
 	//nolint:exhaustruct
 	return &cli.StringFlag{
-		Name:    DatabaseURL,
-		Usage:   "database connection URL",
-		Sources: cli.EnvVars("CONDUIT_DATABASE_URL"),
+		Name:  DatabaseURL,
+		Usage: "database connection URL",
+		Sources: cli.NewValueSourceChain(
+			cli.EnvVar("CONDUIT_DATABASE_URL"),
+			yamlsrc.YAML("database.url", src),
+		),
 	}
 }
 
-func VerboseFlag(usage string) *cli.BoolFlag {
+func VerboseFlag(src altsrc.Sourcer) *cli.BoolFlag {
 	//nolint:exhaustruct
 	return &cli.BoolFlag{
-		Name:    Verbose,
-		Usage:   usage,
-		Sources: cli.EnvVars("CONDUIT_VERBOSE"),
+		Name:  Verbose,
+		Usage: "verbose mode",
+		Sources: cli.NewValueSourceChain(
+			cli.EnvVar("CONDUIT_VERBOSE"),
+			yamlsrc.YAML("verbose", src),
+		),
 	}
 }
