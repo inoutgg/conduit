@@ -8,10 +8,11 @@ import (
 	"os"
 
 	"github.com/spf13/afero"
+	altsrc "github.com/urfave/cli-altsrc/v3"
+	yamlsrc "github.com/urfave/cli-altsrc/v3/yaml"
 	"github.com/urfave/cli/v3"
 
 	"go.inout.gg/conduit"
-	"go.inout.gg/conduit/cmd/internal/config"
 	"go.inout.gg/conduit/conduitcli"
 	"go.inout.gg/conduit/conduitregistry"
 	"go.inout.gg/conduit/internal/cmdutil"
@@ -25,44 +26,56 @@ const (
 	dryRunFlag          = "dry-run"
 )
 
-func NewCommand(fs afero.Fs, cfg *config.Config) *cli.Command {
+func NewCommand(fs afero.Fs, src altsrc.Sourcer) *cli.Command {
 	//nolint:exhaustruct
 	return &cli.Command{
 		Name:  "apply",
 		Usage: "apply migrations in the given direction",
 		Flags: []cli.Flag{
-			cmdutil.DatabaseURLFlag(),
-			cmdutil.MigrationsDirFlag(),
+			cmdutil.DatabaseURLFlag(src),
+			cmdutil.MigrationsDirFlag(src),
 
 			//nolint:exhaustruct
 			&cli.IntFlag{
-				Name:    stepsFlag,
-				Usage:   "maximum migrations steps",
-				Sources: cli.EnvVars("CONDUIT_STEPS"),
+				Name:  stepsFlag,
+				Usage: "maximum migrations steps",
+				Sources: cli.NewValueSourceChain(
+					cli.EnvVar("CONDUIT_STEPS"),
+					yamlsrc.YAML("apply.steps", src),
+				),
 			},
 
 			//nolint:exhaustruct
 			&cli.StringSliceFlag{
-				Name:    allowHazardsFlag,
-				Usage:   "hazardous operation types to allow (e.g. INDEX_BUILD, DELETES_DATA); may be repeated",
-				Sources: cli.EnvVars("CONDUIT_ALLOW_HAZARDS"),
+				Name:  allowHazardsFlag,
+				Usage: "hazardous operation types to allow (e.g. INDEX_BUILD, DELETES_DATA); may be repeated",
+				Sources: cli.NewValueSourceChain(
+					cli.EnvVar("CONDUIT_ALLOW_HAZARDS"),
+					yamlsrc.YAML("apply.allow-hazards", src),
+				),
 			},
 
 			//nolint:exhaustruct
 			&cli.BoolFlag{
-				Name:    skipSchemaDriftFlag,
-				Usage:   "skip check for schema drift before applying migrations",
-				Sources: cli.EnvVars("CONDUIT_SKIP_SCHEMA_DRIFT_CHECK"),
+				Name:  skipSchemaDriftFlag,
+				Usage: "skip check for schema drift before applying migrations",
+				Sources: cli.NewValueSourceChain(
+					cli.EnvVar("CONDUIT_SKIP_SCHEMA_DRIFT_CHECK"),
+					yamlsrc.YAML("apply.skip-schema-drift-check", src),
+				),
 			},
 
 			//nolint:exhaustruct
 			&cli.BoolFlag{
-				Name:    dryRunFlag,
-				Usage:   "preview migrations without applying them",
-				Sources: cli.EnvVars("CONDUIT_DRY_RUN"),
+				Name:  dryRunFlag,
+				Usage: "preview migrations without applying them",
+				Sources: cli.NewValueSourceChain(
+					cli.EnvVar("CONDUIT_DRY_RUN"),
+					yamlsrc.YAML("apply.dry-run", src),
+				),
 			},
 
-			cmdutil.VerboseFlag("show migration SQL content in dry-run output"),
+			cmdutil.VerboseFlag(src),
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			dir, err := direction.FromString(cmd.Args().First())
@@ -70,37 +83,33 @@ func NewCommand(fs afero.Fs, cfg *config.Config) *cli.Command {
 				return fmt.Errorf("failed to parse direction: %w", err)
 			}
 
-			url := cmdutil.StringOr(cmd, cmdutil.DatabaseURL, cfg.Database.URL)
-			if url == "" {
+			dbURL := cmd.String(cmdutil.DatabaseURL)
+			if dbURL == "" {
 				return fmt.Errorf("missing `%s' flag", cmdutil.DatabaseURL)
 			}
 
-			dirPath, _ := config.FilePath(cfg.Migrations.Dir)
-			migrationsDir := cmdutil.StringOr(cmd, cmdutil.MigrationsDir, dirPath)
-			allowHazards := cmdutil.StringSliceOr(cmd, allowHazardsFlag, cfg.Apply.AllowHazards)
-			skipSchemaDrift := cmdutil.BoolOr(cmd, skipSchemaDriftFlag, cfg.Apply.SkipSchemaDriftCheck)
-			verbose := cmdutil.BoolOr(cmd, cmdutil.Verbose, cfg.Verbose)
+			migrationsDir := cmd.String(cmdutil.MigrationsDir)
 
 			opts := []conduit.Option{conduit.WithRegistry(
 				conduitregistry.FromFS(fs, migrationsDir),
 			)}
-			if skipSchemaDrift {
+			if cmd.Bool(skipSchemaDriftFlag) {
 				opts = append(opts, conduit.WithSkipSchemaDriftCheck())
 			}
 
 			if cmd.Bool(dryRunFlag) {
 				opts = append(opts, conduit.WithExecutor(
-					conduit.NewDryRunExecutor(os.Stdout, verbose),
+					conduit.NewDryRunExecutor(os.Stdout, cmd.Bool(cmdutil.Verbose)),
 				))
 			}
 
 			migrator := conduit.NewMigrator(opts...)
 
 			args := conduitcli.ApplyArgs{
-				DatabaseURL:  url,
+				DatabaseURL:  dbURL,
 				Direction:    dir,
 				Steps:        cmd.Int(stepsFlag),
-				AllowHazards: allowHazards,
+				AllowHazards: cmd.StringSlice(allowHazardsFlag),
 			}
 
 			err = conduitcli.Apply(ctx, migrator, args)

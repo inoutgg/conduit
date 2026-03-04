@@ -1,6 +1,7 @@
 package conduitcli
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 
@@ -8,12 +9,15 @@ import (
 	"github.com/spf13/afero"
 
 	"go.inout.gg/conduit/internal/migrations"
+	conduittemplate "go.inout.gg/conduit/internal/template"
 	"go.inout.gg/conduit/pkg/conduitsum"
 	"go.inout.gg/conduit/pkg/pgdiff"
 	"go.inout.gg/conduit/pkg/sqlsplit"
 	"go.inout.gg/conduit/pkg/timegenerator"
 	"go.inout.gg/conduit/pkg/version"
 )
+
+const configFilename = "conduit.yaml"
 
 // InitArgs configures a project initialization operation.
 type InitArgs struct {
@@ -22,7 +26,8 @@ type InitArgs struct {
 }
 
 // Init creates a new migrations directory with the initial conduit schema
-// migration and generates a conduit.sum file with the baseline schema hash.
+// migration, generates a conduit.sum file with the baseline schema hash,
+// and writes a default conduit.yaml config file.
 func Init(ctx context.Context, fs afero.Fs, timeGen timegenerator.Generator, args InitArgs) error {
 	if err := createMigrationDir(fs, args.Dir); err != nil {
 		return err
@@ -52,6 +57,23 @@ func Init(ctx context.Context, fs afero.Fs, timeGen timegenerator.Generator, arg
 
 	if err := conduitsum.WriteFile(migrationsFs, hash); err != nil {
 		return fmt.Errorf("conduit: failed to write conduit.sum: %w", err)
+	}
+
+	if err := writeConfigFile(fs, args); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func writeConfigFile(fs afero.Fs, args InitArgs) error {
+	var buf bytes.Buffer
+	if err := conduittemplate.ConduitYAMLTemplate.Execute(&buf, args); err != nil {
+		return fmt.Errorf("conduit: failed to render config template: %w", err)
+	}
+
+	if err := afero.WriteFile(fs, configFilename, buf.Bytes(), 0o644); err != nil {
+		return fmt.Errorf("conduit: failed to write config file: %w", err)
 	}
 
 	return nil
