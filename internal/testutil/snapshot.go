@@ -2,8 +2,9 @@ package testutil
 
 import (
 	"bytes"
-	"path"
-	"sort"
+	"fmt"
+	"io/fs"
+	"path/filepath"
 	"testing"
 
 	"github.com/gkampitakis/go-snaps/snaps"
@@ -11,35 +12,41 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// SnapshotFS reads all files from the given afero filesystem directory
-// and returns a sorted string representation suitable for snapshotting.
-func SnapshotFS(t *testing.T, fs afero.Fs, dir string) {
+// SnapshotFS recursively reads all files from the given afero filesystem
+// directory and returns a sorted string representation suitable for
+// snapshotting. File paths are relative to dir.
+func SnapshotFS(t *testing.T, afs afero.Fs, dir string) {
 	t.Helper()
 
 	var b bytes.Buffer
 
-	entries, err := afero.ReadDir(fs, dir)
-	require.NoError(t, err)
-
-	// Sort entries by name for deterministic output.
-	sort.Slice(entries, func(i, j int) bool {
-		return entries[i].Name() < entries[j].Name()
-	})
-
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
+	require.NoError(t, afero.Walk(afs, dir, func(path string, info fs.FileInfo, err error) error {
+		if err != nil {
+			return err
 		}
 
-		content, err := afero.ReadFile(fs, path.Join(dir, entry.Name()))
-		require.NoError(t, err)
+		if info.IsDir() {
+			return nil
+		}
+
+		rel, err := filepath.Rel(dir, path)
+		if err != nil {
+			return fmt.Errorf("failed to compute relative path: %w", err)
+		}
+
+		content, err := afero.ReadFile(afs, path)
+		if err != nil {
+			return fmt.Errorf("failed to read file %s: %w", path, err)
+		}
 
 		b.WriteString("### ")
-		b.WriteString(entry.Name())
+		b.WriteString(rel)
 		b.WriteString(" ###\n")
 		b.Write(content)
 		b.WriteString("\n")
-	}
+
+		return nil
+	}))
 
 	snaps.MatchSnapshot(t, b.String())
 }

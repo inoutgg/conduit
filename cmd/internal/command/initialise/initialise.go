@@ -3,6 +3,7 @@ package initialise
 import (
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
 
 	"github.com/spf13/afero"
@@ -26,8 +27,14 @@ func NewCommand(fs afero.Fs, timeGen timegenerator.Generator, src altsrc.Sourcer
 			cmdutil.ExcludeSchemasFlag(src),
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
+			cwd, err := os.Getwd()
+			if err != nil {
+				return fmt.Errorf("conduit: init: failed to get working directory: %w", err)
+			}
+
 			args := conduitcli.InitArgs{
-				Dir:            filepath.Clean(cmd.String(cmdutil.MigrationsDir)),
+				Dir:            cwd,
+				MigrationsDir:  filepath.Clean(cmd.String(cmdutil.MigrationsDir)),
 				DatabaseURL:    cmd.String(cmdutil.DatabaseURL),
 				ExcludeSchemas: cmd.StringSlice(cmdutil.ExcludeSchemas),
 			}

@@ -1,6 +1,12 @@
 
 [TestInit/should_create_migration_directory_and_schema_file,_when_initialising_fresh_project - 1]
-### 20240115123045_conduit_initial_schema.up.sql ###
+### conduit.yaml ###
+database:
+  url: postgres://test:test@localhost:5432/test?sslmode=disable
+migrations:
+  dir: /testdir/migrations
+
+### testdir/migrations/20240115123045_conduit_initial_schema.up.sql ###
 CREATE TABLE IF NOT EXISTS conduit_migrations (
   id BIGSERIAL NOT NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -11,7 +17,7 @@ CREATE TABLE IF NOT EXISTS conduit_migrations (
   UNIQUE (version, name)
 );
 
-### conduit.sum ###
+### testdir/migrations/conduit.sum ###
 93e081ed14bd9b9e
 
 
