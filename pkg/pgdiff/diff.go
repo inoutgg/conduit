@@ -17,6 +17,7 @@ import (
 	"github.com/stripe/pg-schema-diff/pkg/schema"
 	"github.com/stripe/pg-schema-diff/pkg/tempdb"
 
+	"go.inout.gg/conduit/internal/migrations"
 	"go.inout.gg/conduit/internal/sliceutil"
 	"go.inout.gg/conduit/pkg/sqlsplit"
 	"go.inout.gg/conduit/pkg/version"
@@ -73,6 +74,12 @@ func GeneratePlan(
 		}
 	}
 
+	// Apply conduit's internal schema (e.g. conduit_migrations table) to the
+	// target database so the schema hash includes it.
+	if err := exec(ctx, targetDb.ConnPool, string(migrations.Schema)); err != nil {
+		return result, fmt.Errorf("failed to execute conduit internal schema: %w", err)
+	}
+
 	planOpts := []schemadiff.PlanOpt{
 		schemadiff.WithTempDbFactory(factory),
 		schemadiff.WithGetSchemaOpts(targetDb.ExcludeMetadataOptions...),
@@ -84,11 +91,26 @@ func GeneratePlan(
 		schemaOpts = append(schemaOpts, schema.WithExcludeSchemas(excludeSchemas...))
 	}
 
+	// Include conduit's internal schema in the source DDL so it matches the
+	// target and cancels out in the diff — only user schema changes remain.
+	internalStmts, err := sqlsplit.Split(migrations.Schema)
+	if err != nil {
+		return result, fmt.Errorf("failed to parse conduit internal schema: %w", err)
+	}
+
+	sourceDDL := append(
+		sliceutil.Map(
+			sliceutil.Filter(internalStmts, func(s sqlsplit.Stmt) bool {
+				return s.Type == sqlsplit.StmtTypeQuery
+			}),
+			func(s sqlsplit.Stmt) string { return s.Content },
+		),
+		sliceutil.Map(sourceStmts, func(stmt sqlsplit.Stmt) string { return stmt.Content })...,
+	)
+
 	plan, err := schemadiff.Generate(
 		ctx,
-		schemadiff.DDLSchemaSource(
-			sliceutil.Map(sourceStmts, func(stmt sqlsplit.Stmt) string { return stmt.Content }),
-		),
+		schemadiff.DDLSchemaSource(sourceDDL),
 		schemadiff.DBSchemaSource(targetDb.ConnPool),
 		planOpts...,
 	)
@@ -175,9 +197,21 @@ func DumpSchema(
 		planOpts = append(planOpts, schemadiff.WithExcludeSchemas(excludeSchemas...))
 	}
 
+	// Use conduit's internal schema as the DDL baseline so that conduit-managed
+	// tables (e.g. conduit_migrations) cancel out in the diff against the remote DB.
+	internalStmts, err := sqlsplit.Split(migrations.Schema)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse conduit internal schema: %w", err)
+	}
+
 	plan, err := schemadiff.Generate(
 		ctx,
-		schemadiff.DDLSchemaSource([]string{}),
+		schemadiff.DDLSchemaSource(sliceutil.Map(
+			sliceutil.Filter(internalStmts, func(s sqlsplit.Stmt) bool {
+				return s.Type == sqlsplit.StmtTypeQuery
+			}),
+			func(s sqlsplit.Stmt) string { return s.Content },
+		)),
 		schemadiff.DBSchemaSource(remoteDB),
 		planOpts...,
 	)
@@ -185,7 +219,11 @@ func DumpSchema(
 		return nil, fmt.Errorf("failed to dump schema: %w", err)
 	}
 
-	return plan.Statements, nil
+	// Filter out any remaining conduit internal statements (e.g. when the
+	// remote DB doesn't have conduit tables yet).
+	return sliceutil.Filter(plan.Statements, func(s schemadiff.Statement) bool {
+		return !strings.Contains(s.DDL, "conduit_migrations")
+	}), nil
 }
 
 func newTempDbFactory(ctx context.Context, connConfig *pgx.ConnConfig) (tempdb.Factory, error) {
@@ -264,4 +302,23 @@ func readStmtsFromFile(fs afero.Fs, path string) ([]sqlsplit.Stmt, error) {
 	}
 
 	return stmts, nil
+}
+
+func exec(ctx context.Context, db *sql.DB, sql string) error {
+	stmts, err := sqlsplit.Split([]byte(sql))
+	if err != nil {
+		return fmt.Errorf("failed to parse SQL: %w", err)
+	}
+
+	for _, stmt := range stmts {
+		if stmt.Type != sqlsplit.StmtTypeQuery {
+			continue
+		}
+
+		if _, err := db.ExecContext(ctx, stmt.Content); err != nil {
+			return fmt.Errorf("failed to execute statement: %w", err)
+		}
+	}
+
+	return nil
 }
