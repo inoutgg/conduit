@@ -14,7 +14,8 @@ import (
 
 // DumpArgs configures a schema dump operation.
 type DumpArgs struct {
-	DatabaseURL string
+	DatabaseURL    string
+	ExcludeSchemas []string
 }
 
 // Dump connects to the database, extracts its schema as DDL statements,
@@ -25,7 +26,7 @@ func Dump(ctx context.Context, w io.Writer, bi buildinfo.BuildInfo, args DumpArg
 		return fmt.Errorf("failed to parse database URL: %w", err)
 	}
 
-	stmts, err := pgdiff.DumpSchema(ctx, connConfig)
+	stmts, err := pgdiff.DumpSchema(ctx, connConfig, args.ExcludeSchemas)
 	if err != nil {
 		return fmt.Errorf("failed to dump schema: %w", err)
 	}

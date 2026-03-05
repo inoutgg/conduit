@@ -20,6 +20,7 @@ func NewCommand(bi buildinfo.BuildInfo, src altsrc.Sourcer) *cli.Command {
 		Usage: "dump schema DDL from a remote Postgres database",
 		Flags: []cli.Flag{
 			cmdutil.DatabaseURLFlag(src),
+			cmdutil.ExcludeSchemasFlag(src),
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			dbURL := cmd.String(cmdutil.DatabaseURL)
@@ -27,7 +28,10 @@ func NewCommand(bi buildinfo.BuildInfo, src altsrc.Sourcer) *cli.Command {
 				return fmt.Errorf("missing `%s' flag", cmdutil.DatabaseURL)
 			}
 
-			return conduitcli.Dump(ctx, os.Stdout, bi, conduitcli.DumpArgs{DatabaseURL: dbURL})
+			return conduitcli.Dump(ctx, os.Stdout, bi, conduitcli.DumpArgs{
+				DatabaseURL:    dbURL,
+				ExcludeSchemas: cmd.StringSlice(cmdutil.ExcludeSchemas),
+			})
 		},
 	}
 }

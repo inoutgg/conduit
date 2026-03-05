@@ -7,9 +7,10 @@ import (
 )
 
 const (
-	Verbose       = "verbose"
-	DatabaseURL   = "database-url"
-	MigrationsDir = "migrations-dir"
+	Verbose        = "verbose"
+	DatabaseURL    = "database-url"
+	MigrationsDir  = "migrations-dir"
+	ExcludeSchemas = "exclude-schema"
 )
 
 func MigrationsDirFlag(src altsrc.Sourcer) *cli.StringFlag {
@@ -33,6 +34,18 @@ func DatabaseURLFlag(src altsrc.Sourcer) *cli.StringFlag {
 		Sources: cli.NewValueSourceChain(
 			cli.EnvVar("CONDUIT_DATABASE_URL"),
 			yamlsrc.YAML("database.url", src),
+		),
+	}
+}
+
+func ExcludeSchemasFlag(src altsrc.Sourcer) *cli.StringSliceFlag {
+	//nolint:exhaustruct
+	return &cli.StringSliceFlag{
+		Name:  ExcludeSchemas,
+		Usage: "PostgreSQL schemas to exclude; may be repeated",
+		Sources: cli.NewValueSourceChain(
+			cli.EnvVar("CONDUIT_EXCLUDE_SCHEMAS"),
+			yamlsrc.YAML("exclude-schemas", src),
 		),
 	}
 }

@@ -122,6 +122,7 @@ CREATE TABLE posts (id int, user_id int);`).
 			config,
 			migrationsDir,
 			filepath.Join(baseDir, "schema.sql"),
+			nil,
 		)
 
 		// Assert
@@ -156,7 +157,7 @@ CREATE TABLE posts (
 		testutil.Exec(t, pool, schema)
 
 		// Act
-		stmts, err := DumpSchema(t.Context(), connConfig)
+		stmts, err := DumpSchema(t.Context(), connConfig, nil)
 
 		// Assert
 		require.NoError(t, err)
@@ -172,7 +173,7 @@ CREATE TABLE posts (
 		connConfig := pool.Config().ConnConfig.Copy()
 
 		// Act — DumpSchema on the base TEST_DATABASE_URL which has no user tables.
-		stmts, err := DumpSchema(t.Context(), connConfig)
+		stmts, err := DumpSchema(t.Context(), connConfig, nil)
 
 		// Assert
 		require.NoError(t, err)

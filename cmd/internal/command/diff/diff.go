@@ -33,6 +33,7 @@ func NewCommand(fs afero.Fs, timeGen timegenerator.Generator, bi buildinfo.Build
 					yamlsrc.YAML("migrations.schema", src),
 				),
 			},
+			cmdutil.ExcludeSchemasFlag(src),
 			cmdutil.DatabaseURLFlag(src),
 			cmdutil.MigrationsDirFlag(src),
 		},
@@ -48,10 +49,11 @@ func NewCommand(fs afero.Fs, timeGen timegenerator.Generator, bi buildinfo.Build
 			}
 
 			args := conduitcli.DiffArgs{
-				Dir:         filepath.Clean(cmd.String(cmdutil.MigrationsDir)),
-				Name:        name,
-				SchemaPath:  schema,
-				DatabaseURL: cmd.String(cmdutil.DatabaseURL),
+				Dir:            filepath.Clean(cmd.String(cmdutil.MigrationsDir)),
+				Name:           name,
+				SchemaPath:     schema,
+				DatabaseURL:    cmd.String(cmdutil.DatabaseURL),
+				ExcludeSchemas: cmd.StringSlice(cmdutil.ExcludeSchemas),
 			}
 
 			return conduitcli.Diff(ctx, fs, timeGen, bi, args)
