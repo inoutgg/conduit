@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"path/filepath"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/spf13/afero"
@@ -22,6 +23,7 @@ const configFilename = "conduit.yaml"
 // InitArgs configures a project initialization operation.
 type InitArgs struct {
 	Dir            string
+	MigrationsDir  string
 	DatabaseURL    string
 	ExcludeSchemas []string
 }
@@ -30,11 +32,13 @@ type InitArgs struct {
 // migration, generates a conduit.sum file with the baseline schema hash,
 // and writes a default conduit.yaml config file.
 func Init(ctx context.Context, fs afero.Fs, timeGen timegenerator.Generator, args InitArgs) error {
-	if err := createMigrationDir(fs, args.Dir); err != nil {
+	migrationsPath := filepath.Join(args.Dir, args.MigrationsDir)
+
+	if err := createMigrationDir(fs, migrationsPath); err != nil {
 		return err
 	}
 
-	migrationsFs := afero.NewBasePathFs(fs, args.Dir)
+	migrationsFs := afero.NewBasePathFs(fs, migrationsPath)
 	ver := version.NewFromTime(timeGen.Now())
 
 	if err := createInitialMigration(migrationsFs, ver); err != nil {
@@ -60,20 +64,30 @@ func Init(ctx context.Context, fs afero.Fs, timeGen timegenerator.Generator, arg
 		return fmt.Errorf("conduit: failed to write conduit.sum: %w", err)
 	}
 
-	if err := writeConfigFile(fs, args); err != nil {
+	if err := writeConfigFile(fs, args.Dir, args.MigrationsDir, args.DatabaseURL); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func writeConfigFile(fs afero.Fs, args InitArgs) error {
+func writeConfigFile(fs afero.Fs, parentDir, migrationsName, databaseURL string) error {
 	var buf bytes.Buffer
-	if err := conduittemplate.ConduitYAMLTemplate.Execute(&buf, args); err != nil {
+
+	data := struct {
+		Dir         string
+		DatabaseURL string
+	}{
+		Dir:         migrationsName,
+		DatabaseURL: databaseURL,
+	}
+
+	if err := conduittemplate.ConduitYAMLTemplate.Execute(&buf, data); err != nil {
 		return fmt.Errorf("conduit: failed to render config template: %w", err)
 	}
 
-	if err := afero.WriteFile(fs, configFilename, buf.Bytes(), 0o644); err != nil {
+	configPath := filepath.Join(parentDir, configFilename)
+	if err := afero.WriteFile(fs, configPath, buf.Bytes(), 0o644); err != nil {
 		return fmt.Errorf("conduit: failed to write config file: %w", err)
 	}
 

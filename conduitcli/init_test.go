@@ -16,15 +16,16 @@ func TestInit(t *testing.T) {
 		t.Parallel()
 
 		databaseURL := os.Getenv("TEST_DATABASE_URL")
-		fs, _, dir := testutil.NewMigrationsDirBuilder(t).Build()
+		fs, baseDir, migrationsDir := testutil.NewMigrationsDirBuilder(t).Build()
 		args := InitArgs{
-			Dir:         dir,
-			DatabaseURL: databaseURL,
+			Dir:           baseDir,
+			MigrationsDir: migrationsDir,
+			DatabaseURL:   databaseURL,
 		}
 
 		err := Init(t.Context(), fs, timeGen, args)
 
 		require.NoError(t, err)
-		testutil.SnapshotFS(t, fs, dir)
+		testutil.SnapshotFS(t, fs, baseDir)
 	})
 }
