@@ -21,8 +21,9 @@ const configFilename = "conduit.yaml"
 
 // InitArgs configures a project initialization operation.
 type InitArgs struct {
-	Dir         string
-	DatabaseURL string
+	Dir            string
+	DatabaseURL    string
+	ExcludeSchemas []string
 }
 
 // Init creates a new migrations directory with the initial conduit schema
@@ -50,7 +51,7 @@ func Init(ctx context.Context, fs afero.Fs, timeGen timegenerator.Generator, arg
 		return fmt.Errorf("failed to parse initial schema: %w", err)
 	}
 
-	hash, err := pgdiff.GenerateSchemaHash(ctx, connConfig, stmts)
+	hash, err := pgdiff.GenerateSchemaHash(ctx, connConfig, stmts, args.ExcludeSchemas)
 	if err != nil {
 		return fmt.Errorf("failed to generate schema hash: %w", err)
 	}

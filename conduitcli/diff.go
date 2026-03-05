@@ -31,10 +31,11 @@ var nonTxPatterns = []*regexp.Regexp{
 
 // DiffArgs configures a schema diff operation.
 type DiffArgs struct {
-	Dir         string
-	Name        string
-	SchemaPath  string
-	DatabaseURL string
+	Dir            string
+	Name           string
+	SchemaPath     string
+	DatabaseURL    string
+	ExcludeSchemas []string
 }
 
 // Diff compares the current migrations directory against a target schema file
@@ -60,7 +61,7 @@ func Diff(
 		return fmt.Errorf("failed to parse database URL: %w", err)
 	}
 
-	plan, err := pgdiff.GeneratePlan(ctx, fs, connConfig, args.Dir, args.SchemaPath)
+	plan, err := pgdiff.GeneratePlan(ctx, fs, connConfig, args.Dir, args.SchemaPath, args.ExcludeSchemas)
 	if err != nil {
 		return fmt.Errorf("failed to generate diff plan: %w", err)
 	}

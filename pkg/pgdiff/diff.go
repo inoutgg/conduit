@@ -37,6 +37,7 @@ func GeneratePlan(
 	fs afero.Fs,
 	connConfig *pgx.ConnConfig,
 	migrationsDir, schemaPath string,
+	excludeSchemas []string,
 ) (Plan, error) {
 	var result Plan
 
@@ -72,20 +73,30 @@ func GeneratePlan(
 		}
 	}
 
+	planOpts := []schemadiff.PlanOpt{
+		schemadiff.WithTempDbFactory(factory),
+		schemadiff.WithGetSchemaOpts(targetDb.ExcludeMetadataOptions...),
+	}
+	schemaOpts := targetDb.ExcludeMetadataOptions
+
+	if len(excludeSchemas) > 0 {
+		planOpts = append(planOpts, schemadiff.WithExcludeSchemas(excludeSchemas...))
+		schemaOpts = append(schemaOpts, schema.WithExcludeSchemas(excludeSchemas...))
+	}
+
 	plan, err := schemadiff.Generate(
 		ctx,
 		schemadiff.DDLSchemaSource(
 			sliceutil.Map(sourceStmts, func(stmt sqlsplit.Stmt) string { return stmt.Content }),
 		),
 		schemadiff.DBSchemaSource(targetDb.ConnPool),
-		schemadiff.WithTempDbFactory(factory),
-		schemadiff.WithGetSchemaOpts(targetDb.ExcludeMetadataOptions...),
+		planOpts...,
 	)
 	if err != nil {
 		return result, fmt.Errorf("failed to generate plan: %w", err)
 	}
 
-	hash, err := schema.GetSchemaHash(ctx, targetDb.ConnPool, targetDb.ExcludeMetadataOptions...)
+	hash, err := schema.GetSchemaHash(ctx, targetDb.ConnPool, schemaOpts...)
 	if err != nil {
 		return result, fmt.Errorf("failed to generate target schema hash: %w", err)
 	}
@@ -103,6 +114,7 @@ func GenerateSchemaHash(
 	ctx context.Context,
 	connConfig *pgx.ConnConfig,
 	stmts []sqlsplit.Stmt,
+	excludeSchemas []string,
 ) (string, error) {
 	factory, err := newTempDbFactory(ctx, connConfig)
 	if err != nil {
@@ -126,7 +138,12 @@ func GenerateSchemaHash(
 		}
 	}
 
-	hash, err := schema.GetSchemaHash(ctx, db.ConnPool, db.ExcludeMetadataOptions...)
+	schemaOpts := db.ExcludeMetadataOptions
+	if len(excludeSchemas) > 0 {
+		schemaOpts = append(schemaOpts, schema.WithExcludeSchemas(excludeSchemas...))
+	}
+
+	hash, err := schema.GetSchemaHash(ctx, db.ConnPool, schemaOpts...)
 	if err != nil {
 		return "", fmt.Errorf("failed to get schema hash: %w", err)
 	}
@@ -138,6 +155,7 @@ func GenerateSchemaHash(
 func DumpSchema(
 	ctx context.Context,
 	connConfig *pgx.ConnConfig,
+	excludeSchemas []string,
 ) ([]schemadiff.Statement, error) {
 	remoteDB := stdlib.OpenDB(*connConfig)
 	defer remoteDB.Close()
@@ -148,13 +166,20 @@ func DumpSchema(
 	}
 	defer factory.Close()
 
+	planOpts := []schemadiff.PlanOpt{
+		schemadiff.WithTempDbFactory(factory),
+		schemadiff.WithDoNotValidatePlan(),
+		schemadiff.WithNoConcurrentIndexOps(),
+	}
+	if len(excludeSchemas) > 0 {
+		planOpts = append(planOpts, schemadiff.WithExcludeSchemas(excludeSchemas...))
+	}
+
 	plan, err := schemadiff.Generate(
 		ctx,
 		schemadiff.DDLSchemaSource([]string{}),
 		schemadiff.DBSchemaSource(remoteDB),
-		schemadiff.WithTempDbFactory(factory),
-		schemadiff.WithDoNotValidatePlan(),
-		schemadiff.WithNoConcurrentIndexOps(),
+		planOpts...,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to dump schema: %w", err)

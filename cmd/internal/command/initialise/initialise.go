@@ -23,11 +23,13 @@ func NewCommand(fs afero.Fs, timeGen timegenerator.Generator, src altsrc.Sourcer
 		Flags: []cli.Flag{
 			cmdutil.MigrationsDirFlag(src),
 			cmdutil.DatabaseURLFlag(src),
+			cmdutil.ExcludeSchemasFlag(src),
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			args := conduitcli.InitArgs{
-				Dir:         filepath.Clean(cmd.String(cmdutil.MigrationsDir)),
-				DatabaseURL: cmd.String(cmdutil.DatabaseURL),
+				Dir:            filepath.Clean(cmd.String(cmdutil.MigrationsDir)),
+				DatabaseURL:    cmd.String(cmdutil.DatabaseURL),
+				ExcludeSchemas: cmd.StringSlice(cmdutil.ExcludeSchemas),
 			}
 
 			if err := conduitcli.Init(ctx, fs, timeGen, args); err != nil {
