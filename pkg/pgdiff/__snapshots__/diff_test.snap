@@ -298,8 +298,8 @@ edf1bb36a97d2d9e
 ---
 
 [TestGeneratePlan/should_generate_plan,_when_new_table_is_added_to_schema - 1]
-a1876bffea260abf
-edf1bb36a97d2d9e
+338fc2e58754d681
+4fd46db54e03c09
 []diff.Statement{
     {
         DDL:            "CREATE TABLE \"public\".\"posts\" (\n\t\"id\" integer,\n\t\"user_id\" integer\n)",

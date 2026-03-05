@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"go.inout.gg/conduit/internal/migrations"
 	"go.inout.gg/conduit/internal/testutil"
 )
 
@@ -129,6 +130,65 @@ CREATE TABLE posts (id int, user_id int);`).
 		require.NoError(t, err)
 		snaps.MatchSnapshot(t, plan.TargetSchemaHash, plan.SourceSchemaHash, plan.Statements)
 	})
+
+	t.Run("should exclude conduit_migrations from plan statements, when schema has changes", func(t *testing.T) {
+		t.Parallel()
+
+		// Arrange
+		config, err := pgx.ParseConfig(os.Getenv("TEST_DATABASE_URL"))
+		require.NoError(t, err)
+
+		fs, baseDir, migrationsDir := testutil.NewMigrationsDirBuilder(t).
+			WithFile("20230601120000_init.up.sql", "CREATE TABLE users (id int);").
+			WithBaseFile("schema.sql", `CREATE TABLE users (id int);
+CREATE TABLE posts (id int);`).
+			Build()
+
+		// Act
+		plan, err := GeneratePlan(
+			t.Context(),
+			fs,
+			config,
+			migrationsDir,
+			filepath.Join(baseDir, "schema.sql"),
+			nil,
+		)
+
+		// Assert
+		require.NoError(t, err)
+
+		for _, stmt := range plan.Statements {
+			assert.NotContains(t, stmt.DDL, "conduit_migrations",
+				"plan statements should not reference conduit internal tables")
+		}
+	})
+
+	t.Run("should return empty plan, when source and target schemas are identical", func(t *testing.T) {
+		t.Parallel()
+
+		// Arrange
+		config, err := pgx.ParseConfig(os.Getenv("TEST_DATABASE_URL"))
+		require.NoError(t, err)
+
+		fs, baseDir, migrationsDir := testutil.NewMigrationsDirBuilder(t).
+			WithFile("20230601120000_init.up.sql", "CREATE TABLE users (id int);").
+			WithBaseFile("schema.sql", "CREATE TABLE users (id int);").
+			Build()
+
+		// Act
+		plan, err := GeneratePlan(
+			t.Context(),
+			fs,
+			config,
+			migrationsDir,
+			filepath.Join(baseDir, "schema.sql"),
+			nil,
+		)
+
+		// Assert
+		require.NoError(t, err)
+		assert.Empty(t, plan.Statements)
+	})
 }
 
 func TestDumpSchema(t *testing.T) {
@@ -178,6 +238,28 @@ CREATE TABLE posts (
 		// Assert
 		require.NoError(t, err)
 		assert.Empty(t, stmts)
+	})
+
+	t.Run("should exclude conduit_migrations from dump, when database has conduit tables", func(t *testing.T) {
+		t.Parallel()
+
+		// Arrange — create a database with both user tables and conduit internal tables.
+		pool := poolFactory.Pool(t)
+		connConfig := pool.Config().ConnConfig.Copy()
+
+		testutil.Exec(t, pool, schema)
+		testutil.Exec(t, pool, string(migrations.Schema))
+
+		// Act
+		stmts, err := DumpSchema(t.Context(), connConfig, nil)
+
+		// Assert
+		require.NoError(t, err)
+
+		for _, stmt := range stmts {
+			assert.NotContains(t, stmt.DDL, "conduit_migrations",
+				"dump should not include conduit internal tables")
+		}
 	})
 }
 
