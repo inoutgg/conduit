@@ -14,6 +14,7 @@ import (
 	"go.inout.gg/conduit/conduitcli"
 	"go.inout.gg/conduit/internal/cmdutil"
 	"go.inout.gg/conduit/pkg/buildinfo"
+	"go.inout.gg/conduit/pkg/hashsum"
 	"go.inout.gg/conduit/pkg/timegenerator"
 )
 
@@ -49,15 +50,16 @@ func NewCommand(fs afero.Fs, timeGen timegenerator.Generator, bi buildinfo.Build
 				return fmt.Errorf("missing required flag: --%s", schemaFlag)
 			}
 
+			store := hashsum.NewFSStore(fs, "conduit.sum")
 			args := conduitcli.DiffArgs{
-				Dir:            filepath.Clean(cmd.String(cmdutil.MigrationsDir)),
+				MigrationsDir:  filepath.Clean(cmd.String(cmdutil.MigrationsDir)),
 				Name:           name,
 				SchemaPath:     schema,
 				DatabaseURL:    cmd.String(cmdutil.DatabaseURL),
 				ExcludeSchemas: cmd.StringSlice(cmdutil.ExcludeSchemas),
 			}
 
-			return conduitcli.Diff(ctx, fs, timeGen, bi, args)
+			return conduitcli.Diff(ctx, fs, timeGen, bi, store, args)
 		},
 	}
 }

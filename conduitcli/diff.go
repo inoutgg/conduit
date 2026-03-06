@@ -13,13 +13,16 @@ import (
 	"github.com/spf13/afero"
 	schemadiff "github.com/stripe/pg-schema-diff/pkg/diff"
 
+	"go.inout.gg/conduit"
 	internaltpl "go.inout.gg/conduit/internal/template"
 	"go.inout.gg/conduit/pkg/buildinfo"
-	"go.inout.gg/conduit/pkg/conduitsum"
+	"go.inout.gg/conduit/pkg/hashsum"
 	"go.inout.gg/conduit/pkg/pgdiff"
 	"go.inout.gg/conduit/pkg/timegenerator"
 	"go.inout.gg/conduit/pkg/version"
 )
+
+var ErrMigrationsNotFound = errors.New("migrations directory not found")
 
 //nolint:gochecknoglobals
 var nonTxPatterns = []*regexp.Regexp{
@@ -31,7 +34,8 @@ var nonTxPatterns = []*regexp.Regexp{
 
 // DiffArgs configures a schema diff operation.
 type DiffArgs struct {
-	Dir            string
+	RootDir        string
+	MigrationsDir  string
 	Name           string
 	SchemaPath     string
 	DatabaseURL    string
@@ -48,20 +52,21 @@ func Diff(
 	fs afero.Fs,
 	timeGen timegenerator.Generator,
 	bi buildinfo.BuildInfo,
+	store hashsum.Store,
 	args DiffArgs,
 ) error {
-	if !exists(fs, args.Dir) {
-		return fmt.Errorf("migrations directory %q not found: run 'conduit init' first", args.Dir)
+	if !exists(fs, args.MigrationsDir) {
+		return fmt.Errorf("%w: directory %q does not exist", ErrMigrationsNotFound, args.MigrationsDir)
 	}
 
-	migrationsFs := afero.NewBasePathFs(fs, args.Dir)
+	migrationsFs := afero.NewBasePathFs(fs, args.MigrationsDir)
 
 	connConfig, err := pgx.ParseConfig(args.DatabaseURL)
 	if err != nil {
 		return fmt.Errorf("failed to parse database URL: %w", err)
 	}
 
-	plan, err := pgdiff.GeneratePlan(ctx, fs, connConfig, args.Dir, args.SchemaPath, args.ExcludeSchemas)
+	plan, err := pgdiff.GeneratePlan(ctx, fs, connConfig, args.MigrationsDir, args.SchemaPath, args.ExcludeSchemas)
 	if err != nil {
 		return fmt.Errorf("failed to generate diff plan: %w", err)
 	}
@@ -70,11 +75,12 @@ func Diff(
 		return errors.New("no schema changes detected")
 	}
 
-	if expectedHash, err := conduitsum.ReadFile(migrationsFs); err == nil {
-		if plan.SourceSchemaHash != expectedHash {
+	if ok, actual, err := store.Compare(args.RootDir, []byte(plan.SourceSchemaHash)); err == nil {
+		if !ok {
 			return fmt.Errorf(
-				"source schema drift detected: expected hash %s (from conduit.sum), got %s",
-				expectedHash,
+				"%w: expected hash %s, got %s",
+				conduit.ErrSchemaDrift,
+				actual,
 				plan.SourceSchemaHash,
 			)
 		}
@@ -141,8 +147,8 @@ func Diff(
 		}
 	}
 
-	if err := conduitsum.WriteFile(migrationsFs, plan.TargetSchemaHash); err != nil {
-		return fmt.Errorf("failed to write conduit.sum: %w", err)
+	if err := store.Save(args.RootDir, []byte(plan.TargetSchemaHash)); err != nil {
+		return fmt.Errorf("failed to write hash sum: %w", err)
 	}
 
 	return nil

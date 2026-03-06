@@ -6,12 +6,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gkampitakis/go-snaps/snaps"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	schemadiff "github.com/stripe/pg-schema-diff/pkg/diff"
 
+	"go.inout.gg/conduit"
 	"go.inout.gg/conduit/internal/testutil"
+	"go.inout.gg/conduit/pkg/hashsum"
 	"go.inout.gg/conduit/pkg/timegenerator"
 )
 
@@ -22,31 +25,36 @@ func TestDiff(t *testing.T) {
 		t.Parallel()
 
 		fs := afero.NewMemMapFs()
+		store := hashsum.NewFSStore(fs, "conduit.sum")
 		args := DiffArgs{
-			Dir:         "/nonexistent",
-			Name:        "add_posts",
-			SchemaPath:  "/schema.sql",
-			DatabaseURL: "postgres://localhost:5432/testdb",
+			RootDir:       "/",
+			MigrationsDir: "/nonexistent",
+			Name:          "add_posts",
+			SchemaPath:    "/schema.sql",
+			DatabaseURL:   "postgres://localhost:5432/testdb",
 		}
 
-		err := Diff(t.Context(), fs, timeGen, bi, args)
+		err := Diff(t.Context(), fs, timeGen, bi, store, args)
 
 		require.Error(t, err)
-		assert.ErrorContains(t, err, "migrations directory does not exist")
+		require.ErrorIs(t, err, ErrMigrationsNotFound)
+		snaps.MatchSnapshot(t, err.Error())
 	})
 
 	t.Run("should return error, when database URL is invalid", func(t *testing.T) {
 		t.Parallel()
 
-		fs, _, dir := testutil.NewMigrationsDirBuilder(t).Build()
+		fs, baseDir, dir := testutil.NewMigrationsDirBuilder(t).Build()
+		store := hashsum.NewFSStore(fs, "conduit.sum")
 		args := DiffArgs{
-			Dir:         dir,
-			Name:        "add_posts",
-			SchemaPath:  "/schema.sql",
-			DatabaseURL: "://invalid",
+			RootDir:       baseDir,
+			MigrationsDir: dir,
+			Name:          "add_posts",
+			SchemaPath:    "/schema.sql",
+			DatabaseURL:   "://invalid",
 		}
 
-		err := Diff(t.Context(), fs, timeGen, bi, args)
+		err := Diff(t.Context(), fs, timeGen, bi, store, args)
 
 		require.Error(t, err)
 		assert.ErrorContains(t, err, "failed to parse database URL")
@@ -62,17 +70,19 @@ func TestDiff(t *testing.T) {
 CREATE TABLE posts (id int, user_id int);`).
 			Build()
 
+		store := hashsum.NewFSStore(fs, "conduit.sum")
 		args := DiffArgs{
-			Dir:         dir,
-			Name:        "add_posts",
-			SchemaPath:  filepath.Join(baseDir, "schema.sql"),
-			DatabaseURL: databaseURL,
+			RootDir:       baseDir,
+			MigrationsDir: dir,
+			Name:          "add_posts",
+			SchemaPath:    filepath.Join(baseDir, "schema.sql"),
+			DatabaseURL:   databaseURL,
 		}
 
-		err := Diff(t.Context(), fs, timeGen, bi, args)
+		err := Diff(t.Context(), fs, timeGen, bi, store, args)
 
 		require.NoError(t, err)
-		testutil.SnapshotFS(t, fs, dir)
+		testutil.SnapshotFS(t, fs, baseDir)
 	})
 
 	t.Run("should return error, when source schema hash does not match conduit.sum", func(t *testing.T) {
@@ -81,22 +91,24 @@ CREATE TABLE posts (id int, user_id int);`).
 		databaseURL := os.Getenv("TEST_DATABASE_URL")
 		fs, baseDir, dir := testutil.NewMigrationsDirBuilder(t).
 			WithFile("20230601120000_init.up.sql", "CREATE TABLE users (id int);").
-			WithFile("conduit.sum", "0000000000000000").
+			WithBaseFile("conduit.sum", "0000000000000000").
 			WithBaseFile("schema.sql", `CREATE TABLE users (id int);
 CREATE TABLE posts (id int, user_id int);`).
 			Build()
 
+		store := hashsum.NewFSStore(fs, "conduit.sum")
 		args := DiffArgs{
-			Dir:         dir,
-			Name:        "add_posts",
-			SchemaPath:  filepath.Join(baseDir, "schema.sql"),
-			DatabaseURL: databaseURL,
+			RootDir:       baseDir,
+			MigrationsDir: dir,
+			Name:          "add_posts",
+			SchemaPath:    filepath.Join(baseDir, "schema.sql"),
+			DatabaseURL:   databaseURL,
 		}
 
-		err := Diff(t.Context(), fs, timeGen, bi, args)
+		err := Diff(t.Context(), fs, timeGen, bi, store, args)
 
 		require.Error(t, err)
-		require.ErrorContains(t, err, "source schema drift detected")
+		require.ErrorIs(t, err, conduit.ErrSchemaDrift)
 
 		// No migration file should have been created.
 		entries, _ := afero.ReadDir(fs, dir)
@@ -117,13 +129,15 @@ CREATE TABLE posts (id int, user_id int);`).
 			Build()
 
 		// First run to generate the correct conduit.sum.
+		store := hashsum.NewFSStore(fs, "conduit.sum")
 		args := DiffArgs{
-			Dir:         dir,
-			Name:        "add_posts",
-			SchemaPath:  filepath.Join(baseDir, "schema.sql"),
-			DatabaseURL: databaseURL,
+			RootDir:       baseDir,
+			MigrationsDir: dir,
+			Name:          "add_posts",
+			SchemaPath:    filepath.Join(baseDir, "schema.sql"),
+			DatabaseURL:   databaseURL,
 		}
-		require.NoError(t, Diff(t.Context(), fs, timeGen, bi, args))
+		require.NoError(t, Diff(t.Context(), fs, timeGen, bi, store, args))
 
 		// Update schema to trigger a new diff, using the existing conduit.sum
 		// which now contains the correct target hash from the first run.
@@ -135,16 +149,16 @@ CREATE TABLE comments (id int, post_id int);`), 0o644),
 		)
 
 		args2 := DiffArgs{
-			Dir:         dir,
-			Name:        "add_comments",
-			SchemaPath:  filepath.Join(baseDir, "schema.sql"),
-			DatabaseURL: databaseURL,
+			MigrationsDir: dir,
+			Name:          "add_comments",
+			SchemaPath:    filepath.Join(baseDir, "schema.sql"),
+			DatabaseURL:   databaseURL,
 		}
 
 		// Act — second diff should succeed because the source hash matches conduit.sum.
 		err := Diff(t.Context(), fs, timegenerator.Stub{
 			T: time.Date(2024, 2, 15, 12, 30, 45, 0, time.UTC),
-		}, bi, args2)
+		}, bi, store, args2)
 
 		require.NoError(t, err)
 	})
@@ -159,14 +173,16 @@ CREATE TABLE comments (id int, post_id int);`), 0o644),
 CREATE INDEX idx_users_id ON users (id);`).
 			Build()
 
+		store := hashsum.NewFSStore(fs, "conduit.sum")
 		args := DiffArgs{
-			Dir:         dir,
-			Name:        "add_index",
-			SchemaPath:  filepath.Join(baseDir, "schema.sql"),
-			DatabaseURL: databaseURL,
+			RootDir:       baseDir,
+			MigrationsDir: dir,
+			Name:          "add_index",
+			SchemaPath:    filepath.Join(baseDir, "schema.sql"),
+			DatabaseURL:   databaseURL,
 		}
 
-		err := Diff(t.Context(), fs, timeGen, bi, args)
+		err := Diff(t.Context(), fs, timeGen, bi, store, args)
 
 		require.NoError(t, err)
 
@@ -186,14 +202,16 @@ CREATE INDEX idx_users_id ON users (id);`).
 CREATE TABLE posts (id int);`).
 			Build()
 
+		store := hashsum.NewFSStore(fs, "conduit.sum")
 		args := DiffArgs{
-			Dir:         dir,
-			Name:        "add_posts",
-			SchemaPath:  filepath.Join(baseDir, "schema.sql"),
-			DatabaseURL: databaseURL,
+			RootDir:       baseDir,
+			MigrationsDir: dir,
+			Name:          "add_posts",
+			SchemaPath:    filepath.Join(baseDir, "schema.sql"),
+			DatabaseURL:   databaseURL,
 		}
 
-		err := Diff(t.Context(), fs, timeGen, bi, args)
+		err := Diff(t.Context(), fs, timeGen, bi, store, args)
 
 		require.NoError(t, err)
 
@@ -212,14 +230,16 @@ CREATE TABLE posts (id int);`).
 			WithBaseFile("schema.sql", "CREATE TABLE users (id int);").
 			Build()
 
+		store := hashsum.NewFSStore(fs, "conduit.sum")
 		args := DiffArgs{
-			Dir:         dir,
-			Name:        "no_changes",
-			SchemaPath:  filepath.Join(baseDir, "schema.sql"),
-			DatabaseURL: databaseURL,
+			RootDir:       baseDir,
+			MigrationsDir: dir,
+			Name:          "no_changes",
+			SchemaPath:    filepath.Join(baseDir, "schema.sql"),
+			DatabaseURL:   databaseURL,
 		}
 
-		err := Diff(t.Context(), fs, timeGen, bi, args)
+		err := Diff(t.Context(), fs, timeGen, bi, store, args)
 
 		require.Error(t, err)
 		assert.ErrorContains(t, err, "no schema changes detected")
@@ -312,17 +332,19 @@ CREATE TABLE posts (id int, user_id int);
 CREATE INDEX idx_posts_user_id ON posts (user_id);`).
 			Build()
 
+		store := hashsum.NewFSStore(fs, "conduit.sum")
 		args := DiffArgs{
-			Dir:         dir,
-			Name:        "add_posts",
-			SchemaPath:  filepath.Join(baseDir, "schema.sql"),
-			DatabaseURL: databaseURL,
+			RootDir:       baseDir,
+			MigrationsDir: dir,
+			Name:          "add_posts",
+			SchemaPath:    filepath.Join(baseDir, "schema.sql"),
+			DatabaseURL:   databaseURL,
 		}
 
-		err := Diff(t.Context(), fs, timeGen, bi, args)
+		err := Diff(t.Context(), fs, timeGen, bi, store, args)
 
 		require.NoError(t, err)
-		testutil.SnapshotFS(t, fs, dir)
+		testutil.SnapshotFS(t, fs, baseDir)
 	})
 }
 

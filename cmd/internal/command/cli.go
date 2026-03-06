@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/spf13/afero"
 	altsrc "github.com/urfave/cli-altsrc/v3"
@@ -30,7 +31,7 @@ func Execute(ctx context.Context) error {
 	var (
 		timeGen    timegenerator.Standard
 		bi         buildinfo.Standard
-		configPath = "conduit.yaml"
+		configPath = filepath.Join(cwd, "conduit.yaml")
 	)
 
 	configSrc := altsrc.NewStringPtrSourcer(&configPath)
