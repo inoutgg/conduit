@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/fs"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	"github.com/gkampitakis/go-snaps/snaps"
@@ -14,8 +15,12 @@ import (
 
 // SnapshotFS recursively reads all files from the given afero filesystem
 // directory and returns a sorted string representation suitable for
-// snapshotting. File paths are relative to dir.
-func SnapshotFS(t *testing.T, afs afero.Fs, dir string) {
+// snapshotting.
+//
+// File paths are relative to dir.
+//
+// Optional exclude patterns are matched against relative paths to skip specific files.
+func SnapshotFS(t *testing.T, afs afero.Fs, dir string, exclude ...string) {
 	t.Helper()
 
 	var b bytes.Buffer
@@ -32,6 +37,10 @@ func SnapshotFS(t *testing.T, afs afero.Fs, dir string) {
 		rel, err := filepath.Rel(dir, path)
 		if err != nil {
 			return fmt.Errorf("failed to compute relative path: %w", err)
+		}
+
+		if slices.Contains(exclude, rel) {
+			return nil
 		}
 
 		content, err := afero.ReadFile(afs, path)

@@ -3,7 +3,7 @@ package dump
 import (
 	"context"
 	"fmt"
-	"os"
+	"io"
 
 	altsrc "github.com/urfave/cli-altsrc/v3"
 	"github.com/urfave/cli/v3"
@@ -13,7 +13,7 @@ import (
 	"go.inout.gg/conduit/pkg/buildinfo"
 )
 
-func NewCommand(bi buildinfo.BuildInfo, src altsrc.Sourcer) *cli.Command {
+func NewCommand(w io.Writer, bi buildinfo.BuildInfo, src altsrc.Sourcer) *cli.Command {
 	//nolint:exhaustruct
 	return &cli.Command{
 		Name:  "dump",
@@ -28,7 +28,7 @@ func NewCommand(bi buildinfo.BuildInfo, src altsrc.Sourcer) *cli.Command {
 				return fmt.Errorf("missing required flag: --%s", cmdutil.DatabaseURL)
 			}
 
-			return conduitcli.Dump(ctx, os.Stdout, bi, conduitcli.DumpArgs{
+			return conduitcli.Dump(ctx, w, bi, conduitcli.DumpArgs{
 				DatabaseURL:    dbURL,
 				ExcludeSchemas: cmd.StringSlice(cmdutil.ExcludeSchemas),
 			})

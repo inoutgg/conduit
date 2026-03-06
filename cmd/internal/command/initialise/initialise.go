@@ -29,6 +29,7 @@ func NewCommand(fs afero.Fs, timeGen timegenerator.Generator, configSrc altsrc.S
 			store := hashsum.NewFSStore(fs, "conduit.sum")
 			args := conduitcli.InitArgs{
 				RootDir:        ".",
+				ConfigName:     "conduit.yaml",
 				MigrationsDir:  filepath.Clean(cmd.String(cmdutil.MigrationsDir)),
 				DatabaseURL:    cmd.String(cmdutil.DatabaseURL),
 				ExcludeSchemas: cmd.StringSlice(cmdutil.ExcludeSchemas),

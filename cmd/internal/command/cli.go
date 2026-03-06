@@ -2,8 +2,7 @@ package command
 
 import (
 	"context"
-	"fmt"
-	"os"
+	"io"
 	"path/filepath"
 
 	"github.com/spf13/afero"
@@ -20,20 +19,16 @@ import (
 )
 
 // Execute evaluates given os.Args and executes a matched command.
-func Execute(ctx context.Context) error {
-	cwd, err := os.Getwd()
-	if err != nil {
-		return fmt.Errorf("failed to get current working directory: %w", err)
-	}
-
-	fs := afero.NewBasePathFs(afero.NewOsFs(), cwd)
-
-	var (
-		timeGen    timegenerator.Standard
-		bi         buildinfo.Standard
-		configPath = filepath.Join(cwd, "conduit.yaml")
-	)
-
+func Execute(
+	ctx context.Context,
+	fs afero.Fs,
+	w io.Writer,
+	timeGen timegenerator.Generator,
+	bi buildinfo.BuildInfo,
+	rootDir string,
+	args []string,
+) error {
+	configPath := filepath.Join(rootDir, "conduit.yaml")
 	configSrc := altsrc.NewStringPtrSourcer(&configPath)
 
 	//nolint:exhaustruct
@@ -54,11 +49,11 @@ func Execute(ctx context.Context) error {
 		Commands: []*cli.Command{
 			initialise.NewCommand(fs, timeGen, configSrc),
 			diff.NewCommand(fs, timeGen, bi, configSrc),
-			apply.NewCommand(fs, configSrc),
-			dump.NewCommand(bi, configSrc),
+			apply.NewCommand(fs, w, configSrc),
+			dump.NewCommand(w, bi, configSrc),
 		},
 	}
 
 	//nolint:wrapcheck
-	return cmd.Run(ctx, os.Args)
+	return cmd.Run(ctx, args)
 }
