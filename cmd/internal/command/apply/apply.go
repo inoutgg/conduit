@@ -3,7 +3,7 @@ package apply
 import (
 	"context"
 	"fmt"
-	"os"
+	"io"
 
 	"github.com/spf13/afero"
 	altsrc "github.com/urfave/cli-altsrc/v3"
@@ -24,7 +24,7 @@ const (
 	dryRunFlag          = "dry-run"
 )
 
-func NewCommand(fs afero.Fs, src altsrc.Sourcer) *cli.Command {
+func NewCommand(fs afero.Fs, w io.Writer, src altsrc.Sourcer) *cli.Command {
 	//nolint:exhaustruct
 	return &cli.Command{
 		Name:  "apply",
@@ -97,7 +97,7 @@ func NewCommand(fs afero.Fs, src altsrc.Sourcer) *cli.Command {
 
 			if cmd.Bool(dryRunFlag) {
 				opts = append(opts, conduit.WithExecutor(
-					conduit.NewDryRunExecutor(os.Stdout, cmd.Bool(cmdutil.Verbose)),
+					conduit.NewDryRunExecutor(w, cmd.Bool(cmdutil.Verbose)),
 				))
 			}
 
