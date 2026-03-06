@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"go.inout.gg/conduit/internal/testutil"
+	"go.inout.gg/conduit/pkg/hashsum"
 )
 
 func TestInit(t *testing.T) {
@@ -17,13 +18,15 @@ func TestInit(t *testing.T) {
 
 		databaseURL := os.Getenv("TEST_DATABASE_URL")
 		fs, baseDir, migrationsDir := testutil.NewMigrationsDirBuilder(t).Build()
+		store := hashsum.NewFSStore(fs, "conduit.sum")
 		args := InitArgs{
-			Dir:           baseDir,
+			RootDir:       baseDir,
+			ConfigName:    "conduit.yaml",
 			MigrationsDir: migrationsDir,
 			DatabaseURL:   databaseURL,
 		}
 
-		err := Init(t.Context(), fs, timeGen, args)
+		err := Init(t.Context(), fs, timeGen, store, args)
 
 		require.NoError(t, err)
 		testutil.SnapshotFS(t, fs, baseDir)
