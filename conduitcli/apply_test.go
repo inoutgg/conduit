@@ -105,7 +105,8 @@ func TestApply(t *testing.T) {
 		err := Apply(t.Context(), m, args)
 
 		require.Error(t, err)
-		assert.ErrorIs(t, err, conduit.ErrHazardDetected)
+		require.ErrorIs(t, err, conduit.ErrHazardDetected)
+		snaps.MatchSnapshot(t, err.Error())
 	})
 
 	t.Run("should log all pending migrations without applying, when dry-run is enabled", func(t *testing.T) {
