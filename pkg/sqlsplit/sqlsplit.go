@@ -214,18 +214,18 @@ func (s *scanner) scan() error {
 func (s *scanner) reportUnclosed() error {
 	switch s.state {
 	case stateBlockComment:
-		return fmt.Errorf("conduit: unclosed block comment starting at %s", s.stateLoc.String())
+		return fmt.Errorf("unclosed block comment starting at %s", s.stateLoc.String())
 	case stateString:
-		return fmt.Errorf("conduit: unclosed string starting at %s", s.stateLoc.String())
+		return fmt.Errorf("unclosed string starting at %s", s.stateLoc.String())
 	case stateDollarString:
 		if s.dollarTag == "" {
-			return fmt.Errorf("conduit: unclosed dollar-quoted string starting at %s", s.stateLoc.String())
+			return fmt.Errorf("unclosed dollar-quoted string starting at %s", s.stateLoc.String())
 		}
 
-		return fmt.Errorf("conduit: unclosed dollar-quoted string $%s$ starting at %s",
+		return fmt.Errorf("unclosed dollar-quoted string $%s$ starting at %s",
 			s.dollarTag, s.stateLoc.String())
 	case stateIdent:
-		return fmt.Errorf("conduit: unclosed quoted identifier starting at %s", s.stateLoc.String())
+		return fmt.Errorf("unclosed quoted identifier starting at %s", s.stateLoc.String())
 
 	case stateStmt:
 	case stateLineComment:

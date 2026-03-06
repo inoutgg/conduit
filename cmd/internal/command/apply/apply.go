@@ -1,9 +1,7 @@
-//nolint:wrapcheck
 package apply
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 
@@ -85,7 +83,7 @@ func NewCommand(fs afero.Fs, src altsrc.Sourcer) *cli.Command {
 
 			dbURL := cmd.String(cmdutil.DatabaseURL)
 			if dbURL == "" {
-				return fmt.Errorf("missing `%s' flag", cmdutil.DatabaseURL)
+				return fmt.Errorf("missing required flag: --%s", cmdutil.DatabaseURL)
 			}
 
 			migrationsDir := cmd.String(cmdutil.MigrationsDir)
@@ -112,16 +110,7 @@ func NewCommand(fs afero.Fs, src altsrc.Sourcer) *cli.Command {
 				AllowHazards: cmd.StringSlice(allowHazardsFlag),
 			}
 
-			err = conduitcli.Apply(ctx, migrator, args)
-			if err != nil && errors.Is(err, conduit.ErrHazardDetected) {
-				return fmt.Errorf(
-					"%w\n\nuse --%s <HAZARD_TYPE>... to allow specific hazard types",
-					err,
-					allowHazardsFlag,
-				)
-			}
-
-			return err
+			return conduitcli.Apply(ctx, migrator, args)
 		},
 	}
 }

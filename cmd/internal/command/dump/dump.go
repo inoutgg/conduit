@@ -25,7 +25,7 @@ func NewCommand(bi buildinfo.BuildInfo, src altsrc.Sourcer) *cli.Command {
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			dbURL := cmd.String(cmdutil.DatabaseURL)
 			if dbURL == "" {
-				return fmt.Errorf("missing `%s' flag", cmdutil.DatabaseURL)
+				return fmt.Errorf("missing required flag: --%s", cmdutil.DatabaseURL)
 			}
 
 			return conduitcli.Dump(ctx, os.Stdout, bi, conduitcli.DumpArgs{

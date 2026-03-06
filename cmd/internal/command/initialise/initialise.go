@@ -29,7 +29,7 @@ func NewCommand(fs afero.Fs, timeGen timegenerator.Generator, src altsrc.Sourcer
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			cwd, err := os.Getwd()
 			if err != nil {
-				return fmt.Errorf("conduit: init: failed to get working directory: %w", err)
+				return fmt.Errorf("failed to get working directory: %w", err)
 			}
 
 			args := conduitcli.InitArgs{
@@ -39,11 +39,7 @@ func NewCommand(fs afero.Fs, timeGen timegenerator.Generator, src altsrc.Sourcer
 				ExcludeSchemas: cmd.StringSlice(cmdutil.ExcludeSchemas),
 			}
 
-			if err := conduitcli.Init(ctx, fs, timeGen, args); err != nil {
-				return fmt.Errorf("conduit: init: %w", err)
-			}
-
-			return nil
+			return conduitcli.Init(ctx, fs, timeGen, args)
 		},
 	}
 }

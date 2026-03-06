@@ -11,9 +11,9 @@ import (
 )
 
 var (
-	ErrEmptyMigration = errors.New("conduit: migration is empty")
-	ErrUpExists       = errors.New("conduit: up migration already registered")
-	ErrDownExists     = errors.New("conduit: down migration already registered")
+	ErrEmptyMigration = errors.New("migration is empty")
+	ErrUpExists       = errors.New("up migration already registered")
+	ErrDownExists     = errors.New("down migration already registered")
 )
 
 type (

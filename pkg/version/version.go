@@ -75,13 +75,13 @@ func ParseMigrationFilename(filename string) (ParsedMigrationFilename, error) {
 
 	basename := filepath.Base(filename)
 	if basename == "." {
-		return m, errors.New("conduit: filename cannot be empty")
+		return m, errors.New("filename cannot be empty")
 	}
 
 	ext := filepath.Ext(basename)
 	if ext != ".sql" {
 		return m, fmt.Errorf(
-			"conduit: unknown migration file extension %q, expected: .sql", ext)
+			"unknown migration file extension %q, expected: .sql", ext)
 	}
 
 	// Check for direction suffix (.up.sql or .down.sql).
@@ -98,13 +98,13 @@ func ParseMigrationFilename(filename string) (ParsedMigrationFilename, error) {
 		withoutExt = strings.TrimSuffix(withoutExt, ".down")
 	default:
 		return m, fmt.Errorf(
-			"conduit: SQL migration file %q must have .up.sql or .down.sql suffix", basename)
+			"SQL migration file %q must have .up.sql or .down.sql suffix", basename)
 	}
 
 	version, name, ok := strings.Cut(withoutExt, "_")
 	if !ok {
 		return m, fmt.Errorf(
-			"conduit: malformed migration filename, expected: <version>_<name>.sql, got: %s",
+			"malformed migration filename, expected: <version>_<name>.sql, got: %s",
 			basename,
 		)
 	}
@@ -112,7 +112,7 @@ func ParseMigrationFilename(filename string) (ParsedMigrationFilename, error) {
 	ver, err := time.Parse(format, version)
 	if err != nil {
 		return m, fmt.Errorf(
-			"conduit: invalid version format %q, expected: YYYYMMDDHHMMSS: %w", version, err)
+			"invalid version format %q, expected: YYYYMMDDHHMMSS: %w", version, err)
 	}
 
 	m = ParsedMigrationFilename{
