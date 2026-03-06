@@ -31,3 +31,9 @@ func (Standard) Version() string {
 
 	return "devel"
 }
+
+// Stub is a BuildInfo implementation that returns a fixed version string.
+// This is intended for use in tests.
+type Stub struct{ V string }
+
+func (s Stub) Version() string { return s.V }
