@@ -14,15 +14,11 @@ import (
 	"go.inout.gg/conduit/pkg/timegenerator"
 )
 
-type buildInfoStub struct{}
-
-func (buildInfoStub) Version() string { return "devel" }
-
 //nolint:gochecknoglobals
 var (
 	poolFactory *pgxephemeraltest.PoolFactory
-	timeGen                         = timegenerator.Stub{T: time.Date(2024, 1, 15, 12, 30, 45, 0, time.UTC)}
-	bi          buildinfo.BuildInfo = buildInfoStub{}
+	timeGen     = timegenerator.Stub{T: time.Date(2024, 1, 15, 12, 30, 45, 0, time.UTC)}
+	bi          = buildinfo.Stub{V: "devel"}
 )
 
 func TestMain(m *testing.M) {
