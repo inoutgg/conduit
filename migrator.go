@@ -40,10 +40,10 @@ const (
 
 var (
 	ErrInvalidStep = errors.New(
-		"conduit: invalid migration step. Expected: -1 (all) or positive integer",
+		"invalid migration step: expected -1 (all) or positive integer",
 	)
-	ErrSchemaDrift    = errors.New("conduit: schema drift detected")
-	ErrHazardDetected = errors.New("conduit: hazardous migration detected")
+	ErrSchemaDrift    = errors.New("schema drift detected")
+	ErrHazardDetected = errors.New("hazardous migration detected")
 )
 
 type (
@@ -196,7 +196,7 @@ func (m *Migrator) Migrate(
 	lockNum := pgLockNum("conduit")
 
 	if err := dbsqlc.New().AcquireLock(ctx, conn, lockNum); err != nil {
-		return nil, fmt.Errorf("conduit: failed to acquire a lock: %w", err)
+		return nil, fmt.Errorf("failed to acquire a lock: %w", err)
 	}
 
 	defer func() {
@@ -222,7 +222,7 @@ func (m *Migrator) Migrate(
 func (m *Migrator) existingMigrationKeys(ctx context.Context, conn *pgx.Conn) ([]string, error) {
 	ok, err := dbsqlc.New().DoesTableExist(ctx, conn, "conduit_migrations")
 	if err != nil {
-		return nil, fmt.Errorf("conduit: failed to fetch from migrations table: %w", err)
+		return nil, fmt.Errorf("failed to fetch from migrations table: %w", err)
 	}
 
 	if !ok {
@@ -232,7 +232,7 @@ func (m *Migrator) existingMigrationKeys(ctx context.Context, conn *pgx.Conn) ([
 
 	rows, err := dbsqlc.New().AllExistingMigrations(ctx, conn)
 	if err != nil {
-		return nil, fmt.Errorf("conduit: failed to fetch existing migrations: %w", err)
+		return nil, fmt.Errorf("failed to fetch existing migrations: %w", err)
 	}
 
 	keys := make([]string, len(rows))
@@ -309,7 +309,7 @@ func (m *Migrator) detectSchemaDrift(ctx context.Context, conn *pgx.Conn) error 
 			return nil
 		}
 
-		return fmt.Errorf("conduit: failed to fetch latest schema hash: %w", err)
+		return fmt.Errorf("failed to fetch latest schema hash: %w", err)
 	}
 
 	db := stdlib.OpenDB(*conn.Config())
@@ -317,7 +317,7 @@ func (m *Migrator) detectSchemaDrift(ctx context.Context, conn *pgx.Conn) error 
 
 	actual, err := schema.GetSchemaHash(ctx, db)
 	if err != nil {
-		return fmt.Errorf("conduit: failed to compute schema hash: %w", err)
+		return fmt.Errorf("failed to compute schema hash: %w", err)
 	}
 
 	if actual != expected {

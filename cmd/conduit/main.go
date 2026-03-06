@@ -2,13 +2,14 @@ package main
 
 import (
 	"context"
-	"log"
+	"os"
 	"os/signal"
 	"syscall"
 
 	dotenv "github.com/joho/godotenv"
 
 	"go.inout.gg/conduit/cmd/internal/command"
+	"go.inout.gg/conduit/cmd/internal/conduiterror"
 )
 
 func main() {
@@ -19,7 +20,8 @@ func main() {
 	err := command.Execute(ctx)
 	if err != nil {
 		cancel()
-		log.Fatal(err)
+		conduiterror.Display(os.Stderr, err)
+		os.Exit(1)
 	}
 
 	cancel()

@@ -3,6 +3,7 @@ package diff
 import (
 	"context"
 	"errors"
+	"fmt"
 	"path/filepath"
 
 	"github.com/spf13/afero"
@@ -40,12 +41,12 @@ func NewCommand(fs afero.Fs, timeGen timegenerator.Generator, bi buildinfo.Build
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			name := cmd.Args().First()
 			if name == "" {
-				return errors.New("missing `name` argument")
+				return errors.New("missing required argument: <name>")
 			}
 
 			schema := cmd.String(schemaFlag)
 			if schema == "" {
-				return errors.New("missing `--schema` flag")
+				return fmt.Errorf("missing required flag: --%s", schemaFlag)
 			}
 
 			args := conduitcli.DiffArgs{

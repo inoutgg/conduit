@@ -61,7 +61,7 @@ func Init(ctx context.Context, fs afero.Fs, timeGen timegenerator.Generator, arg
 	}
 
 	if err := conduitsum.WriteFile(migrationsFs, hash); err != nil {
-		return fmt.Errorf("conduit: failed to write conduit.sum: %w", err)
+		return fmt.Errorf("failed to write conduit.sum: %w", err)
 	}
 
 	if err := writeConfigFile(fs, args.Dir, args.MigrationsDir, args.DatabaseURL); err != nil {
@@ -83,12 +83,12 @@ func writeConfigFile(fs afero.Fs, parentDir, migrationsName, databaseURL string)
 	}
 
 	if err := conduittemplate.ConduitYAMLTemplate.Execute(&buf, data); err != nil {
-		return fmt.Errorf("conduit: failed to render config template: %w", err)
+		return fmt.Errorf("failed to render config template: %w", err)
 	}
 
 	configPath := filepath.Join(parentDir, configFilename)
 	if err := afero.WriteFile(fs, configPath, buf.Bytes(), 0o644); err != nil {
-		return fmt.Errorf("conduit: failed to write config file: %w", err)
+		return fmt.Errorf("failed to write config file: %w", err)
 	}
 
 	return nil
@@ -97,7 +97,7 @@ func writeConfigFile(fs afero.Fs, parentDir, migrationsName, databaseURL string)
 func createMigrationDir(fs afero.Fs, dir string) error {
 	err := fs.MkdirAll(dir, 0o755)
 	if err != nil {
-		return fmt.Errorf("conduit: failed to create migrations directory at %s: %w", dir, err)
+		return fmt.Errorf("failed to create migrations directory at %s: %w", dir, err)
 	}
 
 	return nil
@@ -107,7 +107,7 @@ func createInitialMigration(fs afero.Fs, ver version.Version) error {
 	filename := version.MigrationFilename(ver, "conduit_initial_schema", version.MigrationDirectionUp)
 
 	if err := afero.WriteFile(fs, filename, migrations.Schema, 0o644); err != nil {
-		return fmt.Errorf("conduit: failed to create initial migration file: %w", err)
+		return fmt.Errorf("failed to create initial migration file: %w", err)
 	}
 
 	return nil

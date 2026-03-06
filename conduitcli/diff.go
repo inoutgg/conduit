@@ -51,7 +51,7 @@ func Diff(
 	args DiffArgs,
 ) error {
 	if !exists(fs, args.Dir) {
-		return errors.New("migrations directory does not exist, try to initialise it first")
+		return fmt.Errorf("migrations directory %q not found: run 'conduit init' first", args.Dir)
 	}
 
 	migrationsFs := afero.NewBasePathFs(fs, args.Dir)
@@ -142,7 +142,7 @@ func Diff(
 	}
 
 	if err := conduitsum.WriteFile(migrationsFs, plan.TargetSchemaHash); err != nil {
-		return fmt.Errorf("conduit: failed to write conduit.sum: %w", err)
+		return fmt.Errorf("failed to write conduit.sum: %w", err)
 	}
 
 	return nil
@@ -193,16 +193,16 @@ func isNonTxStmt(ddl string) bool {
 func writeMigration(fs afero.Fs, path string, tpl *template.Template, data any) error {
 	f, err := fs.Create(path)
 	if err != nil {
-		return fmt.Errorf("conduit: failed to create migration file %s: %w", path, err)
+		return fmt.Errorf("failed to create migration file %s: %w", path, err)
 	}
 	defer f.Close()
 
 	if err := tpl.Execute(f, data); err != nil {
-		return fmt.Errorf("conduit: failed to write template: %w", err)
+		return fmt.Errorf("failed to render migration template: %w", err)
 	}
 
 	if err := f.Sync(); err != nil {
-		return fmt.Errorf("conduit: failed to write migration file %s: %w", path, err)
+		return fmt.Errorf("failed to write migration file %s: %w", path, err)
 	}
 
 	return nil

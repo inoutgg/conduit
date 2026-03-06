@@ -46,17 +46,17 @@ func parseSQLMigrationsFromFS(fs afero.Fs, root string) ([]*Migration, error) {
 
 		info, err := version.ParseMigrationFilename(filepath.Base(path))
 		if err != nil {
-			return fmt.Errorf("conduit: failed to parse migration filename: %w", err)
+			return fmt.Errorf("failed to parse migration filename: %w", err)
 		}
 
 		content, err := afero.ReadFile(fs, path)
 		if err != nil {
-			return fmt.Errorf("conduit: failed to read migration file: %w", err)
+			return fmt.Errorf("failed to read migration file: %w", err)
 		}
 
 		stmts, err := sqlsplit.Split(content)
 		if err != nil {
-			return fmt.Errorf("conduit: failed to split migration SQL: %w", err)
+			return fmt.Errorf("failed to split migration SQL: %w", err)
 		}
 
 		key := migrationKey(info.Version, info.Name)
@@ -76,7 +76,7 @@ func parseSQLMigrationsFromFS(fs afero.Fs, root string) ([]*Migration, error) {
 		case version.MigrationDirectionUp:
 			if m.up != nil {
 				return fmt.Errorf(
-					"conduit: duplicate up migration for %s: %w",
+					"duplicate up migration for %s: %w",
 					key,
 					ErrUpExists,
 				)
@@ -87,7 +87,7 @@ func parseSQLMigrationsFromFS(fs afero.Fs, root string) ([]*Migration, error) {
 		case version.MigrationDirectionDown:
 			if m.down != emptyMigrateFunc {
 				return fmt.Errorf(
-					"conduit: duplicate down migration for %s: %w",
+					"duplicate down migration for %s: %w",
 					key,
 					ErrDownExists,
 				)
@@ -99,13 +99,13 @@ func parseSQLMigrationsFromFS(fs afero.Fs, root string) ([]*Migration, error) {
 		return nil
 	})
 	if err != nil {
-		return nil, fmt.Errorf("conduit: error occurred while parsing migrations directory: %w", err)
+		return nil, fmt.Errorf("failed to parse migrations directory: %w", err)
 	}
 
 	result := make([]*Migration, 0, len(migrations))
 	for key, m := range migrations {
 		if m.up == nil {
-			return nil, fmt.Errorf("conduit: migration version %s has a down file but no up file", key)
+			return nil, fmt.Errorf("migration version %s has a down file but no up file", key)
 		}
 
 		result = append(result, m)
@@ -162,7 +162,7 @@ func sqlMigrateFunc(stmts []sqlsplit.Stmt) *migrateFunc {
 			for _, stmt := range queryStmts {
 				if _, err := tx.Exec(ctx, stmt.Content); err != nil {
 					return fmt.Errorf(
-						"conduit: failed to execute migration script: %w\n\n%s",
+						"failed to execute migration script: %w\n\n%s",
 						err,
 						stmt.String(),
 					)
@@ -177,7 +177,7 @@ func sqlMigrateFunc(stmts []sqlsplit.Stmt) *migrateFunc {
 				_, err := conn.Exec(ctx, stmt.Content)
 				if err != nil {
 					return fmt.Errorf(
-						"conduit: failed to execute migration script: %w\n\n%s",
+						"failed to execute migration script: %w\n\n%s",
 						err,
 						stmt.String(),
 					)

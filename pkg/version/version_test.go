@@ -79,12 +79,12 @@ func TestParseMigrationFilename(t *testing.T) {
 		{
 			name:           "Invalid extension",
 			filename:       "20230601150000_invalid_extension.txt",
-			expectedErrMsg: `conduit: unknown migration file extension ".txt", expected: .sql`,
+			expectedErrMsg: `unknown migration file extension ".txt", expected: .sql`,
 		},
 		{
 			name:           "Malformed filename, no underscore",
 			filename:       "20230601160000malformed.up.sql",
-			expectedErrMsg: `conduit: malformed migration filename, expected: <version>_<name>.sql, got: 20230601160000malformed.up.sql`,
+			expectedErrMsg: `malformed migration filename, expected: <version>_<name>.sql, got: 20230601160000malformed.up.sql`,
 		},
 		{
 			name:           "SQL without direction suffix",
@@ -94,17 +94,17 @@ func TestParseMigrationFilename(t *testing.T) {
 		{
 			name:           "Non-numeric version",
 			filename:       "abc_invalid_version.up.sql",
-			expectedErrMsg: `conduit: invalid version format "abc", expected: YYYYMMDDHHMMSS`,
+			expectedErrMsg: `invalid version format "abc", expected: YYYYMMDDHHMMSS`,
 		},
 		{
 			name:           "Empty filename",
 			filename:       "",
-			expectedErrMsg: "conduit: filename cannot be empty",
+			expectedErrMsg: "filename cannot be empty",
 		},
 		{
 			name:           "Invalid version format",
 			filename:       "1234_invalid_version.up.sql",
-			expectedErrMsg: "conduit: invalid version format \"1234\", expected: YYYYMMDDHHMMSS",
+			expectedErrMsg: "invalid version format \"1234\", expected: YYYYMMDDHHMMSS",
 		},
 	}
 

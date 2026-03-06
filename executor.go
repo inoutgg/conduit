@@ -74,7 +74,7 @@ func (e *liveExecutor) Execute(
 
 	if err != nil {
 		return MigrationResult{}, fmt.Errorf(
-			"conduit: failed to apply migration %s: %w",
+			"failed to apply migration %s: %w",
 			migration.Version().String(),
 			err,
 		)
@@ -100,7 +100,7 @@ func (e *liveExecutor) Execute(
 		schemaHash, err = computeSchemaHash(ctx, conn)
 		if err != nil {
 			return MigrationResult{}, fmt.Errorf(
-				"conduit: failed to compute schema hash after migration %s: %w",
+				"failed to compute schema hash after migration %s: %w",
 				migration.Version().String(),
 				err,
 			)
@@ -114,7 +114,7 @@ func (e *liveExecutor) Execute(
 	}
 
 	if err != nil {
-		return MigrationResult{}, fmt.Errorf("conduit: failed to update migrations table %v: %w", dir, err)
+		return MigrationResult{}, fmt.Errorf("failed to record %s migration: %w", dir, err)
 	}
 
 	_ = dbsqlc.New().ResetConn(ctx, conn)
@@ -155,7 +155,7 @@ func applyMigrationTx(
 ) error {
 	tx, err := conn.Begin(ctx)
 	if err != nil {
-		return fmt.Errorf("conduit: failed to open transaction: %w", err)
+		return fmt.Errorf("failed to open transaction: %w", err)
 	}
 
 	defer func() { _ = tx.Rollback(ctx) }()
@@ -166,7 +166,7 @@ func applyMigrationTx(
 	}
 
 	if err := tx.Commit(ctx); err != nil {
-		return fmt.Errorf("conduit: failed to commit transaction: %w", err)
+		return fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
 	return nil
@@ -178,7 +178,7 @@ func computeSchemaHash(ctx context.Context, conn *pgx.Conn) (string, error) {
 
 	hash, err := schema.GetSchemaHash(ctx, db)
 	if err != nil {
-		return "", fmt.Errorf("conduit: failed to compute schema hash: %w", err)
+		return "", fmt.Errorf("failed to compute schema hash: %w", err)
 	}
 
 	return hash, nil
