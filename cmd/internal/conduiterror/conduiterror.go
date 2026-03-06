@@ -22,9 +22,13 @@ func Display(w io.Writer, err error) {
 
 	switch {
 	case errors.Is(err, conduit.ErrSchemaDrift):
-		hint = "if this is expected, re-run with --skip-schema-drift-check"
+		hint = "the database schema was modified outside of migrations (manual DDL).\n" +
+			"Run 'conduit diff' to generate a migration that captures the changes.\n" +
+			"To skip this check: --skip-schema-drift-check"
 	case errors.Is(err, conduit.ErrHazardDetected):
-		hint = "use --allow-hazards <TYPE> to allow specific hazard types"
+		hint = "these operations can cause table locks, downtime, or irreversible data loss in production.\n" +
+			"Review each hazard above before proceeding.\n" +
+			"To explicitly allow specific types: --allow-hazards <TYPE>"
 	}
 
 	fmt.Fprintf(w, "Error: %s\n", err)
