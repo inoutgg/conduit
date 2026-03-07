@@ -10,7 +10,7 @@ import (
 	"go.uber.org/goleak"
 
 	"go.inout.gg/conduit/internal/testmigrator"
-	"go.inout.gg/conduit/pkg/buildinfo"
+	"go.inout.gg/conduit/pkg/conduitbuildinfo"
 	"go.inout.gg/conduit/pkg/timegenerator"
 )
 
@@ -18,7 +18,7 @@ import (
 var (
 	poolFactory *pgxephemeraltest.PoolFactory
 	timeGen     = timegenerator.Stub{T: time.Date(2024, 1, 15, 12, 30, 45, 0, time.UTC)}
-	bi          = buildinfo.Stub{V: "devel"}
+	bi          = conduitbuildinfo.Stub{V: "devel"}
 )
 
 func TestMain(m *testing.M) {

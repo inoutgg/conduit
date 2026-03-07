@@ -13,14 +13,19 @@ import (
 
 	"go.inout.gg/conduit/conduitcli"
 	"go.inout.gg/conduit/internal/cmdutil"
-	"go.inout.gg/conduit/pkg/buildinfo"
+	"go.inout.gg/conduit/pkg/conduitbuildinfo"
 	"go.inout.gg/conduit/pkg/hashsum"
 	"go.inout.gg/conduit/pkg/timegenerator"
 )
 
 const schemaFlag = "schema"
 
-func NewCommand(fs afero.Fs, timeGen timegenerator.Generator, bi buildinfo.BuildInfo, src altsrc.Sourcer) *cli.Command {
+func NewCommand(
+	fs afero.Fs,
+	timeGen timegenerator.Generator,
+	bi conduitbuildinfo.BuildInfo,
+	src altsrc.Sourcer,
+) *cli.Command {
 	//nolint:exhaustruct
 	return &cli.Command{
 		Name:  "diff",

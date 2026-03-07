@@ -7,7 +7,7 @@ import (
 	"go.inout.gg/foundations/debug"
 
 	"go.inout.gg/conduit/internal/direction"
-	"go.inout.gg/conduit/pkg/version"
+	"go.inout.gg/conduit/pkg/conduitversion"
 )
 
 //nolint:gochecknoglobals
@@ -37,7 +37,7 @@ type migrateFunc struct {
 type Migration struct {
 	up      *migrateFunc
 	down    *migrateFunc
-	version version.Version
+	version conduitversion.Version
 	name    string
 }
 
@@ -54,7 +54,7 @@ func (m *Migration) UseTx(dir direction.Direction) (bool, error) {
 	return false, direction.ErrUnknownDirection
 }
 
-func (m *Migration) Version() version.Version { return m.version }
+func (m *Migration) Version() conduitversion.Version { return m.version }
 
 func (m *Migration) Name() string { return m.name }
 

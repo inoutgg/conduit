@@ -22,7 +22,7 @@ import (
 	"go.inout.gg/conduit/internal/direction"
 	internaldebug "go.inout.gg/conduit/internal/internaldebug"
 	"go.inout.gg/conduit/internal/sliceutil"
-	"go.inout.gg/conduit/pkg/version"
+	"go.inout.gg/conduit/pkg/conduitversion"
 )
 
 // AllSteps tells migrator to run all available migrations either up or down.
@@ -113,7 +113,7 @@ type MigrateResult struct {
 // MigrationResult represents the outcome of a single applied migration.
 type MigrationResult struct {
 	// Version is the version of the applied migration.
-	Version       version.Version
+	Version       conduitversion.Version
 	Name          string
 	DurationTotal time.Duration
 }

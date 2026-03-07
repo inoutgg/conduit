@@ -1,4 +1,4 @@
-package version_test
+package conduitversion_test
 
 import (
 	"testing"
@@ -7,18 +7,18 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"go.inout.gg/conduit/pkg/version"
+	"go.inout.gg/conduit/pkg/conduitversion"
 )
 
 func TestVersion_Compare(t *testing.T) {
 	t.Parallel()
 
-	t.Run("should return negative, when earlier version compared to later", func(t *testing.T) {
+	t.Run("should return negative, when earlier conduitversion compared to later", func(t *testing.T) {
 		t.Parallel()
 
 		// Arrange
-		earlier := version.NewFromTime(parseTime("20230601120000"))
-		later := version.NewFromTime(parseTime("20230601130000"))
+		earlier := conduitversion.NewFromTime(parseTime("20230601120000"))
+		later := conduitversion.NewFromTime(parseTime("20230601130000"))
 
 		// Act
 		result1 := earlier.Compare(later)
@@ -29,12 +29,12 @@ func TestVersion_Compare(t *testing.T) {
 		assert.Equal(t, 1, result2)
 	})
 
-	t.Run("should return zero, when versions are equal", func(t *testing.T) {
+	t.Run("should return zero, when conduitversions are equal", func(t *testing.T) {
 		t.Parallel()
 
 		// Arrange
-		v1 := version.NewFromTime(parseTime("20230601120000"))
-		v2 := version.NewFromTime(parseTime("20230601120000"))
+		v1 := conduitversion.NewFromTime(parseTime("20230601120000"))
+		v2 := conduitversion.NewFromTime(parseTime("20230601120000"))
 
 		// Act
 		result := v1.Compare(v2)
@@ -52,7 +52,7 @@ func TestParseMigrationFilename(t *testing.T) {
 		name           string
 		filename       string
 		expectedName   string
-		expectedDir    version.MigrationDirection
+		expectedDir    conduitversion.MigrationDirection
 		expectedErrMsg string
 	}{
 		{
@@ -60,21 +60,21 @@ func TestParseMigrationFilename(t *testing.T) {
 			filename:     "20230601120000_create_user.up.sql",
 			expectedTime: parseTime("20230601120000"),
 			expectedName: "create_user",
-			expectedDir:  version.MigrationDirectionUp,
+			expectedDir:  conduitversion.MigrationDirectionUp,
 		},
 		{
 			name:         "Valid down migration",
 			filename:     "20230601120000_create_user.down.sql",
 			expectedTime: parseTime("20230601120000"),
 			expectedName: "create_user",
-			expectedDir:  version.MigrationDirectionDown,
+			expectedDir:  conduitversion.MigrationDirectionDown,
 		},
 		{
 			name:         "Valid up migration with path",
 			filename:     "/path/to/migrations/20230601140000_add_index.up.sql",
 			expectedTime: parseTime("20230601140000"),
 			expectedName: "add_index",
-			expectedDir:  version.MigrationDirectionUp,
+			expectedDir:  conduitversion.MigrationDirectionUp,
 		},
 		{
 			name:           "Invalid extension",
@@ -92,8 +92,8 @@ func TestParseMigrationFilename(t *testing.T) {
 			expectedErrMsg: `must have .up.sql or .down.sql suffix`,
 		},
 		{
-			name:           "Non-numeric version",
-			filename:       "abc_invalid_version.up.sql",
+			name:           "Non-numeric conduitversion",
+			filename:       "abc_invalid_conduitversion.up.sql",
 			expectedErrMsg: `invalid version format "abc", expected: YYYYMMDDHHMMSS`,
 		},
 		{
@@ -102,8 +102,8 @@ func TestParseMigrationFilename(t *testing.T) {
 			expectedErrMsg: "filename cannot be empty",
 		},
 		{
-			name:           "Invalid version format",
-			filename:       "1234_invalid_version.up.sql",
+			name:           "Invalid conduitversion format",
+			filename:       "1234_invalid_conduitversion.up.sql",
 			expectedErrMsg: "invalid version format \"1234\", expected: YYYYMMDDHHMMSS",
 		},
 	}
@@ -113,7 +113,7 @@ func TestParseMigrationFilename(t *testing.T) {
 			t.Parallel()
 
 			// Act
-			parsed, err := version.ParseMigrationFilename(tt.filename)
+			parsed, err := conduitversion.ParseMigrationFilename(tt.filename)
 
 			// Assert
 			if tt.expectedErrMsg != "" {
@@ -121,7 +121,7 @@ func TestParseMigrationFilename(t *testing.T) {
 				assert.Contains(t, err.Error(), tt.expectedErrMsg)
 			} else {
 				require.NoError(t, err)
-				assert.Equal(t, version.NewFromTime(tt.expectedTime), parsed.Version)
+				assert.Equal(t, conduitversion.NewFromTime(tt.expectedTime), parsed.Version)
 				assert.Equal(t, tt.expectedName, parsed.Name)
 				assert.Equal(t, tt.expectedDir, parsed.Direction)
 			}
@@ -137,7 +137,7 @@ func TestParsedMigrationFilename_Filename(t *testing.T) {
 
 		// Arrange
 		original := "20230601120000_create_user.up.sql"
-		parsed, err := version.ParseMigrationFilename(original)
+		parsed, err := conduitversion.ParseMigrationFilename(original)
 		require.NoError(t, err)
 
 		// Act
@@ -152,7 +152,7 @@ func TestParsedMigrationFilename_Filename(t *testing.T) {
 
 		// Arrange
 		original := "20230601120000_create_user.down.sql"
-		parsed, err := version.ParseMigrationFilename(original)
+		parsed, err := conduitversion.ParseMigrationFilename(original)
 		require.NoError(t, err)
 
 		// Act
@@ -166,7 +166,7 @@ func TestParsedMigrationFilename_Filename(t *testing.T) {
 		t.Parallel()
 
 		// Arrange
-		parsed, err := version.ParseMigrationFilename(
+		parsed, err := conduitversion.ParseMigrationFilename(
 			"/path/to/migrations/20230601140000_add_index.up.sql")
 		require.NoError(t, err)
 

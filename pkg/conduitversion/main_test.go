@@ -1,4 +1,4 @@
-package version_test
+package conduitversion_test
 
 import (
 	"testing"

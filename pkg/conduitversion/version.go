@@ -1,5 +1,5 @@
-// Package version provides utilities for working with migration file versions.
-package version
+// Package conduitversion provides utilities for working with migration file versions.
+package conduitversion
 
 import (
 	"cmp"

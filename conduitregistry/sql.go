@@ -12,8 +12,8 @@ import (
 	"github.com/spf13/afero"
 
 	"go.inout.gg/conduit/internal/sliceutil"
+	"go.inout.gg/conduit/pkg/conduitversion"
 	"go.inout.gg/conduit/pkg/sqlsplit"
-	"go.inout.gg/conduit/pkg/version"
 )
 
 const (
@@ -44,7 +44,7 @@ func parseSQLMigrationsFromFS(fs afero.Fs, root string) ([]*Migration, error) {
 			return nil
 		}
 
-		info, err := version.ParseMigrationFilename(filepath.Base(path))
+		info, err := conduitversion.ParseMigrationFilename(filepath.Base(path))
 		if err != nil {
 			return fmt.Errorf("failed to parse migration filename: %w", err)
 		}
@@ -73,7 +73,7 @@ func parseSQLMigrationsFromFS(fs afero.Fs, root string) ([]*Migration, error) {
 		}
 
 		switch info.Direction {
-		case version.MigrationDirectionUp:
+		case conduitversion.MigrationDirectionUp:
 			if m.up != nil {
 				return fmt.Errorf(
 					"duplicate up migration for %s: %w",
@@ -84,7 +84,7 @@ func parseSQLMigrationsFromFS(fs afero.Fs, root string) ([]*Migration, error) {
 
 			m.up = sqlMigrateFunc(stmts)
 
-		case version.MigrationDirectionDown:
+		case conduitversion.MigrationDirectionDown:
 			if m.down != emptyMigrateFunc {
 				return fmt.Errorf(
 					"duplicate down migration for %s: %w",
@@ -192,6 +192,6 @@ func sqlMigrateFunc(stmts []sqlsplit.Stmt) *migrateFunc {
 }
 
 // migrationKey returns a composite key identifying a migration by version and name.
-func migrationKey(v version.Version, name string) string {
+func migrationKey(v conduitversion.Version, name string) string {
 	return v.String() + "_" + name
 }

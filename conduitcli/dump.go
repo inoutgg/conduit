@@ -8,7 +8,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	"go.inout.gg/conduit/pkg/buildinfo"
+	"go.inout.gg/conduit/pkg/conduitbuildinfo"
 	"go.inout.gg/conduit/pkg/pgdiff"
 )
 
@@ -20,7 +20,7 @@ type DumpArgs struct {
 
 // Dump connects to the database, extracts its schema as DDL statements,
 // and writes the result to w.
-func Dump(ctx context.Context, w io.Writer, bi buildinfo.BuildInfo, args DumpArgs) error {
+func Dump(ctx context.Context, w io.Writer, bi conduitbuildinfo.BuildInfo, args DumpArgs) error {
 	connConfig, err := pgx.ParseConfig(args.DatabaseURL)
 	if err != nil {
 		return fmt.Errorf("failed to parse database URL: %w", err)

@@ -14,7 +14,7 @@ import (
 	"go.inout.gg/conduit/cmd/internal/command/dump"
 	"go.inout.gg/conduit/cmd/internal/command/initialise"
 	"go.inout.gg/conduit/internal/cmdutil"
-	"go.inout.gg/conduit/pkg/buildinfo"
+	"go.inout.gg/conduit/pkg/conduitbuildinfo"
 	"go.inout.gg/conduit/pkg/timegenerator"
 )
 
@@ -24,7 +24,7 @@ func Execute(
 	fs afero.Fs,
 	w io.Writer,
 	timeGen timegenerator.Generator,
-	bi buildinfo.BuildInfo,
+	bi conduitbuildinfo.BuildInfo,
 	rootDir string,
 	args []string,
 ) error {

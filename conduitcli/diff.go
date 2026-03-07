@@ -15,11 +15,11 @@ import (
 
 	"go.inout.gg/conduit"
 	internaltpl "go.inout.gg/conduit/internal/template"
-	"go.inout.gg/conduit/pkg/buildinfo"
+	"go.inout.gg/conduit/pkg/conduitbuildinfo"
+	"go.inout.gg/conduit/pkg/conduitversion"
 	"go.inout.gg/conduit/pkg/hashsum"
 	"go.inout.gg/conduit/pkg/pgdiff"
 	"go.inout.gg/conduit/pkg/timegenerator"
-	"go.inout.gg/conduit/pkg/version"
 )
 
 var ErrMigrationsNotFound = errors.New("migrations directory not found")
@@ -51,7 +51,7 @@ func Diff(
 	ctx context.Context,
 	fs afero.Fs,
 	timeGen timegenerator.Generator,
-	bi buildinfo.BuildInfo,
+	bi conduitbuildinfo.BuildInfo,
 	store hashsum.Store,
 	args DiffArgs,
 ) error {
@@ -86,7 +86,7 @@ func Diff(
 		}
 	}
 
-	v := version.NewFromTime(timeGen.Now())
+	v := conduitversion.NewFromTime(timeGen.Now())
 	migrations := splitMigrations(plan.Statements)
 
 	for i, m := range migrations {
@@ -130,7 +130,7 @@ func Diff(
 			}
 		}
 
-		filename := version.MigrationFilename(v, name, version.MigrationDirectionUp)
+		filename := conduitversion.MigrationFilename(v, name, conduitversion.MigrationDirectionUp)
 
 		if err := writeMigration(
 			migrationsFs,
