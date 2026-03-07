@@ -19,8 +19,8 @@ import (
 
 	"go.inout.gg/conduit/internal/migrations"
 	"go.inout.gg/conduit/internal/sliceutil"
+	"go.inout.gg/conduit/pkg/conduitversion"
 	"go.inout.gg/conduit/pkg/sqlsplit"
-	"go.inout.gg/conduit/pkg/version"
 )
 
 // Plan holds the generated migration plan and the target schema hash.
@@ -250,26 +250,26 @@ func readStmtsFromMigrationsDir(fs afero.Fs, dir string) ([]sqlsplit.Stmt, error
 		return nil, fmt.Errorf("failed to read directory: %w", err)
 	}
 
-	migrations := make([]version.ParsedMigrationFilename, 0, len(entries))
+	migrations := make([]conduitversion.ParsedMigrationFilename, 0, len(entries))
 	for _, entry := range entries {
 		name := entry.Name()
 		if entry.IsDir() || !strings.HasSuffix(name, ".sql") {
 			continue
 		}
 
-		m, err := version.ParseMigrationFilename(name)
+		m, err := conduitversion.ParseMigrationFilename(name)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse migration filename %s: %w", name, err)
 		}
 
-		if m.Direction != version.MigrationDirectionUp {
+		if m.Direction != conduitversion.MigrationDirectionUp {
 			continue
 		}
 
 		migrations = append(migrations, m)
 	}
 
-	slices.SortFunc(migrations, func(a, b version.ParsedMigrationFilename) int {
+	slices.SortFunc(migrations, func(a, b conduitversion.ParsedMigrationFilename) int {
 		return a.Compare(b)
 	})
 

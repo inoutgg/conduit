@@ -11,11 +11,11 @@ import (
 
 	"go.inout.gg/conduit/internal/migrations"
 	conduittemplate "go.inout.gg/conduit/internal/template"
+	"go.inout.gg/conduit/pkg/conduitversion"
 	"go.inout.gg/conduit/pkg/hashsum"
 	"go.inout.gg/conduit/pkg/pgdiff"
 	"go.inout.gg/conduit/pkg/sqlsplit"
 	"go.inout.gg/conduit/pkg/timegenerator"
-	"go.inout.gg/conduit/pkg/version"
 )
 
 type InitArgs struct {
@@ -36,7 +36,7 @@ func Init(ctx context.Context, fs afero.Fs, timeGen timegenerator.Generator, sto
 	}
 
 	migrationsFs := afero.NewBasePathFs(fs, migrationsPath)
-	ver := version.NewFromTime(timeGen.Now())
+	ver := conduitversion.NewFromTime(timeGen.Now())
 
 	if err := createInitialMigration(migrationsFs, ver); err != nil {
 		return err
@@ -99,8 +99,8 @@ func createMigrationDir(fs afero.Fs, dir string) error {
 	return nil
 }
 
-func createInitialMigration(fs afero.Fs, ver version.Version) error {
-	filename := version.MigrationFilename(ver, "conduit_initial_schema", version.MigrationDirectionUp)
+func createInitialMigration(fs afero.Fs, ver conduitversion.Version) error {
+	filename := conduitversion.MigrationFilename(ver, "conduit_initial_schema", conduitversion.MigrationDirectionUp)
 
 	if err := afero.WriteFile(fs, filename, migrations.Schema, 0o644); err != nil {
 		return fmt.Errorf("failed to create initial migration file: %w", err)

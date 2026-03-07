@@ -13,7 +13,7 @@ import (
 
 	"go.inout.gg/conduit/cmd/internal/command"
 	"go.inout.gg/conduit/cmd/internal/conduiterror"
-	"go.inout.gg/conduit/pkg/buildinfo"
+	"go.inout.gg/conduit/pkg/conduitbuildinfo"
 	"go.inout.gg/conduit/pkg/timegenerator"
 )
 
@@ -39,7 +39,7 @@ func run(ctx context.Context, w io.Writer, args []string) error {
 
 	var (
 		timeGen timegenerator.Standard
-		bi      buildinfo.Standard
+		bi      conduitbuildinfo.Standard
 		fs      = afero.NewBasePathFs(afero.NewOsFs(), cwd)
 	)
 

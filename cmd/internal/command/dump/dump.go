@@ -10,10 +10,10 @@ import (
 
 	"go.inout.gg/conduit/conduitcli"
 	"go.inout.gg/conduit/internal/cmdutil"
-	"go.inout.gg/conduit/pkg/buildinfo"
+	"go.inout.gg/conduit/pkg/conduitbuildinfo"
 )
 
-func NewCommand(w io.Writer, bi buildinfo.BuildInfo, src altsrc.Sourcer) *cli.Command {
+func NewCommand(w io.Writer, bi conduitbuildinfo.BuildInfo, src altsrc.Sourcer) *cli.Command {
 	//nolint:exhaustruct
 	return &cli.Command{
 		Name:  "dump",

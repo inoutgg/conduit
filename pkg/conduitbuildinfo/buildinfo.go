@@ -1,4 +1,4 @@
-package buildinfo
+package conduitbuildinfo
 
 import "runtime/debug"
 
