@@ -164,24 +164,36 @@ func splitMigrations(stmts []schemadiff.Statement) []migration {
 		return nil
 	}
 
-	var migrations []migration
-
-	//nolint:exhaustruct
-	current := migration{isNonTx: isNonTxStmt(stmts[0].DDL)}
+	var (
+		migrations []migration
+		current    *migration
+	)
 
 	for _, stmt := range stmts {
-		isNonTx := isNonTxStmt(stmt.DDL)
-		if isNonTx != current.isNonTx {
-			migrations = append(migrations, current)
+		if isNonTxStmt(stmt.DDL) {
+			if current != nil {
+				migrations = append(migrations, *current)
+				current = nil
+			}
 
-			//nolint:exhaustruct
-			current = migration{isNonTx: isNonTx}
+			migrations = append(migrations, migration{
+				stmts:   []schemadiff.Statement{stmt},
+				isNonTx: true,
+			})
+
+			continue
+		}
+
+		if current == nil {
+			current = &migration{} //nolint:exhaustruct
 		}
 
 		current.stmts = append(current.stmts, stmt)
 	}
 
-	migrations = append(migrations, current)
+	if current != nil {
+		migrations = append(migrations, *current)
+	}
 
 	return migrations
 }

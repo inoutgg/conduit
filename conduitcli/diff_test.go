@@ -272,39 +272,47 @@ func TestSplitMigrations(t *testing.T) {
 		assert.Len(t, migrations[0].stmts, 2)
 	})
 
-	t.Run("should produce single non-tx group, when all statements are concurrent", func(t *testing.T) {
+	t.Run("should produce separate non-tx groups, when all statements are concurrent", func(t *testing.T) {
 		t.Parallel()
 
 		migrations := splitMigrations([]schemadiff.Statement{
 			stmt("CREATE INDEX CONCURRENTLY idx1 ON t (c)"),
 			stmt("CREATE INDEX CONCURRENTLY idx2 ON t (c)"),
 		})
-		require.Len(t, migrations, 1)
+		require.Len(t, migrations, 2)
 		assert.True(t, migrations[0].isNonTx)
-		assert.Len(t, migrations[0].stmts, 2)
-	})
-
-	t.Run("should split into three groups, when statements alternate tx and non-tx", func(t *testing.T) {
-		t.Parallel()
-
-		migrations := splitMigrations([]schemadiff.Statement{
-			stmt("CREATE TABLE t1 (id int)"),
-			stmt("CREATE TABLE t2 (id int)"),
-			stmt("CREATE INDEX CONCURRENTLY idx ON t1 (id)"),
-			stmt("DROP INDEX CONCURRENTLY old_idx"),
-			stmt("ALTER TABLE t1 ADD COLUMN name text"),
-		})
-		require.Len(t, migrations, 3)
-
-		assert.False(t, migrations[0].isNonTx)
-		assert.Len(t, migrations[0].stmts, 2)
-
+		assert.Len(t, migrations[0].stmts, 1)
 		assert.True(t, migrations[1].isNonTx)
-		assert.Len(t, migrations[1].stmts, 2)
-
-		assert.False(t, migrations[2].isNonTx)
-		assert.Len(t, migrations[2].stmts, 1)
+		assert.Len(t, migrations[1].stmts, 1)
 	})
+
+	t.Run(
+		"should split non-tx statements individually, when statements alternate tx and non-tx",
+		func(t *testing.T) {
+			t.Parallel()
+
+			migrations := splitMigrations([]schemadiff.Statement{
+				stmt("CREATE TABLE t1 (id int)"),
+				stmt("CREATE TABLE t2 (id int)"),
+				stmt("CREATE INDEX CONCURRENTLY idx ON t1 (id)"),
+				stmt("DROP INDEX CONCURRENTLY old_idx"),
+				stmt("ALTER TABLE t1 ADD COLUMN name text"),
+			})
+			require.Len(t, migrations, 4)
+
+			assert.False(t, migrations[0].isNonTx)
+			assert.Len(t, migrations[0].stmts, 2)
+
+			assert.True(t, migrations[1].isNonTx)
+			assert.Len(t, migrations[1].stmts, 1)
+
+			assert.True(t, migrations[2].isNonTx)
+			assert.Len(t, migrations[2].stmts, 1)
+
+			assert.False(t, migrations[3].isNonTx)
+			assert.Len(t, migrations[3].stmts, 1)
+		},
+	)
 
 	t.Run("should produce single non-tx group, when one concurrent statement exists", func(t *testing.T) {
 		t.Parallel()
