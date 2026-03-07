@@ -14,7 +14,7 @@ import (
 	schemadiff "github.com/stripe/pg-schema-diff/pkg/diff"
 
 	"go.inout.gg/conduit"
-	internaltpl "go.inout.gg/conduit/internal/template"
+	internaltpl "go.inout.gg/conduit/internal/conduittemplate"
 	"go.inout.gg/conduit/pkg/conduitbuildinfo"
 	"go.inout.gg/conduit/pkg/conduitversion"
 	"go.inout.gg/conduit/pkg/hashsum"

@@ -9,8 +9,8 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/spf13/afero"
 
+	conduittemplate "go.inout.gg/conduit/internal/conduittemplate"
 	"go.inout.gg/conduit/internal/migrations"
-	conduittemplate "go.inout.gg/conduit/internal/template"
 	"go.inout.gg/conduit/pkg/conduitversion"
 	"go.inout.gg/conduit/pkg/hashsum"
 	"go.inout.gg/conduit/pkg/pgdiff"

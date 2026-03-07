@@ -1,4 +1,4 @@
-package template
+package conduittemplate
 
 import (
 	"text/template"

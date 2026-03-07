@@ -34,6 +34,6 @@ func main() {
 	}
 
 	for _, m := range result.MigrationResults {
-		log.Printf("applied %s_%s (%s)", m.Version, m.Name, m.DurationTotal)
+		log.Printf("applied %s_%s (%s)", m.Version, m.Name, m.DurationTotal) //#nosec G706
 	}
 }
