@@ -23,11 +23,12 @@ Alternatively, pass `--database-url` to each command, or place the variable in a
 conduit init
 ```
 
-This creates a `migrations/` directory with two files:
+This creates a `migrations/` directory and three files:
 
 - An initial migration that sets up conduit's internal `conduit_migrations`
   table.
 - A `conduit.sum` file that tracks the expected schema hash for drift detection.
+- A `conduit.yaml` config file.
 
 To use a custom directory:
 
@@ -52,8 +53,10 @@ CREATE TABLE users (
 
 ## 3. Generate a migration
 
+### From a schema diff
+
 ```sh
-conduit create diff add_users --schema schema.sql
+conduit diff add_users --schema schema.sql
 ```
 
 Conduit compares `migrations/` against `schema.sql` using a temporary database
@@ -66,6 +69,19 @@ access-exclusive lock or deleting data), they are annotated with
 `---- hazard: <TYPE> // <reason> ----` comments so you can review them before
 applying. Conduit will refuse to run such a migration unless you explicitly
 allow the relevant hazard types — see [Hazardous operations](#hazardous-operations).
+
+### As an empty file
+
+When you need to write a migration by hand — for example to seed data or run a
+stored procedure — use `conduit new` instead:
+
+```sh
+conduit new seed_users
+```
+
+This creates a pair of empty `<timestamp>_seed_users.up.sql` and
+`<timestamp>_seed_users.down.sql` files in the migrations directory, ready for
+you to fill in.
 
 ## 4. Apply migrations
 
@@ -81,7 +97,7 @@ Roll back one migration:
 conduit apply down
 ```
 
-> **Note:** `create diff` only generates `.up.sql` files. Down migrations are
+> **Note:** `conduit diff` only generates `.up.sql` files. Down migrations are
 > not created automatically and must be written by hand if needed. In practice,
 > rolling back is rarely the right response to a problem in production — a new
 > forward migration that corrects the issue is safer and keeps history intact.
@@ -89,11 +105,12 @@ conduit apply down
 
 ### Options
 
-| Flag                         | Description                                             |
-| ---------------------------- | ------------------------------------------------------- |
-| `--steps N`                  | Limit the number of migrations to run                   |
-| `--allow-hazards HAZARD_TYPE` | Allow a specific hazard type; may be repeated           |
-| `--no-check-schema-drift`    | Skip schema drift detection                             |
+| Flag                          | Description                                              |
+| ----------------------------- | -------------------------------------------------------- |
+| `--steps N`                   | Limit the number of migrations to run                    |
+| `--allow-hazards HAZARD_TYPE` | Allow a specific hazard type; may be repeated            |
+| `--skip-schema-drift-check`   | Skip schema drift detection                              |
+| `--dry-run`                   | Preview migrations without applying them                 |
 
 ## Hazardous operations
 
@@ -124,6 +141,6 @@ application.
 The typical workflow after the initial setup:
 
 1. Edit `schema.sql` with the desired changes.
-2. Run `conduit create diff <name> --schema schema.sql` to generate a migration.
+2. Run `conduit diff <name> --schema schema.sql` to generate a migration.
 3. Review the generated `.up.sql` file.
 4. Run `conduit apply up`.

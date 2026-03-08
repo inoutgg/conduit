@@ -16,6 +16,13 @@ export CONDUIT_DATABASE_URL="postgres://user:pass@localhost:5432/mydb"
 conduit dump
 ```
 
+To exclude specific PostgreSQL schemas from the dump, pass `--exclude-schema`
+(may be repeated):
+
+```sh
+conduit dump --exclude-schema internal --exclude-schema audit
+```
+
 The output is written to stdout, so redirect it to a file:
 
 ```sh

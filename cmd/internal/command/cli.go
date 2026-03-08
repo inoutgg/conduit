@@ -13,6 +13,7 @@ import (
 	"go.inout.gg/conduit/cmd/internal/command/diff"
 	"go.inout.gg/conduit/cmd/internal/command/dump"
 	"go.inout.gg/conduit/cmd/internal/command/initialise"
+	newmigration "go.inout.gg/conduit/cmd/internal/command/new"
 	"go.inout.gg/conduit/internal/cmdutil"
 	"go.inout.gg/conduit/pkg/conduitbuildinfo"
 	"go.inout.gg/conduit/pkg/stopwatch"
@@ -51,6 +52,7 @@ func Execute(
 		},
 		Commands: []*cli.Command{
 			initialise.NewCommand(fs, stdout, stderr, timeGen, configSrc),
+			newmigration.NewCommand(fs, stdout, stderr, timeGen, configSrc),
 			diff.NewCommand(fs, stdout, stderr, timeGen, bi, configSrc),
 			apply.NewCommand(fs, stdout, stderr, timer, configSrc),
 			dump.NewCommand(stdout, bi, configSrc),
