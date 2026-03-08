@@ -34,7 +34,7 @@ func TestDiff(t *testing.T) {
 			DatabaseURL:   "postgres://localhost:5432/testdb",
 		}
 
-		err := Diff(t.Context(), fs, timeGen, bi, store, args)
+		_, err := Diff(t.Context(), fs, timeGen, bi, store, args)
 
 		require.Error(t, err)
 		require.ErrorIs(t, err, ErrMigrationsNotFound)
@@ -54,7 +54,7 @@ func TestDiff(t *testing.T) {
 			DatabaseURL:   "://invalid",
 		}
 
-		err := Diff(t.Context(), fs, timeGen, bi, store, args)
+		_, err := Diff(t.Context(), fs, timeGen, bi, store, args)
 
 		require.Error(t, err)
 		assert.ErrorContains(t, err, "failed to parse database URL")
@@ -79,9 +79,12 @@ CREATE TABLE posts (id int, user_id int);`).
 			DatabaseURL:   databaseURL,
 		}
 
-		err := Diff(t.Context(), fs, timeGen, bi, store, args)
+		result, err := Diff(t.Context(), fs, timeGen, bi, store, args)
 
 		require.NoError(t, err)
+		require.Len(t, result.Files, 1)
+		assert.Equal(t, 1, result.Files[0].TotalStmtCount)
+		assert.False(t, result.Files[0].IsNonTx)
 		testutil.SnapshotFS(t, fs, baseDir)
 	})
 
@@ -105,7 +108,7 @@ CREATE TABLE posts (id int, user_id int);`).
 			DatabaseURL:   databaseURL,
 		}
 
-		err := Diff(t.Context(), fs, timeGen, bi, store, args)
+		_, err := Diff(t.Context(), fs, timeGen, bi, store, args)
 
 		require.Error(t, err)
 		require.ErrorIs(t, err, conduit.ErrSchemaDrift)
@@ -137,7 +140,8 @@ CREATE TABLE posts (id int, user_id int);`).
 			SchemaPath:    filepath.Join(baseDir, "schema.sql"),
 			DatabaseURL:   databaseURL,
 		}
-		require.NoError(t, Diff(t.Context(), fs, timeGen, bi, store, args))
+		_, err := Diff(t.Context(), fs, timeGen, bi, store, args)
+		require.NoError(t, err)
 
 		// Update schema to trigger a new diff, using the existing conduit.sum
 		// which now contains the correct target hash from the first run.
@@ -156,7 +160,7 @@ CREATE TABLE comments (id int, post_id int);`), 0o644),
 		}
 
 		// Act — second diff should succeed because the source hash matches conduit.sum.
-		err := Diff(t.Context(), fs, timegenerator.Stub{
+		_, err = Diff(t.Context(), fs, timegenerator.Stub{
 			T: time.Date(2024, 2, 15, 12, 30, 45, 0, time.UTC),
 		}, bi, store, args2)
 
@@ -173,18 +177,10 @@ CREATE TABLE comments (id int, post_id int);`), 0o644),
 CREATE INDEX idx_users_id ON users (id);`).
 			Build()
 
-		store := hashsum.NewFSStore(fs, "conduit.sum")
-		args := DiffArgs{
-			RootDir:       baseDir,
-			MigrationsDir: dir,
-			Name:          "add_index",
-			SchemaPath:    filepath.Join(baseDir, "schema.sql"),
-			DatabaseURL:   databaseURL,
-		}
+		result := runDiff(t, fs, baseDir, dir, "add_index", databaseURL)
 
-		err := Diff(t.Context(), fs, timeGen, bi, store, args)
-
-		require.NoError(t, err)
+		require.Len(t, result.Files, 1)
+		assert.True(t, result.Files[0].IsNonTx)
 
 		migrationFile := filepath.Join(dir, "20240115123045_add_index.up.sql")
 		content, err := afero.ReadFile(fs, migrationFile)
@@ -202,18 +198,10 @@ CREATE INDEX idx_users_id ON users (id);`).
 CREATE TABLE posts (id int);`).
 			Build()
 
-		store := hashsum.NewFSStore(fs, "conduit.sum")
-		args := DiffArgs{
-			RootDir:       baseDir,
-			MigrationsDir: dir,
-			Name:          "add_posts",
-			SchemaPath:    filepath.Join(baseDir, "schema.sql"),
-			DatabaseURL:   databaseURL,
-		}
+		result := runDiff(t, fs, baseDir, dir, "add_posts", databaseURL)
 
-		err := Diff(t.Context(), fs, timeGen, bi, store, args)
-
-		require.NoError(t, err)
+		require.Len(t, result.Files, 1)
+		assert.False(t, result.Files[0].IsNonTx)
 
 		migrationFile := filepath.Join(dir, "20240115123045_add_posts.up.sql")
 		content, err := afero.ReadFile(fs, migrationFile)
@@ -221,7 +209,7 @@ CREATE TABLE posts (id int);`).
 		assert.NotContains(t, string(content), "---- disable-tx ----")
 	})
 
-	t.Run("should return error, when no schema changes detected", func(t *testing.T) {
+	t.Run("should return no changes, when schema is already in sync", func(t *testing.T) {
 		t.Parallel()
 
 		databaseURL := os.Getenv("TEST_DATABASE_URL")
@@ -239,10 +227,10 @@ CREATE TABLE posts (id int);`).
 			DatabaseURL:   databaseURL,
 		}
 
-		err := Diff(t.Context(), fs, timeGen, bi, store, args)
+		result, err := Diff(t.Context(), fs, timeGen, bi, store, args)
 
-		require.Error(t, err)
-		assert.ErrorContains(t, err, "no schema changes detected")
+		require.ErrorIs(t, err, ErrNoChanges)
+		assert.Nil(t, result)
 	})
 }
 
@@ -349,9 +337,12 @@ CREATE INDEX idx_posts_user_id ON posts (user_id);`).
 			DatabaseURL:   databaseURL,
 		}
 
-		err := Diff(t.Context(), fs, timeGen, bi, store, args)
+		result, err := Diff(t.Context(), fs, timeGen, bi, store, args)
 
 		require.NoError(t, err)
+		require.Len(t, result.Files, 2)
+		assert.False(t, result.Files[0].IsNonTx)
+		assert.True(t, result.Files[1].IsNonTx)
 		testutil.SnapshotFS(t, fs, baseDir)
 	})
 }
@@ -386,4 +377,22 @@ func TestRequiresDisableTx(t *testing.T) {
 			assert.Equal(t, tt.want, isNonTxStmt(tt.ddl))
 		})
 	}
+}
+
+func runDiff(t *testing.T, fs afero.Fs, baseDir, dir, name, databaseURL string) *DiffResult {
+	t.Helper()
+
+	store := hashsum.NewFSStore(fs, "conduit.sum")
+	args := DiffArgs{
+		RootDir:       baseDir,
+		MigrationsDir: dir,
+		Name:          name,
+		SchemaPath:    filepath.Join(baseDir, "schema.sql"),
+		DatabaseURL:   databaseURL,
+	}
+
+	result, err := Diff(t.Context(), fs, timeGen, bi, store, args)
+	require.NoError(t, err)
+
+	return result
 }

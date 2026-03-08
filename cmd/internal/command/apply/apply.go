@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"time"
 
 	"github.com/spf13/afero"
 	altsrc "github.com/urfave/cli-altsrc/v3"
@@ -24,7 +25,7 @@ const (
 	dryRunFlag          = "dry-run"
 )
 
-func NewCommand(fs afero.Fs, w io.Writer, src altsrc.Sourcer) *cli.Command {
+func NewCommand(fs afero.Fs, stdout io.Writer, stderr io.Writer, src altsrc.Sourcer) *cli.Command {
 	//nolint:exhaustruct
 	return &cli.Command{
 		Name:  "apply",
@@ -87,6 +88,7 @@ func NewCommand(fs afero.Fs, w io.Writer, src altsrc.Sourcer) *cli.Command {
 			}
 
 			migrationsDir := cmd.String(cmdutil.MigrationsDir)
+			isDryRun := cmd.Bool(dryRunFlag)
 
 			opts := []conduit.Option{conduit.WithRegistry(
 				conduitregistry.FromFS(fs, migrationsDir),
@@ -95,9 +97,9 @@ func NewCommand(fs afero.Fs, w io.Writer, src altsrc.Sourcer) *cli.Command {
 				opts = append(opts, conduit.WithSkipSchemaDriftCheck())
 			}
 
-			if cmd.Bool(dryRunFlag) {
+			if isDryRun {
 				opts = append(opts, conduit.WithExecutor(
-					conduit.NewDryRunExecutor(w, cmd.Bool(cmdutil.Verbose)),
+					conduit.NewDryRunExecutor(stdout, cmd.Bool(cmdutil.Verbose)),
 				))
 			}
 
@@ -110,7 +112,76 @@ func NewCommand(fs afero.Fs, w io.Writer, src altsrc.Sourcer) *cli.Command {
 				AllowHazards: cmd.StringSlice(allowHazardsFlag),
 			}
 
-			return conduitcli.Apply(ctx, migrator, args)
+			result, err := conduitcli.Apply(ctx, migrator, args)
+			if err != nil {
+				return fmt.Errorf("failed to apply migrations: %w", err)
+			}
+
+			displayResult(stderr, result, isDryRun)
+
+			return nil
 		},
 	}
+}
+
+func displayResult(w io.Writer, result *conduit.MigrateResult, isDryRun bool) {
+	migrations := result.MigrationResults
+	n := len(migrations)
+
+	if n == 0 {
+		if result.Direction == direction.DirectionUp {
+			fmt.Fprintln(w, "No pending migrations.")
+		} else {
+			fmt.Fprintln(w, "No migrations to roll back.")
+		}
+
+		return
+	}
+
+	if isDryRun {
+		for _, m := range migrations {
+			fmt.Fprintf(w, "Pending %s_%s\n", m.Version.String(), m.Name)
+		}
+
+		fmt.Fprintln(w)
+		fmt.Fprintf(w, "%d pending migrations (dry run)\n", n)
+
+		return
+	}
+
+	var total time.Duration
+
+	if result.Direction == direction.DirectionDown {
+		for _, m := range migrations {
+			total += m.DurationTotal
+			fmt.Fprintf(
+				w, "Rolled back %s_%s (%s)\n",
+				m.Version.String(), m.Name, formatDuration(m.DurationTotal),
+			)
+		}
+
+		fmt.Fprintln(w)
+		fmt.Fprintf(w, "Rolled back %d migrations in %s\n", n, formatDuration(total))
+
+		return
+	}
+
+	for _, m := range migrations {
+		total += m.DurationTotal
+		fmt.Fprintf(
+			w, "Applied %s_%s (%s)\n",
+			m.Version.String(), m.Name, formatDuration(m.DurationTotal),
+		)
+	}
+
+	fmt.Fprintln(w)
+	fmt.Fprintf(w, "Applied %d migrations in %s\n", n, formatDuration(total))
+}
+
+func formatDuration(d time.Duration) string {
+	if d < time.Second {
+		return fmt.Sprintf("%dms", d.Milliseconds())
+	}
+
+	return d.Round(time.Millisecond).String()
 }

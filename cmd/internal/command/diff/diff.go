@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"path/filepath"
 
 	"github.com/spf13/afero"
@@ -22,6 +23,8 @@ const schemaFlag = "schema"
 
 func NewCommand(
 	fs afero.Fs,
+	_ io.Writer,
+	stderr io.Writer,
 	timeGen timegenerator.Generator,
 	bi conduitbuildinfo.BuildInfo,
 	src altsrc.Sourcer,
@@ -64,7 +67,31 @@ func NewCommand(
 				ExcludeSchemas: cmd.StringSlice(cmdutil.ExcludeSchemas),
 			}
 
-			return conduitcli.Diff(ctx, fs, timeGen, bi, store, args)
+			result, err := conduitcli.Diff(ctx, fs, timeGen, bi, store, args)
+			if errors.Is(err, conduitcli.ErrNoChanges) {
+				fmt.Fprintln(stderr, "No schema changes detected.")
+
+				return nil
+			}
+
+			if err != nil {
+				return fmt.Errorf("failed to generate diff: %w", err)
+			}
+
+			for _, f := range result.Files {
+				if f.IsNonTx {
+					fmt.Fprintf(
+						stderr, "Created %s (%d statements, non-tx)\n",
+						f.Path, f.TotalStmtCount,
+					)
+				} else {
+					fmt.Fprintf(stderr, "Created %s (%d statements)\n", f.Path, f.TotalStmtCount)
+				}
+			}
+
+			fmt.Fprintln(stderr, "Updated conduit.sum")
+
+			return nil
 		},
 	}
 }

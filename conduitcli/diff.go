@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"text/template"
@@ -22,7 +23,10 @@ import (
 	"go.inout.gg/conduit/pkg/timegenerator"
 )
 
-var ErrMigrationsNotFound = errors.New("migrations directory not found")
+var (
+	ErrMigrationsNotFound = errors.New("migrations directory not found")
+	ErrNoChanges          = errors.New("no schema changes detected")
+)
 
 //nolint:gochecknoglobals
 var nonTxPatterns = []*regexp.Regexp{
@@ -42,11 +46,29 @@ type DiffArgs struct {
 	ExcludeSchemas []string
 }
 
+// DiffResultFile describes a single migration file created by a Diff operation.
+type DiffResultFile struct {
+	// Path is the path of the created migration file.
+	Path string
+	// TotalStmtCount is the number of SQL statements in the file.
+	TotalStmtCount int
+	// IsNonTx is true when the migration must run outside a transaction.
+	IsNonTx bool
+}
+
+// DiffResult holds the outcome of a Diff operation.
+type DiffResult struct {
+	// Files lists the migration files that were created.
+	Files []DiffResultFile
+}
+
 // Diff compares the current migrations directory against a target schema file
 // and generates new migration files for any detected differences.
 //
 // Statements that require non-transactional execution (e.g. CREATE INDEX
 // CONCURRENTLY) are automatically split into separate migration files.
+//
+// When the schema is already in sync, Diff returns ErrNoChanges.
 func Diff(
 	ctx context.Context,
 	fs afero.Fs,
@@ -54,30 +76,31 @@ func Diff(
 	bi conduitbuildinfo.BuildInfo,
 	store hashsum.Store,
 	args DiffArgs,
-) error {
+) (*DiffResult, error) {
 	if !exists(fs, args.MigrationsDir) {
-		return fmt.Errorf("%w: directory %q does not exist", ErrMigrationsNotFound, args.MigrationsDir)
+		return nil, fmt.Errorf("%w: directory %q does not exist",
+			ErrMigrationsNotFound, args.MigrationsDir)
 	}
 
 	migrationsFs := afero.NewBasePathFs(fs, args.MigrationsDir)
 
 	connConfig, err := pgx.ParseConfig(args.DatabaseURL)
 	if err != nil {
-		return fmt.Errorf("failed to parse database URL: %w", err)
+		return nil, fmt.Errorf("failed to parse database URL: %w", err)
 	}
 
 	plan, err := pgdiff.GeneratePlan(ctx, fs, connConfig, args.MigrationsDir, args.SchemaPath, args.ExcludeSchemas)
 	if err != nil {
-		return fmt.Errorf("failed to generate diff plan: %w", err)
+		return nil, fmt.Errorf("failed to generate diff plan: %w", err)
 	}
 
 	if len(plan.Statements) == 0 {
-		return errors.New("no schema changes detected")
+		return nil, ErrNoChanges
 	}
 
 	if ok, actual, err := store.Compare(args.RootDir, []byte(plan.SourceSchemaHash)); err == nil {
 		if !ok {
-			return fmt.Errorf(
+			return nil, fmt.Errorf(
 				"%w: expected hash %s, got %s",
 				conduit.ErrSchemaDrift,
 				actual,
@@ -88,6 +111,8 @@ func Diff(
 
 	v := conduitversion.NewFromTime(timeGen.Now())
 	migrations := splitMigrations(plan.Statements)
+
+	var files []DiffResultFile
 
 	for i, m := range migrations {
 		name := args.Name
@@ -143,15 +168,21 @@ func Diff(
 				"DisableTx":      m.isNonTx,
 			},
 		); err != nil {
-			return err
+			return nil, err
 		}
+
+		files = append(files, DiffResultFile{
+			Path:           filepath.Join(args.MigrationsDir, filename),
+			TotalStmtCount: len(m.stmts),
+			IsNonTx:        m.isNonTx,
+		})
 	}
 
 	if err := store.Save(args.RootDir, []byte(plan.TargetSchemaHash)); err != nil {
-		return fmt.Errorf("failed to write hash sum: %w", err)
+		return nil, fmt.Errorf("failed to write hash sum: %w", err)
 	}
 
-	return nil
+	return &DiffResult{Files: files}, nil
 }
 
 type migration struct {

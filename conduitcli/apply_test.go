@@ -33,9 +33,10 @@ func TestApply(t *testing.T) {
 			Direction:   direction.DirectionUp,
 		}
 
-		err := Apply(t.Context(), m, args)
+		result, err := Apply(t.Context(), m, args)
 
 		require.NoError(t, err)
+		assert.Len(t, result.MigrationResults, 1)
 		assert.True(t, testutil.TableExists(t, pool, "users"))
 	})
 
@@ -51,7 +52,7 @@ func TestApply(t *testing.T) {
 		m := conduit.NewMigrator(conduit.WithRegistry(r), conduit.WithSkipSchemaDriftCheck())
 
 		// First apply up.
-		err := Apply(t.Context(), m, ApplyArgs{
+		_, err := Apply(t.Context(), m, ApplyArgs{
 			DatabaseURL: testutil.ConnString(pool),
 			Direction:   direction.DirectionUp,
 		})
@@ -59,12 +60,13 @@ func TestApply(t *testing.T) {
 		require.True(t, testutil.TableExists(t, pool, "users"))
 
 		// Then apply down.
-		err = Apply(t.Context(), m, ApplyArgs{
+		result, err := Apply(t.Context(), m, ApplyArgs{
 			DatabaseURL: testutil.ConnString(pool),
 			Direction:   direction.DirectionDown,
 		})
 
 		require.NoError(t, err)
+		assert.Len(t, result.MigrationResults, 1)
 		assert.False(t, testutil.TableExists(t, pool, "users"))
 	})
 
@@ -81,7 +83,7 @@ func TestApply(t *testing.T) {
 			Direction:   direction.DirectionUp,
 		}
 
-		err := Apply(t.Context(), m, args)
+		_, err := Apply(t.Context(), m, args)
 
 		require.Error(t, err)
 		assert.ErrorContains(t, err, "failed to connect to database")
@@ -102,7 +104,7 @@ func TestApply(t *testing.T) {
 			Direction:   direction.DirectionUp,
 		}
 
-		err := Apply(t.Context(), m, args)
+		_, err := Apply(t.Context(), m, args)
 
 		require.Error(t, err)
 		require.ErrorIs(t, err, conduit.ErrHazardDetected)
@@ -131,12 +133,13 @@ func TestApply(t *testing.T) {
 			conduit.WithSkipSchemaDriftCheck(),
 		)
 
-		err := Apply(t.Context(), m, ApplyArgs{
+		result, err := Apply(t.Context(), m, ApplyArgs{
 			DatabaseURL: testutil.ConnString(pool),
 			Direction:   direction.DirectionUp,
 		})
 
 		require.NoError(t, err)
+		assert.Len(t, result.MigrationResults, 3)
 		assert.False(t, testutil.TableExists(t, pool, "users"))
 		assert.False(t, testutil.TableExists(t, pool, "orders"))
 		assert.False(t, testutil.TableExists(t, pool, "items"))
@@ -160,7 +163,7 @@ func TestApply(t *testing.T) {
 			// First apply all up for real.
 			m := conduit.NewMigrator(conduit.WithRegistry(r), conduit.WithSkipSchemaDriftCheck())
 
-			err := Apply(t.Context(), m, ApplyArgs{
+			_, err := Apply(t.Context(), m, ApplyArgs{
 				DatabaseURL: testutil.ConnString(pool),
 				Direction:   direction.DirectionUp,
 			})
@@ -178,7 +181,7 @@ func TestApply(t *testing.T) {
 				conduit.WithSkipSchemaDriftCheck(),
 			)
 
-			err = Apply(t.Context(), dryRunMigrator, ApplyArgs{
+			_, err = Apply(t.Context(), dryRunMigrator, ApplyArgs{
 				DatabaseURL: testutil.ConnString(pool),
 				Direction:   direction.DirectionDown,
 			})
@@ -209,7 +212,7 @@ func TestApply(t *testing.T) {
 			conduit.WithSkipSchemaDriftCheck(),
 		)
 
-		err := Apply(t.Context(), m, ApplyArgs{
+		_, err := Apply(t.Context(), m, ApplyArgs{
 			DatabaseURL: testutil.ConnString(pool),
 			Direction:   direction.DirectionUp,
 		})

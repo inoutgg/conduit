@@ -26,49 +26,76 @@ type InitArgs struct {
 	ExcludeSchemas []string
 }
 
+// InitResult holds the outcome of an Init operation.
+type InitResult struct {
+	// MigrationsDirPath is the path of the created migrations directory.
+	MigrationsDirPath string
+	// MigrationPath is the path of the initial migration file.
+	MigrationPath string
+	// ConfigPath is the path of the created config file.
+	ConfigPath string
+	// SumPath is the path of the created hash sum file.
+	SumPath string
+}
+
 // Init creates a new migrations directory with the initial conduit schema
 // migration, generates a conduit.sum file with the baseline schema hash,
 // and writes a default conduit.yaml config file.
-func Init(ctx context.Context, fs afero.Fs, timeGen timegenerator.Generator, store hashsum.Store, args InitArgs) error {
+func Init(
+	ctx context.Context,
+	fs afero.Fs,
+	timeGen timegenerator.Generator,
+	store hashsum.Store,
+	args InitArgs,
+) (*InitResult, error) {
 	migrationsPath := filepath.Join(args.RootDir, args.MigrationsDir)
 	if err := createMigrationDir(fs, migrationsPath); err != nil {
-		return err
+		return nil, err
 	}
 
 	migrationsFs := afero.NewBasePathFs(fs, migrationsPath)
-	ver := conduitversion.NewFromTime(timeGen.Now())
+	migrationFilename := conduitversion.MigrationFilename(
+		conduitversion.NewFromTime(timeGen.Now()),
+		"conduit_initial_schema",
+		conduitversion.MigrationDirectionUp,
+	)
 
-	if err := createInitialMigration(migrationsFs, ver); err != nil {
-		return err
+	if err := createInitialMigration(migrationsFs, migrationFilename); err != nil {
+		return nil, err
 	}
 
 	connConfig, err := pgx.ParseConfig(args.DatabaseURL)
 	if err != nil {
-		return fmt.Errorf("failed to parse database URL: %w", err)
+		return nil, fmt.Errorf("failed to parse database URL: %w", err)
 	}
 
 	stmts, err := sqlsplit.Split(migrations.Schema)
 	if err != nil {
-		return fmt.Errorf("failed to parse initial schema: %w", err)
+		return nil, fmt.Errorf("failed to parse initial schema: %w", err)
 	}
 
 	hash, err := pgdiff.GenerateSchemaHash(ctx, connConfig, stmts, args.ExcludeSchemas)
 	if err != nil {
-		return fmt.Errorf("failed to generate schema hash: %w", err)
+		return nil, fmt.Errorf("failed to generate schema hash: %w", err)
 	}
 
 	if err := store.Save(args.RootDir, []byte(hash)); err != nil {
-		return fmt.Errorf("failed to write conduit.sum: %w", err)
+		return nil, fmt.Errorf("failed to write conduit.sum: %w", err)
 	}
 
 	if err := writeConfigFile(fs, args.RootDir, args.ConfigName, ConfigArgs{
 		MigrationsDir: args.MigrationsDir,
 		DatabaseURL:   args.DatabaseURL,
 	}); err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	return &InitResult{
+		MigrationsDirPath: args.MigrationsDir,
+		MigrationPath:     filepath.Join(args.MigrationsDir, migrationFilename),
+		ConfigPath:        args.ConfigName,
+		SumPath:           "conduit.sum",
+	}, nil
 }
 
 type ConfigArgs struct {
@@ -99,9 +126,7 @@ func createMigrationDir(fs afero.Fs, dir string) error {
 	return nil
 }
 
-func createInitialMigration(fs afero.Fs, ver conduitversion.Version) error {
-	filename := conduitversion.MigrationFilename(ver, "conduit_initial_schema", conduitversion.MigrationDirectionUp)
-
+func createInitialMigration(fs afero.Fs, filename string) error {
 	if err := afero.WriteFile(fs, filename, migrations.Schema, 0o644); err != nil {
 		return fmt.Errorf("failed to create initial migration file: %w", err)
 	}

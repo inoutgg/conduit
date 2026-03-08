@@ -24,19 +24,19 @@ func Apply(
 	ctx context.Context,
 	migrator *conduit.Migrator,
 	args ApplyArgs,
-) error {
+) (*conduit.MigrateResult, error) {
 	conn, err := pgx.Connect(ctx, args.DatabaseURL)
 	if err != nil {
-		return fmt.Errorf("failed to connect to database: %w", err)
+		return nil, fmt.Errorf("failed to connect to database: %w", err)
 	}
 
-	_, err = migrator.Migrate(ctx, args.Direction, conn, &conduit.MigrateOptions{
+	result, err := migrator.Migrate(ctx, args.Direction, conn, &conduit.MigrateOptions{
 		Steps:        args.Steps,
 		AllowHazards: args.AllowHazards,
 	})
 	if err != nil {
-		return fmt.Errorf("failed to apply migrations: %w", err)
+		return nil, fmt.Errorf("failed to apply migrations: %w", err)
 	}
 
-	return nil
+	return result, nil
 }

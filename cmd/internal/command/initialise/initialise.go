@@ -2,6 +2,8 @@ package initialise
 
 import (
 	"context"
+	"fmt"
+	"io"
 	"path/filepath"
 
 	"github.com/spf13/afero"
@@ -14,7 +16,13 @@ import (
 	"go.inout.gg/conduit/pkg/timegenerator"
 )
 
-func NewCommand(fs afero.Fs, timeGen timegenerator.Generator, configSrc altsrc.Sourcer) *cli.Command {
+func NewCommand(
+	fs afero.Fs,
+	_ io.Writer,
+	stderr io.Writer,
+	timeGen timegenerator.Generator,
+	configSrc altsrc.Sourcer,
+) *cli.Command {
 	//nolint:exhaustruct
 	return &cli.Command{
 		Name:    "init",
@@ -35,7 +43,19 @@ func NewCommand(fs afero.Fs, timeGen timegenerator.Generator, configSrc altsrc.S
 				ExcludeSchemas: cmd.StringSlice(cmdutil.ExcludeSchemas),
 			}
 
-			return conduitcli.Init(ctx, fs, timeGen, store, args)
+			result, err := conduitcli.Init(ctx, fs, timeGen, store, args)
+			if err != nil {
+				return fmt.Errorf("failed to initialise: %w", err)
+			}
+
+			fmt.Fprintln(stderr, "Created "+result.MigrationsDirPath)
+			fmt.Fprintln(stderr, "Created "+result.MigrationPath)
+			fmt.Fprintln(stderr, "Created "+result.ConfigPath)
+			fmt.Fprintln(stderr, "Created "+result.SumPath)
+			fmt.Fprintln(stderr)
+			fmt.Fprintln(stderr, "Initialised conduit in "+result.MigrationsDirPath)
+
+			return nil
 		},
 	}
 }

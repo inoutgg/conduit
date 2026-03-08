@@ -4,6 +4,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"go.inout.gg/conduit/internal/testutil"
@@ -26,9 +27,14 @@ func TestInit(t *testing.T) {
 			DatabaseURL:   databaseURL,
 		}
 
-		err := Init(t.Context(), fs, timeGen, store, args)
+		result, err := Init(t.Context(), fs, timeGen, store, args)
 
 		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.Equal(t, migrationsDir, result.MigrationsDirPath)
+		assert.NotEmpty(t, result.MigrationPath)
+		assert.Equal(t, "conduit.yaml", result.ConfigPath)
+		assert.Equal(t, "conduit.sum", result.SumPath)
 		testutil.SnapshotFS(t, fs, baseDir)
 	})
 }

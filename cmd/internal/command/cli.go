@@ -22,7 +22,8 @@ import (
 func Execute(
 	ctx context.Context,
 	fs afero.Fs,
-	w io.Writer,
+	stdout io.Writer,
+	stderr io.Writer,
 	timeGen timegenerator.Generator,
 	bi conduitbuildinfo.BuildInfo,
 	rootDir string,
@@ -47,10 +48,10 @@ func Execute(
 			cmdutil.VerboseFlag(configSrc),
 		},
 		Commands: []*cli.Command{
-			initialise.NewCommand(fs, timeGen, configSrc),
-			diff.NewCommand(fs, timeGen, bi, configSrc),
-			apply.NewCommand(fs, w, configSrc),
-			dump.NewCommand(w, bi, configSrc),
+			initialise.NewCommand(fs, stdout, stderr, timeGen, configSrc),
+			diff.NewCommand(fs, stdout, stderr, timeGen, bi, configSrc),
+			apply.NewCommand(fs, stdout, stderr, configSrc),
+			dump.NewCommand(stdout, bi, configSrc),
 		},
 	}
 

@@ -15,19 +15,26 @@ import (
 	"go.inout.gg/conduit/internal/testutil"
 )
 
-func exec(t *testing.T, fs afero.Fs, stdout *bytes.Buffer, args string) error {
+type execResult struct {
+	stdout *bytes.Buffer
+	stderr *bytes.Buffer
+}
+
+func exec(t *testing.T, fs afero.Fs, args string) (execResult, error) {
 	t.Helper()
 
-	//nolint:wrapcheck
-	return command.Execute(t.Context(), fs, stdout, timeGen, bi, "/", strings.Fields(args))
+	var stdout, stderr bytes.Buffer
+
+	err := command.Execute(t.Context(), fs, &stdout, &stderr, timeGen, bi, "/", strings.Fields(args))
+
+	return execResult{stdout: &stdout, stderr: &stderr}, err //nolint:wrapcheck
 }
 
 func bootstrap(t *testing.T, fs afero.Fs, dbURL string) {
 	t.Helper()
 
-	var stdout bytes.Buffer
-
-	require.NoError(t, exec(t, fs, &stdout, "conduit init --database-url "+dbURL))
+	_, err := exec(t, fs, "conduit init --database-url "+dbURL)
+	require.NoError(t, err)
 }
 
 func snapshotConfig(t *testing.T, fs afero.Fs) {
@@ -48,14 +55,12 @@ func TestInit(t *testing.T) {
 		pool := poolFactory.Pool(t)
 		fs := afero.NewMemMapFs()
 
-		var stdout bytes.Buffer
-
-		err := exec(t, fs, &stdout, "conduit init --database-url "+testutil.ConnString(pool))
+		r, err := exec(t, fs, "conduit init --database-url "+testutil.ConnString(pool))
 
 		require.NoError(t, err)
 		snapshotConfig(t, fs)
 		testutil.SnapshotFS(t, fs, ".", "conduit.yaml")
-		snaps.MatchSnapshot(t, stdout.String())
+		snaps.MatchSnapshot(t, r.stderr.String())
 	})
 
 	t.Run("should initialise migration directory, when custom migrations dir is specified", func(t *testing.T) {
@@ -64,15 +69,13 @@ func TestInit(t *testing.T) {
 		pool := poolFactory.Pool(t)
 		fs := afero.NewMemMapFs()
 
-		var stdout bytes.Buffer
-
-		err := exec(t, fs, &stdout, "conduit init --database-url "+
+		r, err := exec(t, fs, "conduit init --database-url "+
 			testutil.ConnString(pool)+" --migrations-dir ./custom")
 
 		require.NoError(t, err)
 		snapshotConfig(t, fs)
 		testutil.SnapshotFS(t, fs, ".", "conduit.yaml")
-		snaps.MatchSnapshot(t, stdout.String())
+		snaps.MatchSnapshot(t, r.stderr.String())
 	})
 }
 
@@ -92,13 +95,11 @@ func TestDiff(t *testing.T) {
 			[]byte("CREATE TABLE posts (id int, user_id int);"), 0o644,
 		))
 
-		var stdout bytes.Buffer
-
-		err := exec(t, fs, &stdout, "conduit diff --database-url "+dbURL+" --schema schema.sql add_posts")
+		r, err := exec(t, fs, "conduit diff --database-url "+dbURL+" --schema schema.sql add_posts")
 
 		require.NoError(t, err)
 		testutil.SnapshotFS(t, fs, ".", "conduit.yaml")
-		snaps.MatchSnapshot(t, stdout.String())
+		snaps.MatchSnapshot(t, r.stderr.String())
 	})
 
 	t.Run("should return error, when name argument is missing", func(t *testing.T) {
@@ -107,9 +108,7 @@ func TestDiff(t *testing.T) {
 		pool := poolFactory.Pool(t)
 		fs := afero.NewMemMapFs()
 
-		var stdout bytes.Buffer
-
-		err := exec(t, fs, &stdout, "conduit diff --database-url "+
+		_, err := exec(t, fs, "conduit diff --database-url "+
 			testutil.ConnString(pool)+" --schema schema.sql")
 
 		require.ErrorContains(t, err, "missing required argument: <name>")
@@ -121,11 +120,38 @@ func TestDiff(t *testing.T) {
 		pool := poolFactory.Pool(t)
 		fs := afero.NewMemMapFs()
 
-		var stdout bytes.Buffer
-
-		err := exec(t, fs, &stdout, "conduit diff --database-url "+testutil.ConnString(pool)+" add_posts")
+		_, err := exec(t, fs, "conduit diff --database-url "+testutil.ConnString(pool)+" add_posts")
 
 		require.ErrorContains(t, err, "missing required flag: --schema")
+	})
+
+	t.Run("should report no changes, when schema is already in sync", func(t *testing.T) {
+		t.Parallel()
+
+		pool := poolFactory.Pool(t)
+		fs := afero.NewMemMapFs()
+		dbURL := testutil.ConnString(pool)
+
+		bootstrap(t, fs, dbURL)
+
+		// Write a target schema that matches the initial migration exactly.
+		require.NoError(t, afero.WriteFile(
+			fs, "schema.sql",
+			[]byte(`CREATE TABLE IF NOT EXISTS conduit_migrations (
+  id BIGSERIAL NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  version VARCHAR(255) NOT NULL,
+  name VARCHAR(4095) NOT NULL,
+  hash VARCHAR(64) NOT NULL DEFAULT '',
+  PRIMARY KEY (id),
+  UNIQUE (version, name)
+);`), 0o644,
+		))
+
+		r, err := exec(t, fs, "conduit diff --database-url "+dbURL+" --schema schema.sql no_op")
+
+		require.NoError(t, err)
+		snaps.MatchSnapshot(t, r.stderr.String())
 	})
 }
 
@@ -141,13 +167,11 @@ func TestApply(t *testing.T) {
 
 		bootstrap(t, fs, dbURL)
 
-		var stdout bytes.Buffer
-
-		err := exec(t, fs, &stdout, "conduit apply --database-url "+dbURL+" up")
+		r, err := exec(t, fs, "conduit apply --database-url "+dbURL+" up")
 
 		require.NoError(t, err)
 		assert.True(t, testutil.TableExists(t, pool, "conduit_migrations"))
-		snaps.MatchSnapshot(t, stdout.String())
+		snaps.MatchSnapshot(t, r.stderr.String())
 	})
 
 	t.Run("should return error, when schema drift is detected", func(t *testing.T) {
@@ -160,15 +184,14 @@ func TestApply(t *testing.T) {
 		bootstrap(t, fs, dbURL)
 
 		// Apply initial migration to store a schema hash.
-		var stdout bytes.Buffer
-		require.NoError(t, exec(t, fs, &stdout, "conduit apply --database-url "+dbURL+" up"))
+		_, err := exec(t, fs, "conduit apply --database-url "+dbURL+" up")
+		require.NoError(t, err)
 
 		// Manually alter the schema outside of migrations.
 		testutil.Exec(t, pool, "CREATE TABLE rogue_table (id int)")
 
 		// Apply again — drift check should detect the mismatch.
-		stdout.Reset()
-		err := exec(t, fs, &stdout, "conduit apply --database-url "+dbURL+" up")
+		_, err = exec(t, fs, "conduit apply --database-url "+dbURL+" up")
 
 		require.ErrorContains(t, err, "schema drift detected")
 	})
@@ -178,9 +201,7 @@ func TestApply(t *testing.T) {
 
 		fs := afero.NewMemMapFs()
 
-		var stdout bytes.Buffer
-
-		err := exec(t, fs, &stdout, "conduit apply up")
+		_, err := exec(t, fs, "conduit apply up")
 
 		require.ErrorContains(t, err, "missing required flag: --database-url")
 	})
@@ -191,9 +212,7 @@ func TestApply(t *testing.T) {
 		pool := poolFactory.Pool(t)
 		fs := afero.NewMemMapFs()
 
-		var stdout bytes.Buffer
-
-		err := exec(t, fs, &stdout, "conduit apply --database-url "+testutil.ConnString(pool))
+		_, err := exec(t, fs, "conduit apply --database-url "+testutil.ConnString(pool))
 
 		require.ErrorContains(t, err, "failed to parse direction")
 	})
@@ -207,12 +226,10 @@ func TestApply(t *testing.T) {
 
 		bootstrap(t, fs, dbURL)
 
-		var stdout bytes.Buffer
-
-		err := exec(t, fs, &stdout, "conduit apply --database-url "+dbURL+" --dry-run up")
+		r, err := exec(t, fs, "conduit apply --database-url "+dbURL+" --dry-run up")
 
 		require.NoError(t, err)
-		snaps.MatchSnapshot(t, stdout.String())
+		snaps.MatchSnapshot(t, r.stdout.String(), r.stderr.String())
 	})
 }
 
@@ -238,12 +255,10 @@ CREATE TABLE posts (
 
 		fs := afero.NewMemMapFs()
 
-		var stdout bytes.Buffer
-
-		err := exec(t, fs, &stdout, "conduit dump --database-url "+testutil.ConnString(pool))
+		r, err := exec(t, fs, "conduit dump --database-url "+testutil.ConnString(pool))
 
 		require.NoError(t, err)
-		snaps.MatchSnapshot(t, stdout.String())
+		snaps.MatchSnapshot(t, r.stdout.String())
 	})
 
 	t.Run("should return error, when database-url is missing", func(t *testing.T) {
@@ -251,9 +266,7 @@ CREATE TABLE posts (
 
 		fs := afero.NewMemMapFs()
 
-		var stdout bytes.Buffer
-
-		err := exec(t, fs, &stdout, "conduit dump")
+		_, err := exec(t, fs, "conduit dump")
 
 		require.ErrorContains(t, err, "missing required flag: --database-url")
 	})
@@ -276,20 +289,19 @@ func TestInitDiffApply(t *testing.T) {
 	))
 
 	// 3. Diff: generate migration from schema diff.
-	var diffStdout bytes.Buffer
-
-	err := exec(t, fs, &diffStdout, "conduit diff --database-url "+dbURL+" --schema schema.sql add_tables")
+	diffResult, err := exec(t, fs, "conduit diff --database-url "+dbURL+" --schema schema.sql add_tables")
 	require.NoError(t, err)
 
 	// 4. Apply: run all migrations (init + generated).
-	var applyStdout bytes.Buffer
-
-	err = exec(t, fs, &applyStdout, "conduit apply --database-url "+dbURL+" up")
+	applyResult, err := exec(t, fs, "conduit apply --database-url "+dbURL+" up")
 	require.NoError(t, err)
 
 	assert.True(t, testutil.TableExists(t, pool, "conduit_migrations"))
 	assert.True(t, testutil.TableExists(t, pool, "users"))
 	assert.True(t, testutil.TableExists(t, pool, "posts"))
 	testutil.SnapshotFS(t, fs, ".", "conduit.yaml")
-	snaps.MatchSnapshot(t, diffStdout.String(), applyStdout.String())
+	snaps.MatchSnapshot(t, diffResult.stderr.String())
+	assert.Contains(t, applyResult.stderr.String(), "Applied 20240115123045_conduit_initial_schema")
+	assert.Contains(t, applyResult.stderr.String(), "Applied 20240115123045_add_tables")
+	assert.Contains(t, applyResult.stderr.String(), "Applied 2 migrations in")
 }

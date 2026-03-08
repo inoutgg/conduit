@@ -22,7 +22,7 @@ func main() {
 
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM)
 
-	if err := run(ctx, os.Stdout, os.Args); err != nil {
+	if err := run(ctx, os.Stdout, os.Stderr, os.Args); err != nil {
 		cancel()
 		conduiterror.Display(os.Stderr, err)
 		os.Exit(1)
@@ -31,7 +31,7 @@ func main() {
 	cancel()
 }
 
-func run(ctx context.Context, w io.Writer, args []string) error {
+func run(ctx context.Context, stdout io.Writer, stderr io.Writer, args []string) error {
 	cwd, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf("failed to get current working directory: %w", err)
@@ -43,7 +43,7 @@ func run(ctx context.Context, w io.Writer, args []string) error {
 		fs      = afero.NewBasePathFs(afero.NewOsFs(), cwd)
 	)
 
-	if err := command.Execute(ctx, fs, w, timeGen, bi, cwd, args); err != nil {
+	if err := command.Execute(ctx, fs, stdout, stderr, timeGen, bi, cwd, args); err != nil {
 		//nolint:wrapcheck
 		return err
 	}

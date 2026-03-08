@@ -2,6 +2,10 @@
 [TestApply/should_preview_migrations,_when_dry-run_is_enabled - 1]
 20240115123045_conduit_initial_schema
 
+Pending 20240115123045_conduit_initial_schema
+
+1 pending migrations (dry run)
+
 ---
 
 [TestInit/should_initialise_migration_directory,_when_custom_migrations_dir_is_specified - 1]
@@ -30,6 +34,12 @@ CREATE TABLE IF NOT EXISTS conduit_migrations (
 ---
 
 [TestInit/should_initialise_migration_directory,_when_custom_migrations_dir_is_specified - 3]
+Created custom
+Created custom/20240115123045_conduit_initial_schema.up.sql
+Created conduit.yaml
+Created conduit.sum
+
+Initialised conduit in custom
 
 ---
 
@@ -59,6 +69,12 @@ CREATE TABLE IF NOT EXISTS conduit_migrations (
 ---
 
 [TestInit/should_initialise_migration_directory,_when_using_default_settings - 3]
+Created migrations
+Created migrations/20240115123045_conduit_initial_schema.up.sql
+Created conduit.yaml
+Created conduit.sum
+
+Initialised conduit in migrations
 
 ---
 
@@ -93,6 +109,9 @@ ALTER TABLE "public"."posts" VALIDATE CONSTRAINT "posts_user_id_fkey";
 ---
 
 [TestApply/should_apply_migrations_up - 1]
+Applied 20240115123045_conduit_initial_schema (0ms)
+
+Applied 1 migrations in 0ms
 
 ---
 
@@ -130,6 +149,8 @@ CREATE TABLE posts (id int, user_id int);
 ---
 
 [TestDiff/should_create_migration_file,_when_schema_diff_exists - 2]
+Created migrations/20240115123045_add_posts.up.sql (1 statements)
+Updated conduit.sum
 
 ---
 
@@ -172,6 +193,12 @@ CREATE TABLE posts (id int, user_id int);
 ---
 
 [TestInitDiffApply - 2]
+Created migrations/20240115123045_add_tables.up.sql (2 statements)
+Updated conduit.sum
 
+---
+
+[TestDiff/should_report_no_changes,_when_schema_is_already_in_sync - 1]
+No schema changes detected.
 
 ---
