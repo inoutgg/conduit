@@ -1,0 +1,8 @@
+
+[TestNew/should_create_empty_up_and_down_migration_files - 1]
+### migrations/20240115123045_add_users.down.sql ###
+
+### migrations/20240115123045_add_users.up.sql ###
+
+
+---
