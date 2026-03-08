@@ -1,5 +1,4 @@
-// Package pgdiff compares PostgreSQL schemas using temporary databases
-// and generates migration plans via pg-schema-diff.
+// Package pgdiff compares PostgreSQL schemas and generates migration plans.
 package pgdiff
 
 import (
@@ -30,9 +29,9 @@ type Plan struct {
 	Statements       []schemadiff.Statement
 }
 
-// GeneratePlan generates a migration plan by comparing the source schema
-// from migrationsDir against the target schema in schemaPath. It also
-// computes the target schema hash without creating an additional temp database.
+// GeneratePlan compares the source schema (from migrationsDir) against the
+// target schema (in schemaPath) and returns a plan with the required DDL
+// statements and schema hashes.
 func GeneratePlan(
 	ctx context.Context,
 	fs afero.Fs,
@@ -130,8 +129,8 @@ func GeneratePlan(
 	return result, nil
 }
 
-// GenerateSchemaHash creates a temp database, applies the given DDL statements,
-// and returns the schema hash.
+// GenerateSchemaHash applies the given DDL statements and returns the
+// resulting schema hash.
 func GenerateSchemaHash(
 	ctx context.Context,
 	connConfig *pgx.ConnConfig,

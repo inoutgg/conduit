@@ -60,6 +60,7 @@ func NewCommand(
 
 			store := hashsum.NewFSStore(fs, "conduit.sum")
 			args := conduitcli.DiffArgs{
+				RootDir:        ".",
 				MigrationsDir:  filepath.Clean(cmd.String(cmdutil.MigrationsDir)),
 				Name:           name,
 				SchemaPath:     schema,

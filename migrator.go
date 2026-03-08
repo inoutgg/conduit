@@ -20,18 +20,18 @@ import (
 	"go.inout.gg/conduit/conduitregistry"
 	"go.inout.gg/conduit/internal/dbsqlc"
 	"go.inout.gg/conduit/internal/direction"
-	internaldebug "go.inout.gg/conduit/internal/internaldebug"
+	"go.inout.gg/conduit/internal/internaldebug"
 	"go.inout.gg/conduit/internal/sliceutil"
 	"go.inout.gg/conduit/pkg/conduitversion"
 	"go.inout.gg/conduit/pkg/stopwatch"
 )
 
-// AllSteps tells migrator to run all available migrations either up or down.
+// AllSteps tells the migrator to apply every available migration.
 const AllSteps = -1
 
 const (
-	DefaultUpStep   = AllSteps // roll up
-	DefaultDownStep = 1        // roll back
+	DefaultUpStep   = AllSteps // default for up: apply all pending
+	DefaultDownStep = 1        // default for down: roll back one
 )
 
 const (
@@ -52,16 +52,11 @@ type (
 	Migration = conduitregistry.Migration
 )
 
-// config is the configuration for the Migrator.
-//
-// Logger and Registry fields are optional.
-// If Registry is omitted, the global registry is used.
-// If Logger is omitted, slog.Default is used.
 type config struct {
-	Logger               *slog.Logger              // optional
-	Registry             *conduitregistry.Registry // optional
-	Executor             MigrationExecutor         // optional
-	SkipSchemaDriftCheck bool                      // optional
+	Logger               *slog.Logger
+	Registry             *conduitregistry.Registry
+	Executor             MigrationExecutor
+	SkipSchemaDriftCheck bool
 }
 
 // Option configures a Migrator.
@@ -95,31 +90,36 @@ func (c *config) defaults() {
 		c.Logger = slog.Default()
 	}
 
-	c.Registry = cmp.Or(c.Registry, globalRegistry)
+	if c.Registry == nil {
+		c.Registry = globalRegistry
+	}
 
 	if c.Executor == nil {
 		c.Executor = NewLiveExecutor(c.Logger, stopwatch.Standard{})
 	}
 }
 
-// MigrateResult represents the outcome of an applied migrations batch.
+// MigrateResult holds the outcome of a [Migrator.Migrate] call.
 type MigrateResult struct {
-	// Direction of the applied migrations.
-	Direction direction.Direction
-
-	// MigrationResults is the result of applied migrations.
+	Direction        direction.Direction
 	MigrationResults []MigrationResult
 }
 
-// MigrationResult represents the outcome of a single applied migration.
+// MigrationResult holds the outcome of a single applied migration.
 type MigrationResult struct {
-	// Version is the version of the applied migration.
 	Version       conduitversion.Version
 	Name          string
 	DurationTotal time.Duration
 }
 
-// MigrateOptions specifies options for a Migrator.Migrate operation.
+// MigrateOptions configures a single [Migrator.Migrate] call.
+//
+// Steps controls how many migrations to apply. Use [AllSteps] (-1) to apply
+// all pending migrations. When zero, the direction-specific default is used
+// ([DefaultUpStep] for up, [DefaultDownStep] for down).
+//
+// AllowHazards lists hazard types that are permitted to proceed. Migrations
+// containing unlisted hazards cause [ErrHazardDetected].
 type MigrateOptions struct {
 	AllowHazards []HazardType
 	Steps        int
@@ -164,16 +164,11 @@ func NewMigrator(opts ...Option) *Migrator {
 	}
 }
 
-// Migrate applies migrations in the specified direction (up or down).
+// Migrate applies migrations in the given direction. It acquires a Postgres
+// advisory lock for the duration of the operation.
 //
-// It uses a Postgres advisory lock before running migrations.
-//
-// By default, it applies all pending migrations when rolling up, and
-// only one migration when rolling back. Use MigrateOptions.Step to control
-// the number of migrations, or set it to -1 to migrate all.
-//
-// If a migration is registered in transaction mode, it creates a new transaction
-// before applying the migration.
+// When opts is nil, direction-specific defaults are used: all pending
+// migrations for up, one migration for down.
 //
 //nolint:nonamedreturns
 func (m *Migrator) Migrate(

@@ -11,7 +11,7 @@ import (
 	"go.inout.gg/conduit/internal/direction"
 )
 
-// ApplyArgs configures a migration apply operation.
+// ApplyArgs configures an [Apply] operation.
 type ApplyArgs struct {
 	DatabaseURL  string
 	Direction    direction.Direction
@@ -19,7 +19,8 @@ type ApplyArgs struct {
 	Steps        int
 }
 
-// Apply connects to the database and runs pending migrations in the given direction.
+// Apply connects to the database and applies migrations in the configured
+// direction.
 func Apply(
 	ctx context.Context,
 	migrator *conduit.Migrator,

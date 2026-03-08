@@ -10,22 +10,20 @@ import (
 	"go.inout.gg/conduit/pkg/timegenerator"
 )
 
-// NewArgs configures a new empty migration creation operation.
+// NewArgs configures a [New] operation.
 type NewArgs struct {
 	MigrationsDir string
 	Name          string
 }
 
-// NewResult holds the outcome of a New operation.
+// NewResult holds the paths created by [New].
 type NewResult struct {
-	// UpFile is the path of the created up migration file.
-	UpFile string
-	// DownFile is the path of the created down migration file.
+	UpFile   string
 	DownFile string
 }
 
 // New creates a pair of empty up and down migration files in the migrations
-// directory. The files are empty and ready for the caller to fill in.
+// directory.
 func New(fs afero.Fs, timeGen timegenerator.Generator, args NewArgs) (*NewResult, error) {
 	if !exists(fs, args.MigrationsDir) {
 		return nil, fmt.Errorf("%w: directory %q does not exist",

@@ -1,6 +1,5 @@
-// Package conduitregistry provides a Go API for running Conduit's own migrations via API.
+// Package conduitregistry loads and stores SQL migration files.
 //
-// By default, when initializing a new migration project using the Conduit CLI,
-// the migrations folder will contain an automatically generated migration that
-// utilizes this API.
+// Use [FromFS] to parse migration files from a filesystem, then pass the
+// resulting [Registry] to [conduit.WithRegistry].
 package conduitregistry

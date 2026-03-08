@@ -9,7 +9,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/spf13/afero"
 
-	conduittemplate "go.inout.gg/conduit/internal/conduittemplate"
+	"go.inout.gg/conduit/internal/conduittemplate"
 	"go.inout.gg/conduit/internal/migrations"
 	"go.inout.gg/conduit/pkg/conduitversion"
 	"go.inout.gg/conduit/pkg/hashsum"
@@ -18,6 +18,7 @@ import (
 	"go.inout.gg/conduit/pkg/timegenerator"
 )
 
+// InitArgs configures an [Init] operation.
 type InitArgs struct {
 	RootDir        string
 	ConfigName     string
@@ -26,21 +27,16 @@ type InitArgs struct {
 	ExcludeSchemas []string
 }
 
-// InitResult holds the outcome of an Init operation.
+// InitResult holds the paths created by [Init].
 type InitResult struct {
-	// MigrationsDirPath is the path of the created migrations directory.
 	MigrationsDirPath string
-	// MigrationPath is the path of the initial migration file.
-	MigrationPath string
-	// ConfigPath is the path of the created config file.
-	ConfigPath string
-	// SumPath is the path of the created hash sum file.
-	SumPath string
+	MigrationPath     string
+	ConfigPath        string
+	SumPath           string
 }
 
-// Init creates a new migrations directory with the initial conduit schema
-// migration, generates a conduit.sum file with the baseline schema hash,
-// and writes a default conduit.yaml config file.
+// Init scaffolds a new conduit project: migrations directory, initial schema
+// migration, conduit.sum, and conduit.yaml config file.
 func Init(
 	ctx context.Context,
 	fs afero.Fs,

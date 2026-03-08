@@ -7,19 +7,18 @@ type BuildInfo interface {
 	Version() string
 }
 
-// Standard is the default BuildInfo implementation that reads version
-// information from ldflags or the Go module build info.
+// Standard reads version from ldflags or the Go module build info.
+// Falls back to "devel" when neither is available.
 type Standard struct{}
 
 // buildVersion can be overridden at build time via:
 //
-//	go build -ldflags "-X go.inout.gg/conduit/pkg/buildinfo.buildVersion=v1.2.3"
+//	go build -ldflags "-X go.inout.gg/conduit/pkg/conduitbuildinfo.buildVersion=v1.2.3"
 //
 //nolint:gochecknoglobals
 var buildVersion string
 
-// Version returns the conduit version. It prefers the value set via -ldflags,
-// falls back to the Go module version from build info, and defaults to "devel".
+// Version returns the conduit version.
 func (Standard) Version() string {
 	if buildVersion != "" {
 		return buildVersion

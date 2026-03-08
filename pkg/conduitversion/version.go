@@ -21,9 +21,8 @@ func NewFromTime(t time.Time) Version { return Version{t: t} }
 // String formats the version as a YYYYMMDDHHMMSS string.
 func (v Version) String() string { return v.t.Format(format) }
 
-// Compare compares current version and the other one,
-// returning -1 if current version is older, 0 if versions are equal,
-// and 1 if current version is newer.
+// Compare returns -1, 0, or 1 if v is older than, equal to, or newer than
+// other.
 func (v Version) Compare(other Version) int { return v.t.Compare(other.t) }
 
 // MigrationDirection indicates whether a migration file is up-only or down-only.
@@ -41,17 +40,14 @@ func MigrationFilename(v Version, name string, direction MigrationDirection) str
 	return fmt.Sprintf("%s_%s.%s.sql", v.String(), name, direction)
 }
 
-// ParsedMigrationFilename represents the components of a parsed migration filename.
+// ParsedMigrationFilename holds the components of a parsed migration filename.
 type ParsedMigrationFilename struct {
 	Version   Version
 	Name      string
 	Direction MigrationDirection
 }
 
-// Compare compares current ParsedMigrationFilename and the other one.
-//
-// It compares by Version first, then by Name lexicographically when
-// versions are equal (e.g. split migrations with the same timestamp).
+// Compare orders by Version first, then by Name lexicographically.
 func (f ParsedMigrationFilename) Compare(other ParsedMigrationFilename) int {
 	if c := f.Version.Compare(other.Version); c != 0 {
 		return c

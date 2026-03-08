@@ -126,7 +126,8 @@ func NewCommand(
 
 			result, err := conduitcli.Apply(ctx, migrator, args)
 			if err != nil {
-				return fmt.Errorf("failed to apply migrations: %w", err)
+				//nolint:wrapcheck
+				return err
 			}
 
 			displayResult(stderr, result, isDryRun)

@@ -3,10 +3,8 @@ package conduit
 import pgdiff "github.com/stripe/pg-schema-diff/pkg/diff"
 
 // HazardType identifies the category of risk a migration statement carries.
-//
-// Hazardous operation types re-exported from pg-schema-diff.
-// Pass these to MigrateOptions.AllowHazards to permit specific categories
-// of risky operations.
+// Pass one or more values to [MigrateOptions].AllowHazards to permit
+// specific categories of risky operations.
 type HazardType = pgdiff.MigrationHazardType
 
 const (

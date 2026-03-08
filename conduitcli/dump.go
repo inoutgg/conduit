@@ -12,14 +12,13 @@ import (
 	"go.inout.gg/conduit/pkg/pgdiff"
 )
 
-// DumpArgs configures a schema dump operation.
+// DumpArgs configures a [Dump] operation.
 type DumpArgs struct {
 	DatabaseURL    string
 	ExcludeSchemas []string
 }
 
-// Dump connects to the database, extracts its schema as DDL statements,
-// and writes the result to w.
+// Dump extracts the database schema as DDL and writes it to w.
 func Dump(ctx context.Context, w io.Writer, bi conduitbuildinfo.BuildInfo, args DumpArgs) error {
 	connConfig, err := pgx.ParseConfig(args.DatabaseURL)
 	if err != nil {

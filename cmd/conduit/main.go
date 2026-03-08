@@ -45,10 +45,6 @@ func run(ctx context.Context, stdout io.Writer, stderr io.Writer, args []string)
 		fs      = afero.NewBasePathFs(afero.NewOsFs(), cwd)
 	)
 
-	if err := command.Execute(ctx, fs, stdout, stderr, timeGen, bi, sw, cwd, args); err != nil {
-		//nolint:wrapcheck
-		return err
-	}
-
-	return nil
+	//nolint:wrapcheck
+	return command.Execute(ctx, fs, stdout, stderr, timeGen, bi, sw, cwd, args)
 }

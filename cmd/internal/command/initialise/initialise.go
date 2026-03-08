@@ -21,7 +21,7 @@ func NewCommand(
 	_ io.Writer,
 	stderr io.Writer,
 	timeGen timegenerator.Generator,
-	configSrc altsrc.Sourcer,
+	src altsrc.Sourcer,
 ) *cli.Command {
 	//nolint:exhaustruct
 	return &cli.Command{
@@ -29,9 +29,9 @@ func NewCommand(
 		Aliases: []string{"i"},
 		Usage:   "initialise migration directory",
 		Flags: []cli.Flag{
-			cmdutil.MigrationsDirFlag(configSrc),
-			cmdutil.DatabaseURLFlag(configSrc),
-			cmdutil.ExcludeSchemasFlag(configSrc),
+			cmdutil.MigrationsDirFlag(src),
+			cmdutil.DatabaseURLFlag(src),
+			cmdutil.ExcludeSchemasFlag(src),
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			store := hashsum.NewFSStore(fs, "conduit.sum")

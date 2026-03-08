@@ -1,7 +1,8 @@
-// Package sqlsplit splits SQL files into individual statements, handling
-// PostgreSQL syntax such as dollar-quoted strings, block comments, and
-// quoted identifiers. Top-level comments are emitted as separate
-// statements so they can carry directives (e.g. enable-tx).
+// Package sqlsplit splits SQL text into individual statements.
+//
+// It handles PostgreSQL syntax including dollar-quoted strings, nested block
+// comments, and quoted identifiers. Top-level comments are emitted as
+// separate [Stmt] values so they can carry directives.
 package sqlsplit
 
 import (

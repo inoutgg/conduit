@@ -17,15 +17,13 @@ import (
 )
 
 const (
-	// EnableTxDirective is a SQL comment directive that, when present in a
-	// migration file, causes the migration to run inside a transaction.
-	// By default, migrations run outside a transaction.
+	// EnableTxDirective, when present as a top-level SQL comment, causes
+	// the migration to run inside a transaction. Without it, migrations
+	// run outside a transaction.
 	EnableTxDirective = "---- enable-tx ----"
 
-	// HazardDirectivePrefix is the prefix for SQL comment directives that mark
-	// hazardous operations. The full format is:
-	//
-	//   ---- hazard: TYPE // message ----
+	// HazardDirectivePrefix marks a hazardous operation in a migration.
+	// Format: ---- hazard: TYPE // message ----.
 	HazardDirectivePrefix = "---- hazard:"
 )
 
@@ -156,7 +154,9 @@ func sqlMigrateFunc(stmts []sqlsplit.Stmt) *migrateFunc {
 	migration := &migrateFunc{
 		useTx:   useTx,
 		hazards: hazards,
-		content: strings.Join(contents, "\n"), fn: nil, fnx: nil,
+		content: strings.Join(contents, "\n"),
+		fn:      nil,
+		fnx:     nil,
 	}
 
 	if useTx {

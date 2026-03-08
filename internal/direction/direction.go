@@ -15,7 +15,8 @@ const (
 
 var ErrUnknownDirection = errors.New("unknown direction: expected 'up' or 'down'")
 
-// FromString converts a string to a Direction. It returns UnknownDirectionErr for invalid inputs.
+// FromString converts a string to a Direction. It returns ErrUnknownDirection
+// for invalid inputs.
 func FromString(s string) (Direction, error) {
 	switch s {
 	case string(DirectionUp):

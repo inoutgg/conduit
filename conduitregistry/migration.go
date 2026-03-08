@@ -33,7 +33,8 @@ type migrateFunc struct {
 	useTx   bool
 }
 
-// Migration represents a single database migration.
+// Migration represents a single versioned database migration with up and down
+// SQL content.
 type Migration struct {
 	up      *migrateFunc
 	down    *migrateFunc
@@ -84,8 +85,6 @@ func (m *Migration) Hazards(dir direction.Direction) []Hazard {
 }
 
 // Apply executes the migration on a bare connection without a transaction.
-// Use this for migrations that cannot run inside a transaction
-// (e.g. CREATE INDEX CONCURRENTLY).
 func (m *Migration) Apply(ctx context.Context, dir direction.Direction, conn *pgx.Conn) error {
 	debug.Assert(conn != nil, "expected conn to be defined")
 

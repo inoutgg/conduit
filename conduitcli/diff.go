@@ -12,7 +12,7 @@ import (
 	"github.com/spf13/afero"
 
 	"go.inout.gg/conduit"
-	internaltpl "go.inout.gg/conduit/internal/conduittemplate"
+	"go.inout.gg/conduit/internal/conduittemplate"
 	"go.inout.gg/conduit/pkg/conduitbuildinfo"
 	"go.inout.gg/conduit/pkg/conduitversion"
 	"go.inout.gg/conduit/pkg/hashsum"
@@ -35,22 +35,20 @@ type DiffArgs struct {
 	ExcludeSchemas []string
 }
 
-// DiffResultFile describes a single migration file created by a Diff operation.
+// DiffResultFile describes a migration file created by [Diff].
 type DiffResultFile struct {
-	// Path is the path of the created migration file.
 	Path string
 }
 
-// DiffResult holds the outcome of a Diff operation.
+// DiffResult holds the outcome of a [Diff] operation.
 type DiffResult struct {
-	// Files lists the migration files that were created.
 	Files []DiffResultFile
 }
 
-// Diff compares the current migrations directory against a target schema file
-// and generates a new migration file for each detected statement.
+// Diff compares existing migrations against a target schema file and generates
+// a new migration for each detected change.
 //
-// When the schema is already in sync, Diff returns ErrNoChanges.
+// Returns [ErrNoChanges] when the schema is already in sync.
 func Diff(
 	ctx context.Context,
 	fs afero.Fs,
@@ -118,7 +116,7 @@ func Diff(
 		if err := writeMigration(
 			migrationsFs,
 			filename,
-			internaltpl.SQLUpMigrationTemplate,
+			conduittemplate.SQLUpMigrationTemplate,
 			map[string]any{
 				"SchemaPath":     args.SchemaPath,
 				"ConduitVersion": bi.Version(),
