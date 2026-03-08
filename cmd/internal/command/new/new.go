@@ -1,4 +1,5 @@
-package newmigration
+//nolint:predeclared
+package new
 
 import (
 	"context"
@@ -15,6 +16,7 @@ import (
 	"go.inout.gg/conduit/pkg/timegenerator"
 )
 
+//nolint:revive
 func NewCommand(
 	fs afero.Fs,
 	_ io.Writer,

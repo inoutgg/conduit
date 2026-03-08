@@ -154,7 +154,8 @@ func sqlMigrateFunc(stmts []sqlsplit.Stmt) *migrateFunc {
 	})
 
 	migration := &migrateFunc{
-		useTx: useTx, hazards: hazards,
+		useTx:   useTx,
+		hazards: hazards,
 		content: strings.Join(contents, "\n"), fn: nil, fnx: nil,
 	}
 
