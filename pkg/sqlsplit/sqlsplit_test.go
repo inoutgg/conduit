@@ -295,7 +295,7 @@ SELECT 2;`,
 		},
 		{
 			name: "top-level directive-style comments",
-			input: `---- disable-tx ----
+			input: `---- enable-tx ----
 CREATE TABLE users (id int);
 ---- create above / drop below ----
 DROP TABLE users;`,
@@ -462,7 +462,7 @@ SELECT 1;`,
 		},
 		{
 			name: "comment then multiline statement",
-			input: `---- disable-tx ----
+			input: `---- enable-tx ----
 CREATE TABLE users (
   id int,
   name text

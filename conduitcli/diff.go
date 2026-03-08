@@ -5,14 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"text/template"
-	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/spf13/afero"
-	schemadiff "github.com/stripe/pg-schema-diff/pkg/diff"
 
 	"go.inout.gg/conduit"
 	internaltpl "go.inout.gg/conduit/internal/conduittemplate"
@@ -28,14 +25,6 @@ var (
 	ErrNoChanges          = errors.New("no schema changes detected")
 )
 
-//nolint:gochecknoglobals
-var nonTxPatterns = []*regexp.Regexp{
-	regexp.MustCompile(`(?i)CREATE\s+(UNIQUE\s+)?INDEX\s+CONCURRENTLY`),
-	regexp.MustCompile(`(?i)DROP\s+INDEX\s+CONCURRENTLY`),
-	regexp.MustCompile(`(?i)REINDEX\s+.*CONCURRENTLY`),
-	regexp.MustCompile(`(?i)ALTER\s+TYPE\s+.*ADD\s+VALUE`),
-}
-
 // DiffArgs configures a schema diff operation.
 type DiffArgs struct {
 	RootDir        string
@@ -50,10 +39,6 @@ type DiffArgs struct {
 type DiffResultFile struct {
 	// Path is the path of the created migration file.
 	Path string
-	// TotalStmtCount is the number of SQL statements in the file.
-	TotalStmtCount int
-	// IsNonTx is true when the migration must run outside a transaction.
-	IsNonTx bool
 }
 
 // DiffResult holds the outcome of a Diff operation.
@@ -63,10 +48,7 @@ type DiffResult struct {
 }
 
 // Diff compares the current migrations directory against a target schema file
-// and generates new migration files for any detected differences.
-//
-// Statements that require non-transactional execution (e.g. CREATE INDEX
-// CONCURRENTLY) are automatically split into separate migration files.
+// and generates a new migration file for each detected statement.
 //
 // When the schema is already in sync, Diff returns ErrNoChanges.
 func Diff(
@@ -110,50 +92,26 @@ func Diff(
 	}
 
 	v := conduitversion.NewFromTime(timeGen.Now())
-	migrations := splitMigrations(plan.Statements)
 
 	var files []DiffResultFile
 
-	for i, m := range migrations {
+	for i, stmt := range plan.Statements {
 		name := args.Name
-		if len(migrations) > 1 {
+		if len(plan.Statements) > 1 {
 			name = fmt.Sprintf("%s_%d", args.Name, i+1)
-		}
-
-		// Compute the max timeout across all statements in this migration group.
-		// statement_timeout is applied by PostgreSQL to each statement individually,
-		// not to the migration as a whole.
-		var stmtTimeout, lockTimeout time.Duration
-		for _, stmt := range m.stmts {
-			stmtTimeout = max(stmtTimeout, stmt.Timeout)
-			lockTimeout = max(lockTimeout, stmt.LockTimeout)
 		}
 
 		var upStmts strings.Builder
 
-		if stmtTimeout > 0 {
-			fmt.Fprintf(&upStmts, "SET statement_timeout = '%dms';\n", stmtTimeout.Milliseconds())
+		fmt.Fprintf(&upStmts, "SET statement_timeout = '%dms';\n", stmt.Timeout.Milliseconds())
+		fmt.Fprintf(&upStmts, "SET lock_timeout = '%dms';\n", stmt.LockTimeout.Milliseconds())
+		fmt.Fprintln(&upStmts)
+
+		for _, hazard := range stmt.Hazards {
+			fmt.Fprintf(&upStmts, "---- hazard: %s // %s ----\n", hazard.Type, hazard.Message)
 		}
 
-		if lockTimeout > 0 {
-			fmt.Fprintf(&upStmts, "SET lock_timeout = '%dms';\n", lockTimeout.Milliseconds())
-		}
-
-		if stmtTimeout > 0 || lockTimeout > 0 {
-			upStmts.WriteString("\n")
-		}
-
-		for j, stmt := range m.stmts {
-			for _, hazard := range stmt.Hazards {
-				fmt.Fprintf(&upStmts, "---- hazard: %s // %s ----\n", hazard.Type, hazard.Message)
-			}
-
-			upStmts.WriteString(stmt.ToSQL())
-
-			if j < len(m.stmts)-1 {
-				upStmts.WriteString("\n\n")
-			}
-		}
+		upStmts.WriteString(stmt.ToSQL())
 
 		filename := conduitversion.MigrationFilename(v, name, conduitversion.MigrationDirectionUp)
 
@@ -165,16 +123,13 @@ func Diff(
 				"SchemaPath":     args.SchemaPath,
 				"ConduitVersion": bi.Version(),
 				"UpStmts":        upStmts.String(),
-				"DisableTx":      m.isNonTx,
 			},
 		); err != nil {
 			return nil, err
 		}
 
 		files = append(files, DiffResultFile{
-			Path:           filepath.Join(args.MigrationsDir, filename),
-			TotalStmtCount: len(m.stmts),
-			IsNonTx:        m.isNonTx,
+			Path: filepath.Join(args.MigrationsDir, filename),
 		})
 	}
 
@@ -183,60 +138,6 @@ func Diff(
 	}
 
 	return &DiffResult{Files: files}, nil
-}
-
-type migration struct {
-	stmts   []schemadiff.Statement
-	isNonTx bool
-}
-
-func splitMigrations(stmts []schemadiff.Statement) []migration {
-	if len(stmts) == 0 {
-		return nil
-	}
-
-	var (
-		migrations []migration
-		current    *migration
-	)
-
-	for _, stmt := range stmts {
-		if isNonTxStmt(stmt.DDL) {
-			if current != nil {
-				migrations = append(migrations, *current)
-				current = nil
-			}
-
-			migrations = append(migrations, migration{
-				stmts:   []schemadiff.Statement{stmt},
-				isNonTx: true,
-			})
-
-			continue
-		}
-
-		if current == nil {
-			current = &migration{} //nolint:exhaustruct
-		}
-
-		current.stmts = append(current.stmts, stmt)
-	}
-
-	if current != nil {
-		migrations = append(migrations, *current)
-	}
-
-	return migrations
-}
-
-func isNonTxStmt(ddl string) bool {
-	for _, p := range nonTxPatterns {
-		if p.MatchString(ddl) {
-			return true
-		}
-	}
-
-	return false
 }
 
 func writeMigration(fs afero.Fs, path string, tpl *template.Template, data any) error {

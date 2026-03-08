@@ -79,14 +79,7 @@ func NewCommand(
 			}
 
 			for _, f := range result.Files {
-				if f.IsNonTx {
-					fmt.Fprintf(
-						stderr, "Created %s (%d statements, non-tx)\n",
-						f.Path, f.TotalStmtCount,
-					)
-				} else {
-					fmt.Fprintf(stderr, "Created %s (%d statements)\n", f.Path, f.TotalStmtCount)
-				}
+				fmt.Fprintln(stderr, "Created "+f.Path)
 			}
 
 			fmt.Fprintln(stderr, "Updated conduit.sum")

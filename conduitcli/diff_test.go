@@ -10,7 +10,6 @@ import (
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	schemadiff "github.com/stripe/pg-schema-diff/pkg/diff"
 
 	"go.inout.gg/conduit"
 	"go.inout.gg/conduit/internal/testutil"
@@ -83,8 +82,6 @@ CREATE TABLE posts (id int, user_id int);`).
 
 		require.NoError(t, err)
 		require.Len(t, result.Files, 1)
-		assert.Equal(t, 1, result.Files[0].TotalStmtCount)
-		assert.False(t, result.Files[0].IsNonTx)
 		testutil.SnapshotFS(t, fs, baseDir)
 	})
 
@@ -167,48 +164,6 @@ CREATE TABLE comments (id int, post_id int);`), 0o644),
 		require.NoError(t, err)
 	})
 
-	t.Run("should include disable-tx directive, when diff contains concurrent index", func(t *testing.T) {
-		t.Parallel()
-
-		databaseURL := os.Getenv("TEST_DATABASE_URL")
-		fs, baseDir, dir := testutil.NewMigrationsDirBuilder(t).
-			WithFile("20230601120000_init.up.sql", "CREATE TABLE users (id int);").
-			WithBaseFile("schema.sql", `CREATE TABLE users (id int);
-CREATE INDEX idx_users_id ON users (id);`).
-			Build()
-
-		result := runDiff(t, fs, baseDir, dir, "add_index", databaseURL)
-
-		require.Len(t, result.Files, 1)
-		assert.True(t, result.Files[0].IsNonTx)
-
-		migrationFile := filepath.Join(dir, "20240115123045_add_index.up.sql")
-		content, err := afero.ReadFile(fs, migrationFile)
-		require.NoError(t, err)
-		assert.Contains(t, string(content), "---- disable-tx ----")
-	})
-
-	t.Run("should omit disable-tx directive, when diff has no concurrent DDL", func(t *testing.T) {
-		t.Parallel()
-
-		databaseURL := os.Getenv("TEST_DATABASE_URL")
-		fs, baseDir, dir := testutil.NewMigrationsDirBuilder(t).
-			WithFile("20230601120000_init.up.sql", "CREATE TABLE users (id int);").
-			WithBaseFile("schema.sql", `CREATE TABLE users (id int);
-CREATE TABLE posts (id int);`).
-			Build()
-
-		result := runDiff(t, fs, baseDir, dir, "add_posts", databaseURL)
-
-		require.Len(t, result.Files, 1)
-		assert.False(t, result.Files[0].IsNonTx)
-
-		migrationFile := filepath.Join(dir, "20240115123045_add_posts.up.sql")
-		content, err := afero.ReadFile(fs, migrationFile)
-		require.NoError(t, err)
-		assert.NotContains(t, string(content), "---- disable-tx ----")
-	})
-
 	t.Run("should return no changes, when schema is already in sync", func(t *testing.T) {
 		t.Parallel()
 
@@ -234,90 +189,10 @@ CREATE TABLE posts (id int);`).
 	})
 }
 
-func TestSplitMigrations(t *testing.T) {
+func TestDiffCreatesFilePerStatement(t *testing.T) {
 	t.Parallel()
 
-	stmt := func(ddl string) schemadiff.Statement {
-		return schemadiff.Statement{DDL: ddl}
-	}
-
-	t.Run("should return empty, when no statements provided", func(t *testing.T) {
-		t.Parallel()
-
-		migrations := splitMigrations(nil)
-		assert.Empty(t, migrations)
-	})
-
-	t.Run("should produce single tx group, when all statements are transactional", func(t *testing.T) {
-		t.Parallel()
-
-		migrations := splitMigrations([]schemadiff.Statement{
-			stmt("CREATE TABLE t1 (id int)"),
-			stmt("CREATE TABLE t2 (id int)"),
-		})
-		require.Len(t, migrations, 1)
-		assert.False(t, migrations[0].isNonTx)
-		assert.Len(t, migrations[0].stmts, 2)
-	})
-
-	t.Run("should produce separate non-tx groups, when all statements are concurrent", func(t *testing.T) {
-		t.Parallel()
-
-		migrations := splitMigrations([]schemadiff.Statement{
-			stmt("CREATE INDEX CONCURRENTLY idx1 ON t (c)"),
-			stmt("CREATE INDEX CONCURRENTLY idx2 ON t (c)"),
-		})
-		require.Len(t, migrations, 2)
-		assert.True(t, migrations[0].isNonTx)
-		assert.Len(t, migrations[0].stmts, 1)
-		assert.True(t, migrations[1].isNonTx)
-		assert.Len(t, migrations[1].stmts, 1)
-	})
-
-	t.Run(
-		"should split non-tx statements individually, when statements alternate tx and non-tx",
-		func(t *testing.T) {
-			t.Parallel()
-
-			migrations := splitMigrations([]schemadiff.Statement{
-				stmt("CREATE TABLE t1 (id int)"),
-				stmt("CREATE TABLE t2 (id int)"),
-				stmt("CREATE INDEX CONCURRENTLY idx ON t1 (id)"),
-				stmt("DROP INDEX CONCURRENTLY old_idx"),
-				stmt("ALTER TABLE t1 ADD COLUMN name text"),
-			})
-			require.Len(t, migrations, 4)
-
-			assert.False(t, migrations[0].isNonTx)
-			assert.Len(t, migrations[0].stmts, 2)
-
-			assert.True(t, migrations[1].isNonTx)
-			assert.Len(t, migrations[1].stmts, 1)
-
-			assert.True(t, migrations[2].isNonTx)
-			assert.Len(t, migrations[2].stmts, 1)
-
-			assert.False(t, migrations[3].isNonTx)
-			assert.Len(t, migrations[3].stmts, 1)
-		},
-	)
-
-	t.Run("should produce single non-tx group, when one concurrent statement exists", func(t *testing.T) {
-		t.Parallel()
-
-		migrations := splitMigrations([]schemadiff.Statement{
-			stmt("CREATE INDEX CONCURRENTLY idx ON t (c)"),
-		})
-		require.Len(t, migrations, 1)
-		assert.True(t, migrations[0].isNonTx)
-		assert.Len(t, migrations[0].stmts, 1)
-	})
-}
-
-func TestDiffSplitsMigrations(t *testing.T) {
-	t.Parallel()
-
-	t.Run("should split into tx and non-tx files, when diff contains mixed DDL", func(t *testing.T) {
+	t.Run("should create one file per statement, when diff contains multiple DDL", func(t *testing.T) {
 		t.Parallel()
 
 		databaseURL := os.Getenv("TEST_DATABASE_URL")
@@ -341,58 +216,6 @@ CREATE INDEX idx_posts_user_id ON posts (user_id);`).
 
 		require.NoError(t, err)
 		require.Len(t, result.Files, 2)
-		assert.False(t, result.Files[0].IsNonTx)
-		assert.True(t, result.Files[1].IsNonTx)
 		testutil.SnapshotFS(t, fs, baseDir)
 	})
-}
-
-func TestRequiresDisableTx(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name string
-		ddl  string
-		want bool
-	}{
-		{"CREATE INDEX CONCURRENTLY", "CREATE INDEX CONCURRENTLY idx ON t (c)", true},
-		{"CREATE UNIQUE INDEX CONCURRENTLY", "CREATE UNIQUE INDEX CONCURRENTLY idx ON t (c)", true},
-		{"DROP INDEX CONCURRENTLY", "DROP INDEX CONCURRENTLY idx", true},
-		{"REINDEX INDEX CONCURRENTLY", "REINDEX INDEX CONCURRENTLY idx", true},
-		{"REINDEX TABLE CONCURRENTLY", "REINDEX TABLE CONCURRENTLY t", true},
-		{"ALTER TYPE ADD VALUE", "ALTER TYPE my_enum ADD VALUE 'new_val'", true},
-		{"ALTER TYPE ADD VALUE with BEFORE", "ALTER TYPE my_enum ADD VALUE 'x' BEFORE 'y'", true},
-		{"lowercase create index concurrently", "create index concurrently idx on t (c)", true},
-		{"mixed case", "Create Index Concurrently idx ON t (c)", true},
-		{"CREATE INDEX without CONCURRENTLY", "CREATE INDEX idx ON t (c)", false},
-		{"DROP INDEX without CONCURRENTLY", "DROP INDEX idx", false},
-		{"CREATE TABLE", "CREATE TABLE t (id int)", false},
-		{"ALTER TABLE ADD COLUMN", "ALTER TABLE t ADD COLUMN c int", false},
-		{"ALTER TYPE RENAME", "ALTER TYPE my_enum RENAME TO other_enum", false},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			assert.Equal(t, tt.want, isNonTxStmt(tt.ddl))
-		})
-	}
-}
-
-func runDiff(t *testing.T, fs afero.Fs, baseDir, dir, name, databaseURL string) *DiffResult {
-	t.Helper()
-
-	store := hashsum.NewFSStore(fs, "conduit.sum")
-	args := DiffArgs{
-		RootDir:       baseDir,
-		MigrationsDir: dir,
-		Name:          name,
-		SchemaPath:    filepath.Join(baseDir, "schema.sql"),
-		DatabaseURL:   databaseURL,
-	}
-
-	result, err := Diff(t.Context(), fs, timeGen, bi, store, args)
-	require.NoError(t, err)
-
-	return result
 }

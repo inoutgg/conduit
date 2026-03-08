@@ -95,7 +95,7 @@ func TestApply(t *testing.T) {
 		pool := poolFactory.Pool(t)
 
 		r := testregistry.NewRegistry(t, map[string]string{
-			"20230601120000_hazardous.up.sql": "---- disable-tx ----\n---- hazard: INDEX_BUILD // rebuilds index ----\nCREATE TABLE hazard_test (id INT);",
+			"20230601120000_hazardous.up.sql": "---- hazard: INDEX_BUILD // rebuilds index ----\nCREATE TABLE hazard_test (id INT);",
 		})
 		m := conduit.NewMigrator(conduit.WithRegistry(r), conduit.WithSkipSchemaDriftCheck())
 

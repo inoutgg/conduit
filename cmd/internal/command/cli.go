@@ -15,6 +15,7 @@ import (
 	"go.inout.gg/conduit/cmd/internal/command/initialise"
 	"go.inout.gg/conduit/internal/cmdutil"
 	"go.inout.gg/conduit/pkg/conduitbuildinfo"
+	"go.inout.gg/conduit/pkg/stopwatch"
 	"go.inout.gg/conduit/pkg/timegenerator"
 )
 
@@ -26,6 +27,7 @@ func Execute(
 	stderr io.Writer,
 	timeGen timegenerator.Generator,
 	bi conduitbuildinfo.BuildInfo,
+	timer stopwatch.Stopwatch,
 	rootDir string,
 	args []string,
 ) error {
@@ -50,7 +52,7 @@ func Execute(
 		Commands: []*cli.Command{
 			initialise.NewCommand(fs, stdout, stderr, timeGen, configSrc),
 			diff.NewCommand(fs, stdout, stderr, timeGen, bi, configSrc),
-			apply.NewCommand(fs, stdout, stderr, configSrc),
+			apply.NewCommand(fs, stdout, stderr, timer, configSrc),
 			dump.NewCommand(stdout, bi, configSrc),
 		},
 	}

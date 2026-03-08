@@ -23,6 +23,7 @@ import (
 	internaldebug "go.inout.gg/conduit/internal/internaldebug"
 	"go.inout.gg/conduit/internal/sliceutil"
 	"go.inout.gg/conduit/pkg/conduitversion"
+	"go.inout.gg/conduit/pkg/stopwatch"
 )
 
 // AllSteps tells migrator to run all available migrations either up or down.
@@ -97,7 +98,7 @@ func (c *config) defaults() {
 	c.Registry = cmp.Or(c.Registry, globalRegistry)
 
 	if c.Executor == nil {
-		c.Executor = NewLiveExecutor(c.Logger)
+		c.Executor = NewLiveExecutor(c.Logger, stopwatch.Standard{})
 	}
 }
 
@@ -259,7 +260,7 @@ func (m *Migrator) migrateUp(
 		}
 	}
 
-	targetMigrations := m.registry.CloneMigrations()
+	targetMigrations := m.registry.Migrations()
 	for _, key := range existingKeys {
 		delete(targetMigrations, key)
 	}
@@ -285,7 +286,7 @@ func (m *Migrator) migrateDown(
 		existingKeysSet[key] = struct{}{}
 	}
 
-	targetMigrations := m.registry.CloneMigrations()
+	targetMigrations := m.registry.Migrations()
 	for key := range targetMigrations {
 		if _, ok := existingKeysSet[key]; !ok {
 			delete(targetMigrations, key)

@@ -11,6 +11,7 @@ import (
 
 	"go.inout.gg/conduit/internal/testmigrator"
 	"go.inout.gg/conduit/pkg/conduitbuildinfo"
+	"go.inout.gg/conduit/pkg/stopwatch"
 	"go.inout.gg/conduit/pkg/timegenerator"
 )
 
@@ -19,6 +20,7 @@ var (
 	poolFactory *pgxephemeraltest.PoolFactory
 	timeGen     = timegenerator.Stub{T: time.Date(2024, 1, 15, 12, 30, 45, 0, time.UTC)}
 	bi          = conduitbuildinfo.Stub{V: "devel"}
+	sw          = stopwatch.Stub{}
 )
 
 func TestMain(m *testing.M) {

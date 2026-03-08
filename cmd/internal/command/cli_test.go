@@ -25,7 +25,7 @@ func exec(t *testing.T, fs afero.Fs, args string) (execResult, error) {
 
 	var stdout, stderr bytes.Buffer
 
-	err := command.Execute(t.Context(), fs, &stdout, &stderr, timeGen, bi, "/", strings.Fields(args))
+	err := command.Execute(t.Context(), fs, &stdout, &stderr, timeGen, bi, sw, "/", strings.Fields(args))
 
 	return execResult{stdout: &stdout, stderr: &stderr}, err //nolint:wrapcheck
 }
@@ -300,8 +300,5 @@ func TestInitDiffApply(t *testing.T) {
 	assert.True(t, testutil.TableExists(t, pool, "users"))
 	assert.True(t, testutil.TableExists(t, pool, "posts"))
 	testutil.SnapshotFS(t, fs, ".", "conduit.yaml")
-	snaps.MatchSnapshot(t, diffResult.stderr.String())
-	assert.Contains(t, applyResult.stderr.String(), "Applied 20240115123045_conduit_initial_schema")
-	assert.Contains(t, applyResult.stderr.String(), "Applied 20240115123045_add_tables")
-	assert.Contains(t, applyResult.stderr.String(), "Applied 2 migrations in")
+	snaps.MatchSnapshot(t, diffResult.stderr.String(), applyResult.stderr.String())
 }

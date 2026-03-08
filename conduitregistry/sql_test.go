@@ -36,11 +36,11 @@ func TestParseSQLMigrationsFromFS(t *testing.T) {
 
 		upTx, err := m.UseTx(direction.DirectionUp)
 		require.NoError(t, err)
-		assert.True(t, upTx, "up migration should use transaction by default")
+		assert.False(t, upTx, "up migration should not use transaction by default")
 
 		downTx, err := m.UseTx(direction.DirectionDown)
 		require.NoError(t, err)
-		assert.True(t, downTx, "down migration should use transaction by default")
+		assert.False(t, downTx, "down migration should not use transaction by default")
 	})
 
 	t.Run("should parse migration, when only up file exists", func(t *testing.T) {
@@ -64,20 +64,20 @@ func TestParseSQLMigrationsFromFS(t *testing.T) {
 
 		upTx, err := m.UseTx(direction.DirectionUp)
 		require.NoError(t, err)
-		assert.True(t, upTx)
+		assert.False(t, upTx)
 
 		assert.Equal(t, emptyMigrateFunc, m.down)
 	})
 
-	t.Run("should disable transactions, when disable-tx directive is in both files", func(t *testing.T) {
+	t.Run("should enable transactions, when enable-tx directive is in both files", func(t *testing.T) {
 		t.Parallel()
 
 		// Arrange
 		fs, _, dir := testutil.NewMigrationsDirBuilder(t).
 			WithFile("20230601120000_create_user.up.sql",
-				"---- disable-tx ----\nCREATE TABLE users (id INT);").
+				"---- enable-tx ----\nCREATE TABLE users (id INT);").
 			WithFile("20230601120000_create_user.down.sql",
-				"---- disable-tx ----\nDROP TABLE users;").
+				"---- enable-tx ----\nDROP TABLE users;").
 			Build()
 
 		// Act
@@ -91,20 +91,20 @@ func TestParseSQLMigrationsFromFS(t *testing.T) {
 
 		upTx, err := m.UseTx(direction.DirectionUp)
 		require.NoError(t, err)
-		assert.False(t, upTx, "disable-tx directive should disable transactions for up migration")
+		assert.True(t, upTx, "enable-tx directive should enable transactions for up migration")
 
 		downTx, err := m.UseTx(direction.DirectionDown)
 		require.NoError(t, err)
-		assert.False(t, downTx, "disable-tx directive should disable transactions for down migration")
+		assert.True(t, downTx, "enable-tx directive should enable transactions for down migration")
 	})
 
-	t.Run("should disable tx only for up, when disable-tx directive is only in up file", func(t *testing.T) {
+	t.Run("should enable tx only for up, when enable-tx directive is only in up file", func(t *testing.T) {
 		t.Parallel()
 
 		// Arrange
 		fs, _, dir := testutil.NewMigrationsDirBuilder(t).
 			WithFile("20230601120000_create_user.up.sql",
-				"---- disable-tx ----\nCREATE TABLE users (id INT);").
+				"---- enable-tx ----\nCREATE TABLE users (id INT);").
 			WithFile("20230601120000_create_user.down.sql",
 				"DROP TABLE users;").
 			Build()
@@ -120,11 +120,11 @@ func TestParseSQLMigrationsFromFS(t *testing.T) {
 
 		upTx, err := m.UseTx(direction.DirectionUp)
 		require.NoError(t, err)
-		assert.False(t, upTx, "up migration with disable-tx directive should not use transactions")
+		assert.True(t, upTx, "up migration with enable-tx directive should use transactions")
 
 		downTx, err := m.UseTx(direction.DirectionDown)
 		require.NoError(t, err)
-		assert.True(t, downTx, "down migration without disable-tx directive should use transactions")
+		assert.False(t, downTx, "down migration without enable-tx directive should not use transactions")
 	})
 
 	t.Run("should sort by version, when multiple versions exist", func(t *testing.T) {
@@ -195,9 +195,10 @@ func TestParseSQLMigrationsFromFS(t *testing.T) {
 
 		// Arrange
 		fs, _, dir := testutil.NewMigrationsDirBuilder(t).
-			WithFile("20230601120000_add_posts_1.up.sql", "CREATE TABLE posts (id INT);").
+			WithFile("20230601120000_add_posts_1.up.sql",
+				"---- enable-tx ----\nCREATE TABLE posts (id INT);").
 			WithFile("20230601120000_add_posts_2.up.sql",
-				"---- disable-tx ----\nCREATE INDEX CONCURRENTLY idx ON posts (id);").
+				"CREATE INDEX CONCURRENTLY idx ON posts (id);").
 			Build()
 
 		// Act

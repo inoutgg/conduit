@@ -14,6 +14,7 @@ import (
 	"go.inout.gg/conduit/cmd/internal/command"
 	"go.inout.gg/conduit/cmd/internal/conduiterror"
 	"go.inout.gg/conduit/pkg/conduitbuildinfo"
+	"go.inout.gg/conduit/pkg/stopwatch"
 	"go.inout.gg/conduit/pkg/timegenerator"
 )
 
@@ -40,10 +41,11 @@ func run(ctx context.Context, stdout io.Writer, stderr io.Writer, args []string)
 	var (
 		timeGen timegenerator.Standard
 		bi      conduitbuildinfo.Standard
+		sw      stopwatch.Standard
 		fs      = afero.NewBasePathFs(afero.NewOsFs(), cwd)
 	)
 
-	if err := command.Execute(ctx, fs, stdout, stderr, timeGen, bi, cwd, args); err != nil {
+	if err := command.Execute(ctx, fs, stdout, stderr, timeGen, bi, sw, cwd, args); err != nil {
 		//nolint:wrapcheck
 		return err
 	}

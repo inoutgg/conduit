@@ -34,8 +34,8 @@ func New() *Registry {
 
 // FromFS loads SQL migration files from the given filesystem.
 //
-// SQL migrations run in transaction mode by default.
-// To disable transactions, add `---- disable-tx ----` comment in the SQL.
+// SQL migrations run outside a transaction by default.
+// To enable transactions, add `---- enable-tx ----` comment in the SQL.
 func FromFS(fs afero.Fs, root string) *Registry {
 	r := New()
 
@@ -47,8 +47,8 @@ func FromFS(fs afero.Fs, root string) *Registry {
 	return r
 }
 
-// CloneMigrations returns a shallow copy of the registered migrations map.
+// Migrations returns a shallow copy of the registered migrations map.
 // The keys are composite strings of "<version>_<name>".
-func (r *Registry) CloneMigrations() map[string]*Migration {
+func (r *Registry) Migrations() map[string]*Migration {
 	return maps.Clone(r.migrations)
 }

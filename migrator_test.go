@@ -122,15 +122,15 @@ func TestMigrator_MigrateUp(t *testing.T) {
 		}, appliedMigrations(t, pool))
 	})
 
-	t.Run("should apply migration, when disable-tx directive is set", func(t *testing.T) {
+	t.Run("should apply migration, when running in non-tx mode", func(t *testing.T) {
 		t.Parallel()
 
 		// Arrange
 		pool, conn := newConn(t)
 
 		r := testregistry.NewRegistry(t, map[string]string{
-			"20230601120000_create_nontx.up.sql":   "---- disable-tx ----\nCREATE TABLE nontx_test (id INT);",
-			"20230601120000_create_nontx.down.sql": "---- disable-tx ----\nDROP TABLE nontx_test;",
+			"20230601120000_create_nontx.up.sql":   "CREATE TABLE nontx_test (id INT);",
+			"20230601120000_create_nontx.down.sql": "DROP TABLE nontx_test;",
 		})
 		m := conduit.NewMigrator(conduit.WithRegistry(r), conduit.WithSkipSchemaDriftCheck())
 
@@ -211,15 +211,15 @@ func TestMigrator_MigrateDown(t *testing.T) {
 		assert.Empty(t, appliedMigrations(t, pool))
 	})
 
-	t.Run("should roll back migration, when disable-tx directive is set", func(t *testing.T) {
+	t.Run("should roll back migration, when running in non-tx mode", func(t *testing.T) {
 		t.Parallel()
 
 		// Arrange
 		pool, conn := newConn(t)
 
 		r := testregistry.NewRegistry(t, map[string]string{
-			"20230601120000_create_nontx.up.sql":   "---- disable-tx ----\nCREATE TABLE nontx_test (id INT);",
-			"20230601120000_create_nontx.down.sql": "---- disable-tx ----\nDROP TABLE nontx_test;",
+			"20230601120000_create_nontx.up.sql":   "CREATE TABLE nontx_test (id INT);",
+			"20230601120000_create_nontx.down.sql": "DROP TABLE nontx_test;",
 		})
 		m := conduit.NewMigrator(conduit.WithRegistry(r), conduit.WithSkipSchemaDriftCheck())
 
@@ -247,8 +247,8 @@ func TestMigrator_Migrate_Hazards(t *testing.T) {
 		pool, conn := newConn(t)
 
 		r := testregistry.NewRegistry(t, map[string]string{
-			"20230601120000_hazardous.up.sql":   "---- disable-tx ----\n---- hazard: INDEX_BUILD // rebuilds index ----\nCREATE TABLE hazard_test (id INT);",
-			"20230601120000_hazardous.down.sql": "---- disable-tx ----\nDROP TABLE hazard_test;",
+			"20230601120000_hazardous.up.sql":   "---- hazard: INDEX_BUILD // rebuilds index ----\nCREATE TABLE hazard_test (id INT);",
+			"20230601120000_hazardous.down.sql": "DROP TABLE hazard_test;",
 		})
 		m := conduit.NewMigrator(conduit.WithRegistry(r), conduit.WithSkipSchemaDriftCheck())
 
@@ -267,8 +267,8 @@ func TestMigrator_Migrate_Hazards(t *testing.T) {
 		pool, conn := newConn(t)
 
 		r := testregistry.NewRegistry(t, map[string]string{
-			"20230601120000_hazardous.up.sql":   "---- disable-tx ----\n---- hazard: INDEX_BUILD // rebuilds index ----\nCREATE TABLE hazard_allowed (id INT);",
-			"20230601120000_hazardous.down.sql": "---- disable-tx ----\nDROP TABLE hazard_allowed;",
+			"20230601120000_hazardous.up.sql":   "---- hazard: INDEX_BUILD // rebuilds index ----\nCREATE TABLE hazard_allowed (id INT);",
+			"20230601120000_hazardous.down.sql": "DROP TABLE hazard_allowed;",
 		})
 		m := conduit.NewMigrator(conduit.WithRegistry(r), conduit.WithSkipSchemaDriftCheck())
 

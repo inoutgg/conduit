@@ -17,9 +17,10 @@ import (
 )
 
 const (
-	// DisableTxDirective is a SQL comment directive that, when present in a
-	// migration file, causes the migration to run outside a transaction.
-	DisableTxDirective = "---- disable-tx ----"
+	// EnableTxDirective is a SQL comment directive that, when present in a
+	// migration file, causes the migration to run inside a transaction.
+	// By default, migrations run outside a transaction.
+	EnableTxDirective = "---- enable-tx ----"
 
 	// HazardDirectivePrefix is the prefix for SQL comment directives that mark
 	// hazardous operations. The full format is:
@@ -115,9 +116,9 @@ func parseSQLMigrationsFromFS(fs afero.Fs, root string) ([]*Migration, error) {
 }
 
 func sqlMigrateFunc(stmts []sqlsplit.Stmt) *migrateFunc {
-	useTx := !slices.ContainsFunc(stmts, func(stmt sqlsplit.Stmt) bool {
+	useTx := slices.ContainsFunc(stmts, func(stmt sqlsplit.Stmt) bool {
 		return stmt.Type == sqlsplit.StmtTypeComment &&
-			strings.TrimSpace(stmt.Content) == DisableTxDirective
+			strings.TrimSpace(stmt.Content) == EnableTxDirective
 	})
 
 	var hazards []Hazard

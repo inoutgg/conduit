@@ -27,11 +27,9 @@ func TestMigration_Apply(t *testing.T) {
 
 		fs, _, dir := testutil.NewMigrationsDirBuilder(t).
 			WithFile("20230601120000_create_test_apply_up.up.sql",
-				`---- disable-tx ----
-CREATE TABLE test_apply_up (id INT);`).
+				"CREATE TABLE test_apply_up (id INT);").
 			WithFile("20230601120000_create_test_apply_up.down.sql",
-				`---- disable-tx ----
-DROP TABLE test_apply_up;`).
+				"DROP TABLE test_apply_up;").
 			Build()
 
 		migrations, err := parseSQLMigrationsFromFS(fs, dir)
@@ -67,8 +65,7 @@ DROP TABLE test_apply_up;`).
 		t.Cleanup(conn.Release)
 
 		fs, _, dir := testutil.NewMigrationsDirBuilder(t).
-			WithFile("20230601120000_bad.up.sql", `---- disable-tx ----
-INVALID SQL STATEMENT;`).
+			WithFile("20230601120000_bad.up.sql", "INVALID SQL STATEMENT;").
 			Build()
 
 		migrations, err := parseSQLMigrationsFromFS(fs, dir)
@@ -100,9 +97,9 @@ func TestMigration_ApplyTx(t *testing.T) {
 
 		fs, _, dir := testutil.NewMigrationsDirBuilder(t).
 			WithFile("20230601120000_create_test_apply_tx.up.sql",
-				"CREATE TABLE test_apply_tx (id INT);").
+				"---- enable-tx ----\nCREATE TABLE test_apply_tx (id INT);").
 			WithFile("20230601120000_create_test_apply_tx.down.sql",
-				"DROP TABLE test_apply_tx;").
+				"---- enable-tx ----\nDROP TABLE test_apply_tx;").
 			Build()
 
 		migrations, err := parseSQLMigrationsFromFS(fs, dir)
@@ -136,7 +133,7 @@ func TestMigration_ApplyTx(t *testing.T) {
 		t.Cleanup(conn.Release)
 
 		fs, _, dir := testutil.NewMigrationsDirBuilder(t).
-			WithFile("20230601120000_bad_tx.up.sql", "INVALID SQL;").
+			WithFile("20230601120000_bad_tx.up.sql", "---- enable-tx ----\nINVALID SQL;").
 			Build()
 
 		migrations, err := parseSQLMigrationsFromFS(fs, dir)

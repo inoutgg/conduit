@@ -16,13 +16,13 @@ failed to execute migration script: ERROR: syntax error at or near "INVALID" (SQ
 [TestMigration_Apply/should_return_error,_when_SQL_is_invalid - 1]
 failed to execute migration script: ERROR: syntax error at or near "INVALID" (SQLSTATE 42601)
 
-2 | INVALID SQL STATEMENT;
+1 | INVALID SQL STATEMENT;
 
 ---
 
 [TestMigration_ApplyTx/should_return_error,_when_SQL_in_transaction_is_invalid - 1]
 failed to execute migration script: ERROR: syntax error at or near "INVALID" (SQLSTATE 42601)
 
-1 | INVALID SQL;
+2 | INVALID SQL;
 
 ---

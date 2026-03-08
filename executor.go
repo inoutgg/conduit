@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/stdlib"
@@ -14,6 +13,7 @@ import (
 
 	"go.inout.gg/conduit/conduitregistry"
 	"go.inout.gg/conduit/internal/dbsqlc"
+	"go.inout.gg/conduit/pkg/stopwatch"
 )
 
 // MigrationExecutor executes a single migration.
@@ -27,8 +27,8 @@ type MigrationExecutor interface {
 }
 
 // NewLiveExecutor returns an executor that applies migrations to the database.
-func NewLiveExecutor(logger *slog.Logger) MigrationExecutor {
-	return &liveExecutor{logger: logger}
+func NewLiveExecutor(logger *slog.Logger, sw stopwatch.Stopwatch) MigrationExecutor {
+	return &liveExecutor{logger: logger, sw: sw}
 }
 
 // NewDryRunExecutor returns an executor that logs migrations to w without
@@ -41,6 +41,7 @@ func NewDryRunExecutor(w io.Writer, verbose bool) MigrationExecutor {
 // liveExecutor applies migrations to the database.
 type liveExecutor struct {
 	logger *slog.Logger
+	sw     stopwatch.Stopwatch
 }
 
 func (e *liveExecutor) Execute(
@@ -63,7 +64,7 @@ func (e *liveExecutor) Execute(
 		slog.Bool("transacting", inTx),
 	)
 
-	start := time.Now()
+	stop := e.sw.Start()
 
 	var err error
 	if inTx {
@@ -80,7 +81,7 @@ func (e *liveExecutor) Execute(
 		)
 	}
 
-	duration := time.Since(start)
+	duration := stop()
 	result := MigrationResult{
 		DurationTotal: duration,
 		Version:       migration.Version(),

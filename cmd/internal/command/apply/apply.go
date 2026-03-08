@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"time"
 
 	"github.com/spf13/afero"
@@ -16,6 +17,7 @@ import (
 	"go.inout.gg/conduit/conduitregistry"
 	"go.inout.gg/conduit/internal/cmdutil"
 	"go.inout.gg/conduit/internal/direction"
+	"go.inout.gg/conduit/pkg/stopwatch"
 )
 
 const (
@@ -25,7 +27,13 @@ const (
 	dryRunFlag          = "dry-run"
 )
 
-func NewCommand(fs afero.Fs, stdout io.Writer, stderr io.Writer, src altsrc.Sourcer) *cli.Command {
+func NewCommand(
+	fs afero.Fs,
+	stdout io.Writer,
+	stderr io.Writer,
+	timer stopwatch.Stopwatch,
+	src altsrc.Sourcer,
+) *cli.Command {
 	//nolint:exhaustruct
 	return &cli.Command{
 		Name:  "apply",
@@ -90,9 +98,9 @@ func NewCommand(fs afero.Fs, stdout io.Writer, stderr io.Writer, src altsrc.Sour
 			migrationsDir := cmd.String(cmdutil.MigrationsDir)
 			isDryRun := cmd.Bool(dryRunFlag)
 
-			opts := []conduit.Option{conduit.WithRegistry(
-				conduitregistry.FromFS(fs, migrationsDir),
-			)}
+			opts := []conduit.Option{
+				conduit.WithRegistry(conduitregistry.FromFS(fs, migrationsDir)),
+			}
 			if cmd.Bool(skipSchemaDriftFlag) {
 				opts = append(opts, conduit.WithSkipSchemaDriftCheck())
 			}
@@ -100,6 +108,10 @@ func NewCommand(fs afero.Fs, stdout io.Writer, stderr io.Writer, src altsrc.Sour
 			if isDryRun {
 				opts = append(opts, conduit.WithExecutor(
 					conduit.NewDryRunExecutor(stdout, cmd.Bool(cmdutil.Verbose)),
+				))
+			} else {
+				opts = append(opts, conduit.WithExecutor(
+					conduit.NewLiveExecutor(slog.Default(), timer),
 				))
 			}
 
