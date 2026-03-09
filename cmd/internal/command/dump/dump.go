@@ -19,7 +19,14 @@ func NewCommand(w io.Writer, bi conduitbuildinfo.BuildInfo, src altsrc.Sourcer) 
 		Name:  "dump",
 		Usage: "dump schema DDL from a remote Postgres database",
 		Flags: []cli.Flag{
-			cmdutil.DatabaseURLFlag(src),
+			//nolint:exhaustruct
+			&cli.StringFlag{
+				Name:  cmdutil.DatabaseURL,
+				Usage: "database connection URL",
+				Sources: cli.NewValueSourceChain(
+					cli.EnvVar("CONDUIT_DATABASE_URL"),
+				),
+			},
 			cmdutil.ExcludeSchemasFlag(src),
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
