@@ -39,6 +39,7 @@ func NewCommand(
 		Name:  "apply",
 		Usage: "apply migrations in the given direction",
 		Flags: []cli.Flag{
+			//nolint:exhaustruct
 			cmdutil.DatabaseURLFlag(src),
 			cmdutil.MigrationsDirFlag(src),
 
@@ -90,11 +91,6 @@ func NewCommand(
 				return fmt.Errorf("failed to parse direction: %w", err)
 			}
 
-			dbURL := cmd.String(cmdutil.DatabaseURL)
-			if dbURL == "" {
-				return fmt.Errorf("missing required flag: --%s", cmdutil.DatabaseURL)
-			}
-
 			migrationsDir := cmd.String(cmdutil.MigrationsDir)
 			isDryRun := cmd.Bool(dryRunFlag)
 
@@ -118,7 +114,7 @@ func NewCommand(
 			migrator := conduit.NewMigrator(opts...)
 
 			args := conduitcli.ApplyArgs{
-				DatabaseURL:  dbURL,
+				DatabaseURL:  cmd.String(cmdutil.DatabaseURL),
 				Direction:    dir,
 				Steps:        cmd.Int(stepsFlag),
 				AllowHazards: cmd.StringSlice(allowHazardsFlag),

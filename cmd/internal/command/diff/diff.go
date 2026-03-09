@@ -36,8 +36,9 @@ func NewCommand(
 		Flags: []cli.Flag{
 			//nolint:exhaustruct
 			&cli.StringFlag{
-				Name:  schemaFlag,
-				Usage: "path to the target schema SQL file",
+				Name:     schemaFlag,
+				Usage:    "path to the target schema SQL file",
+				Required: true,
 				Sources: cli.NewValueSourceChain(
 					cli.EnvVar("CONDUIT_SCHEMA"),
 					yamlsrc.YAML("migrations.schema", src),
@@ -53,17 +54,12 @@ func NewCommand(
 				return errors.New("missing required argument: <name>")
 			}
 
-			schema := cmd.String(schemaFlag)
-			if schema == "" {
-				return fmt.Errorf("missing required flag: --%s", schemaFlag)
-			}
-
 			store := hashsum.NewFSStore(fs, "conduit.sum")
 			args := conduitcli.DiffArgs{
 				RootDir:        ".",
 				MigrationsDir:  filepath.Clean(cmd.String(cmdutil.MigrationsDir)),
 				Name:           name,
-				SchemaPath:     schema,
+				SchemaPath:     cmd.String(schemaFlag),
 				DatabaseURL:    cmd.String(cmdutil.DatabaseURL),
 				ExcludeSchemas: cmd.StringSlice(cmdutil.ExcludeSchemas),
 			}

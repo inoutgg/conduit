@@ -122,7 +122,7 @@ func TestDiff(t *testing.T) {
 
 		_, err := exec(t, fs, "conduit diff --database-url "+testutil.ConnString(pool)+" add_posts")
 
-		require.ErrorContains(t, err, "missing required flag: --schema")
+		require.ErrorContains(t, err, "Required flag \"schema\" not set")
 	})
 
 	t.Run("should report no changes, when schema is already in sync", func(t *testing.T) {
@@ -203,7 +203,7 @@ func TestApply(t *testing.T) {
 
 		_, err := exec(t, fs, "conduit apply up")
 
-		require.ErrorContains(t, err, "missing required flag: --database-url")
+		require.ErrorContains(t, err, "Required flag \"database-url\" not set")
 	})
 
 	t.Run("should return error, when direction is missing", func(t *testing.T) {
@@ -268,7 +268,7 @@ CREATE TABLE posts (
 
 		_, err := exec(t, fs, "conduit dump")
 
-		require.ErrorContains(t, err, "missing required flag: --database-url")
+		require.ErrorContains(t, err, "Required flag \"database-url\" not set")
 	})
 }
 

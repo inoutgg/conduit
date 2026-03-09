@@ -29,8 +29,9 @@ func MigrationsDirFlag(src altsrc.Sourcer) *cli.StringFlag {
 func DatabaseURLFlag(src altsrc.Sourcer) *cli.StringFlag {
 	//nolint:exhaustruct
 	return &cli.StringFlag{
-		Name:  DatabaseURL,
-		Usage: "database connection URL",
+		Name:     DatabaseURL,
+		Usage:    "database connection URL",
+		Required: true,
 		Sources: cli.NewValueSourceChain(
 			cli.EnvVar("CONDUIT_DATABASE_URL"),
 			yamlsrc.YAML("database.url", src),
