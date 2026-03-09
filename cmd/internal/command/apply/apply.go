@@ -79,7 +79,6 @@ func NewCommand(
 				Usage: "preview migrations without applying them",
 				Sources: cli.NewValueSourceChain(
 					cli.EnvVar("CONDUIT_DRY_RUN"),
-					yamlsrc.YAML("apply.dry-run", src),
 				),
 			},
 
