@@ -14,6 +14,7 @@ import (
 	"go.inout.gg/conduit/cmd/internal/command/dump"
 	"go.inout.gg/conduit/cmd/internal/command/initialise"
 	"go.inout.gg/conduit/cmd/internal/command/new"
+	"go.inout.gg/conduit/cmd/internal/command/rehash"
 	"go.inout.gg/conduit/internal/cmdutil"
 	"go.inout.gg/conduit/pkg/conduitbuildinfo"
 	"go.inout.gg/conduit/pkg/stopwatch"
@@ -56,6 +57,7 @@ func Execute(
 			diff.NewCommand(fs, stdout, stderr, timeGen, bi, configSrc),
 			apply.NewCommand(fs, stdout, stderr, timer, configSrc),
 			dump.NewCommand(stdout, bi, configSrc),
+			rehash.NewCommand(fs, stdout, stderr, configSrc),
 		},
 	}
 

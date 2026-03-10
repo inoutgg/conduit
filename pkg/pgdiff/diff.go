@@ -5,8 +5,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"path/filepath"
-	"slices"
 	"strings"
 
 	"github.com/jackc/pgx/v5"
@@ -16,9 +14,9 @@ import (
 	"github.com/stripe/pg-schema-diff/pkg/schema"
 	"github.com/stripe/pg-schema-diff/pkg/tempdb"
 
+	"go.inout.gg/conduit/internal/migrationfile"
 	"go.inout.gg/conduit/internal/migrations"
 	"go.inout.gg/conduit/internal/sliceutil"
-	"go.inout.gg/conduit/pkg/conduitversion"
 	"go.inout.gg/conduit/pkg/sqlsplit"
 )
 
@@ -41,7 +39,7 @@ func GeneratePlan(
 ) (Plan, error) {
 	var result Plan
 
-	sourceStmts, err := readStmtsFromMigrationsDir(fs, migrationsDir)
+	sourceStmts, err := migrationfile.ReadStmtsFromDir(fs, migrationsDir)
 	if err != nil {
 		return result, fmt.Errorf("failed to read migrations: %w", err)
 	}
@@ -241,52 +239,6 @@ func newTempDbFactory(ctx context.Context, connConfig *pgx.ConnConfig) (tempdb.F
 	}
 
 	return factory, nil
-}
-
-func readStmtsFromMigrationsDir(fs afero.Fs, dir string) ([]sqlsplit.Stmt, error) {
-	entries, err := afero.ReadDir(fs, dir)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read directory: %w", err)
-	}
-
-	migrations := make([]conduitversion.ParsedMigrationFilename, 0, len(entries))
-	for _, entry := range entries {
-		name := entry.Name()
-		if entry.IsDir() || !strings.HasSuffix(name, ".sql") {
-			continue
-		}
-
-		m, err := conduitversion.ParseMigrationFilename(name)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse migration filename %s: %w", name, err)
-		}
-
-		if m.Direction != conduitversion.MigrationDirectionUp {
-			continue
-		}
-
-		migrations = append(migrations, m)
-	}
-
-	slices.SortFunc(migrations, func(a, b conduitversion.ParsedMigrationFilename) int {
-		return a.Compare(b)
-	})
-
-	var allStmts []sqlsplit.Stmt
-
-	for _, m := range migrations {
-		filename := m.Filename()
-		path := filepath.Join(dir, filename)
-
-		stmts, err := readStmtsFromFile(fs, path)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read migration file %s: %w", path, err)
-		}
-
-		allStmts = append(allStmts, stmts...)
-	}
-
-	return allStmts, nil
 }
 
 func readStmtsFromFile(fs afero.Fs, path string) ([]sqlsplit.Stmt, error) {

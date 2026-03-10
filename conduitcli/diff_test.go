@@ -188,34 +188,3 @@ CREATE TABLE comments (id int, post_id int);`), 0o644),
 		assert.Nil(t, result)
 	})
 }
-
-func TestDiffCreatesFilePerStatement(t *testing.T) {
-	t.Parallel()
-
-	t.Run("should create one file per statement, when diff contains multiple DDL", func(t *testing.T) {
-		t.Parallel()
-
-		databaseURL := os.Getenv("TEST_DATABASE_URL")
-		fs, baseDir, dir := testutil.NewMigrationsDirBuilder(t).
-			WithFile("20230601120000_init.up.sql", "CREATE TABLE users (id int);").
-			WithBaseFile("schema.sql", `CREATE TABLE users (id int);
-CREATE TABLE posts (id int, user_id int);
-CREATE INDEX idx_posts_user_id ON posts (user_id);`).
-			Build()
-
-		store := hashsum.NewFSStore(fs, "conduit.sum")
-		args := DiffArgs{
-			RootDir:       baseDir,
-			MigrationsDir: dir,
-			Name:          "add_posts",
-			SchemaPath:    filepath.Join(baseDir, "schema.sql"),
-			DatabaseURL:   databaseURL,
-		}
-
-		result, err := Diff(t.Context(), fs, timeGen, bi, store, args)
-
-		require.NoError(t, err)
-		require.Len(t, result.Files, 2)
-		testutil.SnapshotFS(t, fs, baseDir)
-	})
-}

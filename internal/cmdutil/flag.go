@@ -43,7 +43,7 @@ func ExcludeSchemasFlag(src altsrc.Sourcer) *cli.StringSliceFlag {
 	//nolint:exhaustruct
 	return &cli.StringSliceFlag{
 		Name:  ExcludeSchemas,
-		Usage: "PostgreSQL schemas to exclude; may be repeated",
+		Usage: "PostgreSQL schemas to exclude",
 		Sources: cli.NewValueSourceChain(
 			cli.EnvVar("CONDUIT_EXCLUDE_SCHEMAS"),
 			yamlsrc.YAML("exclude-schemas", src),
