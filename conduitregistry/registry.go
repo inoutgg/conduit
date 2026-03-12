@@ -3,6 +3,7 @@ package conduitregistry
 import (
 	"context"
 	"errors"
+	"io/fs"
 	"maps"
 
 	"github.com/jackc/pgx/v5"
@@ -33,8 +34,14 @@ func New() *Registry {
 	}
 }
 
-// FromFS parses all .up.sql and .down.sql files under root and returns a
-// populated [Registry]. It panics if parsing fails.
+// FromIOFS parses all .up.sql and .down.sql files under root in the given fs (io/fs)
+// and returns a populated [Registry]. It panics if parsing fails.
+func FromIOFS(fs fs.FS, root string) *Registry {
+	return FromFS(afero.FromIOFS{FS: fs}, root)
+}
+
+// FromFS parses all .up.sql and .down.sql files under root in the given fs (afero.Fs)
+// and returns a populated [Registry]. It panics if parsing fails.
 func FromFS(fs afero.Fs, root string) *Registry {
 	r := New()
 
