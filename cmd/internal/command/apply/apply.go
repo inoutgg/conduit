@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"iter"
 	"log/slog"
 	"time"
 
@@ -119,71 +120,74 @@ func NewCommand(
 				AllowHazards: cmd.StringSlice(allowHazardsFlag),
 			}
 
-			result, err := conduitcli.Apply(ctx, migrator, args)
+			seq, err := conduitcli.Apply(ctx, migrator, args)
 			if err != nil {
 				//nolint:wrapcheck
 				return err
 			}
 
-			displayResult(stderr, result, isDryRun)
-
-			return nil
+			return displayResults(stderr, seq, dir, isDryRun)
 		},
 	}
 }
 
-func displayResult(w io.Writer, result *conduit.MigrateResult, isDryRun bool) {
-	migrations := result.MigrationResults
-	n := len(migrations)
+func displayResults(
+	w io.Writer,
+	seq iter.Seq2[*conduit.MigrationResult, error],
+	dir direction.Direction,
+	isDryRun bool,
+) error {
+	var (
+		n     int
+		total time.Duration
+	)
+
+	for m, err := range seq {
+		if err != nil {
+			return err
+		}
+
+		n++
+		total += m.DurationTotal
+
+		switch {
+		case isDryRun:
+			fmt.Fprintf(w, "Pending %s_%s\n", m.Version.String(), m.Name)
+		case dir == direction.DirectionDown:
+			fmt.Fprintf(
+				w, "Rolled back %s_%s (%s)\n",
+				m.Version.String(), m.Name, formatDuration(m.DurationTotal),
+			)
+		default:
+			fmt.Fprintf(
+				w, "Applied %s_%s (%s)\n",
+				m.Version.String(), m.Name, formatDuration(m.DurationTotal),
+			)
+		}
+	}
 
 	if n == 0 {
-		if result.Direction == direction.DirectionUp {
+		if dir == direction.DirectionUp {
 			fmt.Fprintln(w, "No pending migrations.")
 		} else {
 			fmt.Fprintln(w, "No migrations to roll back.")
 		}
 
-		return
-	}
-
-	if isDryRun {
-		for _, m := range migrations {
-			fmt.Fprintf(w, "Pending %s_%s\n", m.Version.String(), m.Name)
-		}
-
-		fmt.Fprintln(w)
-		fmt.Fprintf(w, "%d pending migrations (dry run)\n", n)
-
-		return
-	}
-
-	var total time.Duration
-
-	if result.Direction == direction.DirectionDown {
-		for _, m := range migrations {
-			total += m.DurationTotal
-			fmt.Fprintf(
-				w, "Rolled back %s_%s (%s)\n",
-				m.Version.String(), m.Name, formatDuration(m.DurationTotal),
-			)
-		}
-
-		fmt.Fprintln(w)
-		fmt.Fprintf(w, "Rolled back %d migrations in %s\n", n, formatDuration(total))
-
-		return
-	}
-
-	for _, m := range migrations {
-		total += m.DurationTotal
-		fmt.Fprintf(
-			w, "Applied %s_%s (%s)\n",
-			m.Version.String(), m.Name, formatDuration(m.DurationTotal),
-		)
+		return nil
 	}
 
 	fmt.Fprintln(w)
-	fmt.Fprintf(w, "Applied %d migrations in %s\n", n, formatDuration(total))
+
+	switch {
+	case isDryRun:
+		fmt.Fprintf(w, "%d pending migrations (dry run)\n", n)
+	case dir == direction.DirectionDown:
+		fmt.Fprintf(w, "Rolled back %d migrations in %s\n", n, formatDuration(total))
+	default:
+		fmt.Fprintf(w, "Applied %d migrations in %s\n", n, formatDuration(total))
+	}
+
+	return nil
 }
 
 func formatDuration(d time.Duration) string {

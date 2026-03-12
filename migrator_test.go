@@ -54,7 +54,7 @@ func TestMigrator_MigrateUp(t *testing.T) {
 		m := conduit.NewMigrator(conduit.WithRegistry(r), conduit.WithSkipSchemaDriftCheck())
 
 		// Act
-		result, err := m.Migrate(
+		seq, err := m.Migrate(
 			t.Context(),
 			conduit.DirectionUp,
 			conn,
@@ -63,8 +63,8 @@ func TestMigrator_MigrateUp(t *testing.T) {
 
 		// Assert
 		require.NoError(t, err)
-		assert.Len(t, result.MigrationResults, 2)
-		assert.Equal(t, conduit.DirectionUp, result.Direction)
+		results := testutil.CollectSeq2(t, seq)
+		assert.Len(t, results, 2)
 		assert.True(t, testutil.TableExists(t, pool, "users"))
 		assert.True(t, testutil.TableExists(t, pool, "posts"))
 		assert.Equal(t, []dbsqlc.TestAllMigrationsRow{
@@ -86,15 +86,17 @@ func TestMigrator_MigrateUp(t *testing.T) {
 		m := conduit.NewMigrator(conduit.WithRegistry(r), conduit.WithSkipSchemaDriftCheck())
 
 		// Act
-		_, err := m.Migrate(t.Context(), conduit.DirectionUp, conn, nil)
+		seq, err := m.Migrate(t.Context(), conduit.DirectionUp, conn, nil)
 		require.NoError(t, err)
+		testutil.CollectSeq2(t, seq)
 
 		// Run migration again
-		result, err := m.Migrate(t.Context(), conduit.DirectionUp, conn, nil)
+		seq, err = m.Migrate(t.Context(), conduit.DirectionUp, conn, nil)
 
 		// Assert
 		require.NoError(t, err)
-		assert.Empty(t, result.MigrationResults)
+		results := testutil.CollectSeq2(t, seq)
+		assert.Empty(t, results)
 	})
 
 	t.Run("should apply only one migration, when step count is 1", func(t *testing.T) {
@@ -111,12 +113,13 @@ func TestMigrator_MigrateUp(t *testing.T) {
 		m := conduit.NewMigrator(conduit.WithRegistry(r))
 
 		// Act
-		result, err := m.Migrate(t.Context(), conduit.DirectionUp, conn, &conduit.MigrateOptions{Steps: 1})
+		seq, err := m.Migrate(t.Context(), conduit.DirectionUp, conn, &conduit.MigrateOptions{Steps: 1})
 
 		// Assert
 		require.NoError(t, err)
-		assert.Len(t, result.MigrationResults, 1)
-		assert.Equal(t, "create_a", result.MigrationResults[0].Name)
+		results := testutil.CollectSeq2(t, seq)
+		assert.Len(t, results, 1)
+		assert.Equal(t, "create_a", results[0].Name)
 		assert.Equal(t, []dbsqlc.TestAllMigrationsRow{
 			{Version: "20230601120000", Name: "create_a"},
 		}, appliedMigrations(t, pool))
@@ -135,11 +138,12 @@ func TestMigrator_MigrateUp(t *testing.T) {
 		m := conduit.NewMigrator(conduit.WithRegistry(r), conduit.WithSkipSchemaDriftCheck())
 
 		// Act
-		result, err := m.Migrate(t.Context(), conduit.DirectionUp, conn, nil)
+		seq, err := m.Migrate(t.Context(), conduit.DirectionUp, conn, nil)
 
 		// Assert
 		require.NoError(t, err)
-		assert.Len(t, result.MigrationResults, 1)
+		results := testutil.CollectSeq2(t, seq)
+		assert.Len(t, results, 1)
 		assert.True(t, testutil.TableExists(t, pool, "nontx_test"))
 		assert.Equal(t, []dbsqlc.TestAllMigrationsRow{
 			{Version: "20230601120000", Name: "create_nontx"},
@@ -164,16 +168,18 @@ func TestMigrator_MigrateDown(t *testing.T) {
 		})
 		m := conduit.NewMigrator(conduit.WithRegistry(r), conduit.WithSkipSchemaDriftCheck())
 
-		_, err := m.Migrate(t.Context(), conduit.DirectionUp, conn, nil)
+		seq, err := m.Migrate(t.Context(), conduit.DirectionUp, conn, nil)
 		require.NoError(t, err)
+		testutil.CollectSeq2(t, seq)
 
 		// Act
-		result, err := m.Migrate(t.Context(), conduit.DirectionDown, conn, nil)
+		seq, err = m.Migrate(t.Context(), conduit.DirectionDown, conn, nil)
 
 		// Assert
 		require.NoError(t, err)
-		assert.Len(t, result.MigrationResults, 1)
-		assert.Equal(t, "create_posts", result.MigrationResults[0].Name)
+		results := testutil.CollectSeq2(t, seq)
+		assert.Len(t, results, 1)
+		assert.Equal(t, "create_posts", results[0].Name)
 		assert.False(t, testutil.TableExists(t, pool, "posts"))
 		assert.True(t, testutil.TableExists(t, pool, "users"))
 		assert.Equal(t, []dbsqlc.TestAllMigrationsRow{
@@ -195,17 +201,19 @@ func TestMigrator_MigrateDown(t *testing.T) {
 		})
 		m := conduit.NewMigrator(conduit.WithRegistry(r), conduit.WithSkipSchemaDriftCheck())
 
-		_, err := m.Migrate(t.Context(), conduit.DirectionUp, conn, nil)
+		seq, err := m.Migrate(t.Context(), conduit.DirectionUp, conn, nil)
 		require.NoError(t, err)
+		testutil.CollectSeq2(t, seq)
 
 		// Act
-		result, err := m.Migrate(t.Context(), conduit.DirectionDown, conn, &conduit.MigrateOptions{
+		seq, err = m.Migrate(t.Context(), conduit.DirectionDown, conn, &conduit.MigrateOptions{
 			Steps: conduit.AllSteps,
 		})
 
 		// Assert
 		require.NoError(t, err)
-		assert.Len(t, result.MigrationResults, 2)
+		results := testutil.CollectSeq2(t, seq)
+		assert.Len(t, results, 2)
 		assert.False(t, testutil.TableExists(t, pool, "users"))
 		assert.False(t, testutil.TableExists(t, pool, "posts"))
 		assert.Empty(t, appliedMigrations(t, pool))
@@ -223,15 +231,17 @@ func TestMigrator_MigrateDown(t *testing.T) {
 		})
 		m := conduit.NewMigrator(conduit.WithRegistry(r), conduit.WithSkipSchemaDriftCheck())
 
-		_, err := m.Migrate(t.Context(), conduit.DirectionUp, conn, nil)
+		seq, err := m.Migrate(t.Context(), conduit.DirectionUp, conn, nil)
 		require.NoError(t, err)
+		testutil.CollectSeq2(t, seq)
 
 		// Act
-		result, err := m.Migrate(t.Context(), conduit.DirectionDown, conn, nil)
+		seq, err = m.Migrate(t.Context(), conduit.DirectionDown, conn, nil)
 
 		// Assert
 		require.NoError(t, err)
-		assert.Len(t, result.MigrationResults, 1)
+		results := testutil.CollectSeq2(t, seq)
+		assert.Len(t, results, 1)
 		assert.False(t, testutil.TableExists(t, pool, "nontx_test"))
 		assert.Empty(t, appliedMigrations(t, pool))
 	})
@@ -253,10 +263,12 @@ func TestMigrator_Migrate_Hazards(t *testing.T) {
 		m := conduit.NewMigrator(conduit.WithRegistry(r), conduit.WithSkipSchemaDriftCheck())
 
 		// Act
-		_, err := m.Migrate(t.Context(), conduit.DirectionUp, conn, nil)
+		seq, err := m.Migrate(t.Context(), conduit.DirectionUp, conn, nil)
 
 		// Assert
-		require.ErrorIs(t, err, conduit.ErrHazardDetected)
+		require.NoError(t, err)
+		iterErr := testutil.CollectSeq2Error(t, seq)
+		require.ErrorIs(t, iterErr, conduit.ErrHazardDetected)
 		assert.False(t, testutil.TableExists(t, pool, "hazard_test"))
 	})
 
@@ -273,7 +285,7 @@ func TestMigrator_Migrate_Hazards(t *testing.T) {
 		m := conduit.NewMigrator(conduit.WithRegistry(r), conduit.WithSkipSchemaDriftCheck())
 
 		// Act
-		result, err := m.Migrate(
+		seq, err := m.Migrate(
 			t.Context(),
 			conduit.DirectionUp,
 			conn,
@@ -284,7 +296,8 @@ func TestMigrator_Migrate_Hazards(t *testing.T) {
 
 		// Assert
 		require.NoError(t, err)
-		assert.Len(t, result.MigrationResults, 1)
+		results := testutil.CollectSeq2(t, seq)
+		assert.Len(t, results, 1)
 		assert.True(t, testutil.TableExists(t, pool, "hazard_allowed"))
 	})
 }
@@ -306,35 +319,31 @@ func TestMigrator_Migrate_Result(t *testing.T) {
 	m := conduit.NewMigrator(conduit.WithRegistry(r), conduit.WithSkipSchemaDriftCheck())
 
 	// Act — up
-	upResult, err := m.Migrate(t.Context(), conduit.DirectionUp, conn, nil)
+	seq, err := m.Migrate(t.Context(), conduit.DirectionUp, conn, nil)
 	require.NoError(t, err)
-
-	// Assert — direction
-	assert.Equal(t, conduit.DirectionUp, upResult.Direction)
+	upResults := testutil.CollectSeq2(t, seq)
 
 	// Assert — ascending order
-	require.Len(t, upResult.MigrationResults, 3)
-	assert.Equal(t, "create_a", upResult.MigrationResults[0].Name)
-	assert.Equal(t, "create_b", upResult.MigrationResults[1].Name)
-	assert.Equal(t, "create_c", upResult.MigrationResults[2].Name)
+	require.Len(t, upResults, 3)
+	assert.Equal(t, "create_a", upResults[0].Name)
+	assert.Equal(t, "create_b", upResults[1].Name)
+	assert.Equal(t, "create_c", upResults[2].Name)
 
 	// Assert — positive duration
-	for _, mr := range upResult.MigrationResults {
+	for _, mr := range upResults {
 		assert.Greater(t, mr.DurationTotal, time.Duration(0))
 	}
 
 	// Act — down all
-	downResult, err := m.Migrate(t.Context(), conduit.DirectionDown, conn, &conduit.MigrateOptions{
+	seq, err = m.Migrate(t.Context(), conduit.DirectionDown, conn, &conduit.MigrateOptions{
 		Steps: conduit.AllSteps,
 	})
 	require.NoError(t, err)
-
-	// Assert — direction
-	assert.Equal(t, conduit.DirectionDown, downResult.Direction)
+	downResults := testutil.CollectSeq2(t, seq)
 
 	// Assert — descending order
-	require.Len(t, downResult.MigrationResults, 3)
-	assert.Equal(t, "create_c", downResult.MigrationResults[0].Name)
-	assert.Equal(t, "create_b", downResult.MigrationResults[1].Name)
-	assert.Equal(t, "create_a", downResult.MigrationResults[2].Name)
+	require.Len(t, downResults, 3)
+	assert.Equal(t, "create_c", downResults[0].Name)
+	assert.Equal(t, "create_b", downResults[1].Name)
+	assert.Equal(t, "create_a", downResults[2].Name)
 }

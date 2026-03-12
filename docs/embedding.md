@@ -39,8 +39,15 @@ func main() {
 	}
 	defer conn.Close(ctx)
 
-	if _, err = migrator.Migrate(ctx, conduit.DirectionUp, conn, nil); err != nil {
+	seq, err := migrator.Migrate(ctx, conduit.DirectionUp, conn, nil)
+	if err != nil {
 		log.Fatal(err)
+	}
+
+	for _, err := range seq {
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
 }
 ```
@@ -87,7 +94,7 @@ migrator := conduit.NewMigrator(conduit.WithRegistry(registry))
 | `AllowHazards` | `nil`        | `nil`          | Hazard types to permit; use `HazardType*` constants. Migrations with unlisted hazard types are blocked. |
 
 ```go
-result, err := migrator.Migrate(ctx, conduit.DirectionUp, conn, &conduit.MigrateOptions{
+seq, err := migrator.Migrate(ctx, conduit.DirectionUp, conn, &conduit.MigrateOptions{
 	Steps: 5,
 	AllowHazards: []conduit.HazardType{
 		conduit.HazardTypeIndexBuild,
@@ -105,16 +112,22 @@ Conduit re-exports them as `HazardType*` constants for convenience.
 
 ## Reading migration results
 
-`Migrate` returns a `*MigrateResult` with the list of applied migrations and
-their durations:
+`Migrate` returns an iterator that yields individual `MigrationResult` values as
+each migration completes. Setup errors (lock acquisition, schema drift, etc.)
+are returned synchronously as the second return value. Per-migration errors are
+yielded inline by the iterator.
 
 ```go
-result, err := migrator.Migrate(ctx, conduit.DirectionUp, conn, nil)
+seq, err := migrator.Migrate(ctx, conduit.DirectionUp, conn, nil)
 if err != nil {
 	log.Fatal(err)
 }
 
-for _, m := range result.MigrationResults {
+for m, err := range seq {
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	fmt.Printf("applied %s_%s in %s\n", m.Version, m.Name, m.DurationTotal)
 }
 ```

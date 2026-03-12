@@ -4,6 +4,7 @@ package conduitcli
 import (
 	"context"
 	"fmt"
+	"iter"
 
 	"github.com/jackc/pgx/v5"
 
@@ -20,18 +21,19 @@ type ApplyArgs struct {
 }
 
 // Apply connects to the database and applies migrations in the configured
-// direction.
+// direction. The returned iterator yields individual migration results as
+// each migration completes.
 func Apply(
 	ctx context.Context,
 	migrator *conduit.Migrator,
 	args ApplyArgs,
-) (*conduit.MigrateResult, error) {
+) (iter.Seq2[*conduit.MigrationResult, error], error) {
 	conn, err := pgx.Connect(ctx, args.DatabaseURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to database: %w", err)
 	}
 
-	result, err := migrator.Migrate(ctx, args.Direction, conn, &conduit.MigrateOptions{
+	seq, err := migrator.Migrate(ctx, args.Direction, conn, &conduit.MigrateOptions{
 		Steps:        args.Steps,
 		AllowHazards: args.AllowHazards,
 	})
@@ -39,5 +41,5 @@ func Apply(
 		return nil, fmt.Errorf("failed to apply migrations: %w", err)
 	}
 
-	return result, nil
+	return seq, nil
 }

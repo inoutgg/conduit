@@ -26,14 +26,20 @@ func main() {
 		log.Fatal(err)
 	}
 
-	result, err := migrator.Migrate(ctx, conduit.DirectionUp, conn, nil)
-	conn.Close(ctx)
-
+	seq, err := migrator.Migrate(ctx, conduit.DirectionUp, conn, nil)
 	if err != nil {
+		conn.Close(ctx)
 		log.Fatal(err)
 	}
 
-	for _, m := range result.MigrationResults {
+	for m, err := range seq {
+		if err != nil {
+			conn.Close(ctx)
+			log.Fatal(err)
+		}
+
 		log.Printf("applied %s_%s (%s)", m.Version, m.Name, m.DurationTotal) //#nosec G706
 	}
+
+	conn.Close(ctx)
 }

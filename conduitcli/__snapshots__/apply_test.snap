@@ -21,6 +21,6 @@ CREATE INDEX idx_orders_id ON orders (id);
 ---
 
 [TestApply/should_return_error,_when_hazard_is_detected - 1]
-failed to apply migrations: hazardous migration detected: migration 20230601120000_hazardous contains hazards:
+hazardous migration detected: migration 20230601120000_hazardous contains hazards:
   - INDEX_BUILD: rebuilds index
 ---

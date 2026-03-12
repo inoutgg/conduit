@@ -3,7 +3,7 @@ CREATE TABLE IF NOT EXISTS conduit_migrations (
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   version VARCHAR(255) NOT NULL,
   name VARCHAR(4095) NOT NULL,
-  hash VARCHAR(64) NOT NULL DEFAULT '',
+  hash VARCHAR(64) NOT NULL,
   PRIMARY KEY (id),
   UNIQUE (version, name)
 );

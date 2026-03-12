@@ -33,10 +33,11 @@ func TestApply(t *testing.T) {
 			Direction:   direction.DirectionUp,
 		}
 
-		result, err := Apply(t.Context(), m, args)
+		seq, err := Apply(t.Context(), m, args)
 
 		require.NoError(t, err)
-		assert.Len(t, result.MigrationResults, 1)
+		results := testutil.CollectSeq2(t, seq)
+		assert.Len(t, results, 1)
 		assert.True(t, testutil.TableExists(t, pool, "users"))
 	})
 
@@ -52,21 +53,23 @@ func TestApply(t *testing.T) {
 		m := conduit.NewMigrator(conduit.WithRegistry(r), conduit.WithSkipSchemaDriftCheck())
 
 		// First apply up.
-		_, err := Apply(t.Context(), m, ApplyArgs{
+		seq, err := Apply(t.Context(), m, ApplyArgs{
 			DatabaseURL: testutil.ConnString(pool),
 			Direction:   direction.DirectionUp,
 		})
 		require.NoError(t, err)
+		testutil.CollectSeq2(t, seq)
 		require.True(t, testutil.TableExists(t, pool, "users"))
 
 		// Then apply down.
-		result, err := Apply(t.Context(), m, ApplyArgs{
+		seq, err = Apply(t.Context(), m, ApplyArgs{
 			DatabaseURL: testutil.ConnString(pool),
 			Direction:   direction.DirectionDown,
 		})
 
 		require.NoError(t, err)
-		assert.Len(t, result.MigrationResults, 1)
+		results := testutil.CollectSeq2(t, seq)
+		assert.Len(t, results, 1)
 		assert.False(t, testutil.TableExists(t, pool, "users"))
 	})
 
@@ -104,11 +107,13 @@ func TestApply(t *testing.T) {
 			Direction:   direction.DirectionUp,
 		}
 
-		_, err := Apply(t.Context(), m, args)
+		seq, err := Apply(t.Context(), m, args)
+		require.NoError(t, err)
 
-		require.Error(t, err)
-		require.ErrorIs(t, err, conduit.ErrHazardDetected)
-		snaps.MatchSnapshot(t, err.Error())
+		iterErr := testutil.CollectSeq2Error(t, seq)
+		require.Error(t, iterErr)
+		require.ErrorIs(t, iterErr, conduit.ErrHazardDetected)
+		snaps.MatchSnapshot(t, iterErr.Error())
 	})
 
 	t.Run("should log all pending migrations without applying, when dry-run is enabled", func(t *testing.T) {
@@ -133,13 +138,14 @@ func TestApply(t *testing.T) {
 			conduit.WithSkipSchemaDriftCheck(),
 		)
 
-		result, err := Apply(t.Context(), m, ApplyArgs{
+		seq, err := Apply(t.Context(), m, ApplyArgs{
 			DatabaseURL: testutil.ConnString(pool),
 			Direction:   direction.DirectionUp,
 		})
 
 		require.NoError(t, err)
-		assert.Len(t, result.MigrationResults, 3)
+		results := testutil.CollectSeq2(t, seq)
+		assert.Len(t, results, 3)
 		assert.False(t, testutil.TableExists(t, pool, "users"))
 		assert.False(t, testutil.TableExists(t, pool, "orders"))
 		assert.False(t, testutil.TableExists(t, pool, "items"))
@@ -163,11 +169,12 @@ func TestApply(t *testing.T) {
 			// First apply all up for real.
 			m := conduit.NewMigrator(conduit.WithRegistry(r), conduit.WithSkipSchemaDriftCheck())
 
-			_, err := Apply(t.Context(), m, ApplyArgs{
+			seq, err := Apply(t.Context(), m, ApplyArgs{
 				DatabaseURL: testutil.ConnString(pool),
 				Direction:   direction.DirectionUp,
 			})
 			require.NoError(t, err)
+			testutil.CollectSeq2(t, seq)
 			require.True(t, testutil.TableExists(t, pool, "users"))
 			require.True(t, testutil.TableExists(t, pool, "orders"))
 
@@ -181,12 +188,13 @@ func TestApply(t *testing.T) {
 				conduit.WithSkipSchemaDriftCheck(),
 			)
 
-			_, err = Apply(t.Context(), dryRunMigrator, ApplyArgs{
+			seq, err = Apply(t.Context(), dryRunMigrator, ApplyArgs{
 				DatabaseURL: testutil.ConnString(pool),
 				Direction:   direction.DirectionDown,
 			})
 
 			require.NoError(t, err)
+			testutil.CollectSeq2(t, seq)
 			assert.True(t, testutil.TableExists(t, pool, "users"))
 			assert.True(t, testutil.TableExists(t, pool, "orders"))
 			snaps.MatchSnapshot(t, buf.String())
@@ -212,12 +220,13 @@ func TestApply(t *testing.T) {
 			conduit.WithSkipSchemaDriftCheck(),
 		)
 
-		_, err := Apply(t.Context(), m, ApplyArgs{
+		seq, err := Apply(t.Context(), m, ApplyArgs{
 			DatabaseURL: testutil.ConnString(pool),
 			Direction:   direction.DirectionUp,
 		})
 
 		require.NoError(t, err)
+		testutil.CollectSeq2(t, seq)
 		assert.False(t, testutil.TableExists(t, pool, "users"))
 		assert.False(t, testutil.TableExists(t, pool, "orders"))
 		snaps.MatchSnapshot(t, buf.String())

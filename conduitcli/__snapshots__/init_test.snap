@@ -1,7 +1,7 @@
 
 [TestInit/should_create_migration_directory_and_schema_file,_when_initialising_fresh_project - 1]
 ### conduit.sum ###
-93e081ed14bd9b9e
+cf28a36ac69eb894
 ### conduit.yaml ###
 database:
   url: postgres://test:test@localhost:5432/test?sslmode=disable
@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS conduit_migrations (
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   version VARCHAR(255) NOT NULL,
   name VARCHAR(4095) NOT NULL,
-  hash VARCHAR(64) NOT NULL DEFAULT '',
+  hash VARCHAR(64) NOT NULL,
   PRIMARY KEY (id),
   UNIQUE (version, name)
 );

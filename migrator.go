@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"hash/fnv"
+	"iter"
 	"log/slog"
 	"maps"
 	"slices"
@@ -99,12 +100,6 @@ func (c *config) defaults() {
 	}
 }
 
-// MigrateResult holds the outcome of a [Migrator.Migrate] call.
-type MigrateResult struct {
-	Direction        direction.Direction
-	MigrationResults []MigrationResult
-}
-
 // MigrationResult holds the outcome of a single applied migration.
 type MigrationResult struct {
 	Version       conduitversion.Version
@@ -167,16 +162,18 @@ func NewMigrator(opts ...Option) *Migrator {
 // Migrate applies migrations in the given direction. It acquires a Postgres
 // advisory lock for the duration of the operation.
 //
+// The returned iterator yields individual [MigrationResult] values as each
+// migration completes. If a migration fails, the iterator yields the error
+// and stops. The advisory lock is held for the duration of the iteration.
+//
 // When opts is nil, direction-specific defaults are used: all pending
 // migrations for up, one migration for down.
-//
-//nolint:nonamedreturns
 func (m *Migrator) Migrate(
 	ctx context.Context,
 	dir Direction,
 	conn *pgx.Conn,
 	opts *MigrateOptions,
-) (result *MigrateResult, err error) {
+) (iter.Seq2[*MigrationResult, error], error) {
 	debug.Assert(conn != nil, "expected conn to be defined")
 
 	if opts == nil {
@@ -195,24 +192,27 @@ func (m *Migrator) Migrate(
 		return nil, fmt.Errorf("failed to acquire a lock: %w", err)
 	}
 
-	defer func() {
-		_ = dbsqlc.New().ReleaseLock(ctx, conn, lockNum)
-	}()
+	defer func() { _ = dbsqlc.New().ReleaseLock(ctx, conn, lockNum) }()
+
+	var (
+		migrations []*conduitregistry.Migration
+		err        error
+	)
 
 	switch dir {
 	case DirectionUp:
-		result, err = m.migrateUp(ctx, conn, opts)
+		migrations, err = m.upMigrations(ctx, conn)
 	case DirectionDown:
-		result, err = m.migrateDown(ctx, conn, opts)
+		migrations, err = m.downMigrations(ctx, conn)
 	default:
-		return nil, direction.ErrUnknownDirection
+		err = direction.ErrUnknownDirection
 	}
 
 	if err != nil {
 		return nil, err
 	}
 
-	return result, nil
+	return m.applyMigrations(ctx, migrations, dir, conn, opts), nil
 }
 
 func (m *Migrator) existingMigrationKeys(ctx context.Context, conn *pgx.Conn) ([]string, error) {
@@ -239,11 +239,10 @@ func (m *Migrator) existingMigrationKeys(ctx context.Context, conn *pgx.Conn) ([
 	return keys, nil
 }
 
-func (m *Migrator) migrateUp(
+func (m *Migrator) upMigrations(
 	ctx context.Context,
 	conn *pgx.Conn,
-	opts *MigrateOptions,
-) (*MigrateResult, error) {
+) ([]*conduitregistry.Migration, error) {
 	existingKeys, err := m.existingMigrationKeys(ctx, conn)
 	if err != nil {
 		return nil, err
@@ -263,14 +262,13 @@ func (m *Migrator) migrateUp(
 	migrations := slices.Collect(maps.Values(targetMigrations))
 	slices.SortFunc(migrations, compareMigrations)
 
-	return m.applyMigrations(ctx, migrations, DirectionUp, conn, opts)
+	return migrations, nil
 }
 
-func (m *Migrator) migrateDown(
+func (m *Migrator) downMigrations(
 	ctx context.Context,
 	conn *pgx.Conn,
-	opts *MigrateOptions,
-) (*MigrateResult, error) {
+) ([]*conduitregistry.Migration, error) {
 	existingKeys, err := m.existingMigrationKeys(ctx, conn)
 	if err != nil {
 		return nil, err
@@ -293,7 +291,7 @@ func (m *Migrator) migrateDown(
 		return compareMigrations(b, a)
 	})
 
-	return m.applyMigrations(ctx, migrations, DirectionDown, conn, opts)
+	return migrations, nil
 }
 
 func (m *Migrator) detectSchemaDrift(ctx context.Context, conn *pgx.Conn) error {
@@ -328,72 +326,69 @@ func (m *Migrator) detectSchemaDrift(ctx context.Context, conn *pgx.Conn) error 
 	return nil
 }
 
-//nolint:nonamedreturns
 func (m *Migrator) applyMigrations(
 	ctx context.Context,
 	migrations []*conduitregistry.Migration,
 	dir Direction,
 	conn *pgx.Conn,
 	opts *MigrateOptions,
-) (result *MigrateResult, err error) {
-	if opts.Steps != AllSteps {
-		migrations = migrations[0:min(opts.Steps, len(migrations))]
-	}
+) iter.Seq2[*MigrationResult, error] {
+	return func(yield func(*MigrationResult, error) bool) {
+		if opts.Steps != AllSteps {
+			migrations = migrations[0:min(opts.Steps, len(migrations))]
+		}
 
-	results := make([]MigrationResult, len(migrations))
-
-	internaldebug.Log(
-		"running migrations migrations=[%s] steps=%d total_migrations_count=%d",
-		strings.Join(sliceutil.Map(migrations, func(m *conduitregistry.Migration) string {
-			return fmt.Sprintf("name=%s version=%s", m.Name(), m.Version().String())
-		}), ", "),
-		opts.Steps,
-		len(migrations),
-	)
-
-	for i, migration := range migrations {
 		internaldebug.Log(
-			"running migration name=%s version=%s direction=%s",
-			migration.Name(),
-			migration.Version().String(),
-			dir,
+			"running migrations migrations=[%s] steps=%d total_migrations_count=%d",
+			strings.Join(sliceutil.Map(migrations, func(m *conduitregistry.Migration) string {
+				return fmt.Sprintf("name=%s version=%s", m.Name(), m.Version().String())
+			}), ", "),
+			opts.Steps,
+			len(migrations),
 		)
 
-		if hazards := migration.Hazards(dir); len(hazards) > 0 {
-			var blocked []string
+		for _, migration := range migrations {
+			internaldebug.Log(
+				"running migration name=%s version=%s direction=%s",
+				migration.Name(),
+				migration.Version().String(),
+				dir,
+			)
 
-			for _, h := range hazards {
-				if !slices.Contains(opts.AllowHazards, h.Type) {
-					blocked = append(blocked, fmt.Sprintf("%s: %s", h.Type, h.Message))
+			if hazards := migration.Hazards(dir); len(hazards) > 0 {
+				var blocked []string
+
+				for _, h := range hazards {
+					if !slices.Contains(opts.AllowHazards, h.Type) {
+						blocked = append(blocked, fmt.Sprintf("%s: %s", h.Type, h.Message))
+					}
+				}
+
+				if len(blocked) > 0 {
+					yield(nil, fmt.Errorf(
+						"%w: migration %s_%s contains hazards:\n  - %s",
+						ErrHazardDetected,
+						migration.Version().String(),
+						migration.Name(),
+						strings.Join(blocked, "\n  - "),
+					))
+
+					return
 				}
 			}
 
-			if len(blocked) > 0 {
-				return nil, fmt.Errorf(
-					"%w: migration %s_%s contains hazards:\n  - %s",
-					ErrHazardDetected,
-					migration.Version().String(),
-					migration.Name(),
-					strings.Join(blocked, "\n  - "),
-				)
+			migrationResult, err := m.executor.Execute(ctx, migration, dir, conn)
+			if err != nil {
+				yield(nil, err)
+
+				return
+			}
+
+			if !yield(&migrationResult, nil) {
+				return
 			}
 		}
-
-		migrationResult, err := m.executor.Execute(ctx, migration, dir, conn)
-		if err != nil {
-			//nolint:wrapcheck
-			return nil, err
-		}
-
-		results[i] = migrationResult
 	}
-
-	result = &MigrateResult{
-		MigrationResults: results,
-		Direction:        dir,
-	}
-
-	return result, nil
 }
 
 func compareMigrations(a, b *conduitregistry.Migration) int {
