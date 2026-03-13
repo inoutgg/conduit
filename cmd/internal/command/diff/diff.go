@@ -44,6 +44,7 @@ func NewCommand(
 					yamlsrc.YAML("migrations.schema", src),
 				),
 			},
+			cmdutil.SkipSchemaDriftCheckFlag(src),
 			cmdutil.ExcludeSchemasFlag(src),
 			cmdutil.DatabaseURLFlag(src),
 			cmdutil.MigrationsDirFlag(src),
@@ -56,12 +57,13 @@ func NewCommand(
 
 			store := hashsum.NewFSStore(fs, "conduit.sum")
 			args := conduitcli.DiffArgs{
-				RootDir:        ".",
-				MigrationsDir:  filepath.Clean(cmd.String(cmdutil.MigrationsDir)),
-				Name:           name,
-				SchemaPath:     cmd.String(schemaFlag),
-				DatabaseURL:    cmd.String(cmdutil.DatabaseURL),
-				ExcludeSchemas: cmd.StringSlice(cmdutil.ExcludeSchemas),
+				RootDir:              ".",
+				MigrationsDir:        filepath.Clean(cmd.String(cmdutil.MigrationsDir)),
+				Name:                 name,
+				SchemaPath:           cmd.String(schemaFlag),
+				DatabaseURL:          cmd.String(cmdutil.DatabaseURL),
+				ExcludeSchemas:       cmd.StringSlice(cmdutil.ExcludeSchemas),
+				SkipSchemaDriftCheck: cmd.Bool(cmdutil.SkipSchemaDriftCheck),
 			}
 
 			result, err := conduitcli.Diff(ctx, fs, timeGen, bi, store, args)

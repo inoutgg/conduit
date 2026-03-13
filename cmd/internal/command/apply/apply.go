@@ -22,10 +22,9 @@ import (
 )
 
 const (
-	stepsFlag           = "steps"
-	allowHazardsFlag    = "allow-hazards"
-	skipSchemaDriftFlag = "skip-schema-drift-check"
-	dryRunFlag          = "dry-run"
+	stepsFlag        = "steps"
+	allowHazardsFlag = "allow-hazards"
+	dryRunFlag       = "dry-run"
 )
 
 func NewCommand(
@@ -64,15 +63,7 @@ func NewCommand(
 				),
 			},
 
-			//nolint:exhaustruct
-			&cli.BoolFlag{
-				Name:  skipSchemaDriftFlag,
-				Usage: "skip check for schema drift before applying migrations",
-				Sources: cli.NewValueSourceChain(
-					cli.EnvVar("CONDUIT_SKIP_SCHEMA_DRIFT_CHECK"),
-					yamlsrc.YAML("apply.skip-schema-drift-check", src),
-				),
-			},
+			cmdutil.SkipSchemaDriftCheckFlag(src),
 
 			//nolint:exhaustruct
 			&cli.BoolFlag{
@@ -97,7 +88,7 @@ func NewCommand(
 			opts := []conduit.Option{
 				conduit.WithRegistry(conduitregistry.FromFS(fs, migrationsDir)),
 			}
-			if cmd.Bool(skipSchemaDriftFlag) {
+			if cmd.Bool(cmdutil.SkipSchemaDriftCheck) {
 				opts = append(opts, conduit.WithSkipSchemaDriftCheck())
 			}
 

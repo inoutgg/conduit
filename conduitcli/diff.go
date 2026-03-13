@@ -27,12 +27,13 @@ var (
 
 // DiffArgs configures a schema diff operation.
 type DiffArgs struct {
-	RootDir        string
-	MigrationsDir  string
-	Name           string
-	SchemaPath     string
-	DatabaseURL    string
-	ExcludeSchemas []string
+	RootDir              string
+	MigrationsDir        string
+	Name                 string
+	SchemaPath           string
+	DatabaseURL          string
+	ExcludeSchemas       []string
+	SkipSchemaDriftCheck bool
 }
 
 // DiffResultFile describes a migration file created by [Diff].
@@ -78,14 +79,16 @@ func Diff(
 		return nil, ErrNoChanges
 	}
 
-	if ok, actual, err := store.Compare(args.RootDir, []byte(plan.SourceSchemaHash)); err == nil {
-		if !ok {
-			return nil, fmt.Errorf(
-				"%w: expected hash %s, got %s",
-				conduit.ErrSchemaDrift,
-				actual,
-				plan.SourceSchemaHash,
-			)
+	if !args.SkipSchemaDriftCheck {
+		if ok, actual, err := store.Compare(args.RootDir, []byte(plan.SourceSchemaHash)); err == nil {
+			if !ok {
+				return nil, fmt.Errorf(
+					"%w: expected hash %s, got %s",
+					conduit.ErrSchemaDrift,
+					actual,
+					plan.SourceSchemaHash,
+				)
+			}
 		}
 	}
 

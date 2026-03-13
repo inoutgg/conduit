@@ -7,10 +7,11 @@ import (
 )
 
 const (
-	Verbose        = "verbose"
-	DatabaseURL    = "database-url"
-	MigrationsDir  = "migrations-dir"
-	ExcludeSchemas = "exclude-schema"
+	Verbose          = "verbose"
+	DatabaseURL      = "database-url"
+	MigrationsDir    = "migrations-dir"
+	ExcludeSchemas   = "exclude-schema"
+	SkipSchemaDriftCheck = "skip-schema-drift-check"
 )
 
 func MigrationsDirFlag(src altsrc.Sourcer) *cli.StringFlag {
@@ -47,6 +48,18 @@ func ExcludeSchemasFlag(src altsrc.Sourcer) *cli.StringSliceFlag {
 		Sources: cli.NewValueSourceChain(
 			cli.EnvVar("CONDUIT_EXCLUDE_SCHEMAS"),
 			yamlsrc.YAML("exclude-schemas", src),
+		),
+	}
+}
+
+func SkipSchemaDriftCheckFlag(src altsrc.Sourcer) *cli.BoolFlag {
+	//nolint:exhaustruct
+	return &cli.BoolFlag{
+		Name:  SkipSchemaDriftCheck,
+		Usage: "skip check for schema drift",
+		Sources: cli.NewValueSourceChain(
+			cli.EnvVar("CONDUIT_SKIP_SCHEMA_DRIFT_CHECK"),
+			yamlsrc.YAML("skip-schema-drift-check", src),
 		),
 	}
 }
