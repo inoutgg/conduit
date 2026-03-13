@@ -1,6 +1,7 @@
 package conduit_test
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -299,6 +300,63 @@ func TestMigrator_Migrate_Hazards(t *testing.T) {
 		results := testutil.CollectSeq2(t, seq)
 		assert.Len(t, results, 1)
 		assert.True(t, testutil.TableExists(t, pool, "hazard_allowed"))
+	})
+}
+
+func TestMigrator_Migrate_Ordering(t *testing.T) {
+	t.Parallel()
+
+	t.Run("should roll up/back same-version migrations in correct order", func(t *testing.T) {
+		t.Parallel()
+
+		_, conn := newConn(t)
+
+		r := testregistry.NewRegistry(t, map[string]string{
+			"20240115123045_add_posts_01.up.sql":   "CREATE TABLE add_posts_down_01 (id INT);",
+			"20240115123045_add_posts_01.down.sql": "DROP TABLE add_posts_down_01;",
+			"20240115123045_add_posts_02.up.sql":   "CREATE TABLE add_posts_down_02 (id INT);",
+			"20240115123045_add_posts_02.down.sql": "DROP TABLE add_posts_down_02;",
+			"20240115123045_add_posts_03.up.sql":   "CREATE TABLE add_posts_down_03 (id INT);",
+			"20240115123045_add_posts_03.down.sql": "DROP TABLE add_posts_down_03;",
+			"20240115123045_add_posts_04.up.sql":   "CREATE TABLE add_posts_down_04 (id INT);",
+			"20240115123045_add_posts_04.down.sql": "DROP TABLE add_posts_down_04;",
+			"20240115123045_add_posts_05.up.sql":   "CREATE TABLE add_posts_down_05 (id INT);",
+			"20240115123045_add_posts_05.down.sql": "DROP TABLE add_posts_down_05;",
+			"20240115123045_add_posts_06.up.sql":   "CREATE TABLE add_posts_down_06 (id INT);",
+			"20240115123045_add_posts_06.down.sql": "DROP TABLE add_posts_down_06;",
+			"20240115123045_add_posts_07.up.sql":   "CREATE TABLE add_posts_down_07 (id INT);",
+			"20240115123045_add_posts_07.down.sql": "DROP TABLE add_posts_down_07;",
+			"20240115123045_add_posts_08.up.sql":   "CREATE TABLE add_posts_down_08 (id INT);",
+			"20240115123045_add_posts_08.down.sql": "DROP TABLE add_posts_down_08;",
+			"20240115123045_add_posts_09.up.sql":   "CREATE TABLE add_posts_down_09 (id INT);",
+			"20240115123045_add_posts_09.down.sql": "DROP TABLE add_posts_down_09;",
+			"20240115123045_add_posts_10.up.sql":   "CREATE TABLE add_posts_down_10 (id INT);",
+			"20240115123045_add_posts_10.down.sql": "DROP TABLE add_posts_down_10;",
+		})
+		m := conduit.NewMigrator(conduit.WithRegistry(r), conduit.WithSkipSchemaDriftCheck())
+
+		seq, err := m.Migrate(t.Context(), conduit.DirectionUp, conn, nil)
+		require.NoError(t, err)
+
+		results := testutil.CollectSeq2(t, seq)
+
+		require.Len(t, results, 10)
+
+		for i, res := range results {
+			assert.Equal(t, fmt.Sprintf("add_posts_%02d", i+1), res.Name)
+		}
+
+		seq, err = m.Migrate(t.Context(), conduit.DirectionDown, conn, &conduit.MigrateOptions{
+			Steps: conduit.AllSteps,
+		})
+		require.NoError(t, err)
+		results = testutil.CollectSeq2(t, seq)
+
+		require.Len(t, results, 10)
+
+		for i, res := range results {
+			assert.Equal(t, fmt.Sprintf("add_posts_%02d", 10-i), res.Name)
+		}
 	})
 }
 

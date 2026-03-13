@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"text/template"
 
@@ -96,10 +97,11 @@ func Diff(
 
 	var files []DiffResultFile
 
+	width := len(strconv.Itoa(len(plan.Statements)))
 	for i, stmt := range plan.Statements {
 		name := args.Name
 		if len(plan.Statements) > 1 {
-			name = fmt.Sprintf("%s_%d", args.Name, i+1)
+			name = fmt.Sprintf("%s_%0*d", args.Name, width, i+1)
 		}
 
 		var upStmts strings.Builder

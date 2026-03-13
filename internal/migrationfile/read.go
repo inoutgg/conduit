@@ -40,7 +40,7 @@ func ReadStmtsFromDir(fs afero.Fs, dir string) ([]sqlsplit.Stmt, error) {
 		migrations = append(migrations, m)
 	}
 
-	slices.SortFunc(migrations, func(a, b conduitversion.ParsedMigrationFilename) int {
+	slices.SortStableFunc(migrations, func(a, b conduitversion.ParsedMigrationFilename) int {
 		return a.Compare(b)
 	})
 

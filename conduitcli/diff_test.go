@@ -3,6 +3,7 @@ package conduitcli
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 	"time"
 
@@ -186,5 +187,67 @@ CREATE TABLE comments (id int, post_id int);`), 0o644),
 
 		require.ErrorIs(t, err, ErrNoChanges)
 		assert.Nil(t, result)
+	})
+
+	// Build a target schema that will produce 10 DDL statements:
+	//   1  × CREATE TABLE posts (non-concurrent, runs in a transaction)
+	//   9  × CREATE INDEX CONCURRENTLY (each runs outside a transaction)
+	t.Run("should use zero-padded filenames, when diff produces 10 or more migration files", func(t *testing.T) {
+		t.Parallel()
+
+		databaseURL := os.Getenv("TEST_DATABASE_URL")
+		fs, baseDir, dir := testutil.NewMigrationsDirBuilder(t).
+			WithFile("20230601120000_init.up.sql", "CREATE TABLE users (id int);").
+			WithBaseFile("schema.sql", `CREATE TABLE users (id int);
+CREATE TABLE posts (
+    id    int,
+    col_a int,
+    col_b int,
+    col_c int,
+    col_d int,
+    col_e int,
+    col_f int,
+    col_g int,
+    col_h int,
+    col_i int
+);
+CREATE INDEX ON posts(col_a);
+CREATE INDEX ON posts(col_b);
+CREATE INDEX ON posts(col_c);
+CREATE INDEX ON posts(col_d);
+CREATE INDEX ON posts(col_e);
+CREATE INDEX ON posts(col_f);
+CREATE INDEX ON posts(col_g);
+CREATE INDEX ON posts(col_h);
+CREATE INDEX ON posts(col_i);`).
+			Build()
+
+		store := hashsum.NewFSStore(fs, "conduit.sum")
+		args := DiffArgs{
+			RootDir:       baseDir,
+			MigrationsDir: dir,
+			Name:          "add_posts",
+			SchemaPath:    filepath.Join(baseDir, "schema.sql"),
+			DatabaseURL:   databaseURL,
+		}
+
+		result, err := Diff(t.Context(), fs, timegenerator.Stub{
+			T: time.Date(2024, 1, 15, 12, 30, 45, 0, time.UTC),
+		}, bi, store, args)
+
+		require.NoError(t, err)
+		require.Greater(t, len(result.Files), 1, "expected multiple migration files")
+
+		names := make([]string, len(result.Files))
+		for i, f := range result.Files {
+			names[i] = filepath.Base(f.Path)
+		}
+
+		sorted := slices.Sorted(slices.Values(names))
+		assert.Equal(t, names, sorted,
+			"migration filenames must sort lexicographically in statement order; "+
+				"zero-padding is required when total count >= 10")
+
+		testutil.SnapshotFS(t, fs, baseDir)
 	})
 }
