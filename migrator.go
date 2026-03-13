@@ -297,6 +297,16 @@ func (m *Migrator) downMigrations(
 func (m *Migrator) detectSchemaDrift(ctx context.Context, conn *pgx.Conn) error {
 	internaldebug.Log("detecting schema drift")
 
+	ok, err := dbsqlc.New().DoesTableExist(ctx, conn, "conduit_migrations")
+	if err != nil {
+		return fmt.Errorf("failed to check if migrations table exists: %w", err)
+	}
+
+	if !ok {
+		internaldebug.Log("conduit_migrations table does not exist, skipping schema drift check")
+		return nil
+	}
+
 	expected, err := dbsqlc.New().LatestSchemaHash(ctx, conn)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
