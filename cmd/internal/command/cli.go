@@ -52,7 +52,7 @@ func Execute(
 			cmdutil.VerboseFlag(configSrc),
 		},
 		Commands: []*cli.Command{
-			initialise.NewCommand(fs, stdout, stderr, timeGen, configSrc),
+			initialise.NewCommand(fs, stdout, stderr, timeGen),
 			new.NewCommand(fs, stdout, stderr, timeGen, configSrc),
 			diff.NewCommand(fs, stdout, stderr, timeGen, bi, configSrc),
 			apply.NewCommand(fs, stdout, stderr, timer, configSrc),

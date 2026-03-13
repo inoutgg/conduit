@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 
 	"github.com/spf13/afero"
-	altsrc "github.com/urfave/cli-altsrc/v3"
 	"github.com/urfave/cli/v3"
 
 	"go.inout.gg/conduit/conduitcli"
@@ -21,7 +20,6 @@ func NewCommand(
 	_ io.Writer,
 	stderr io.Writer,
 	timeGen timegenerator.Generator,
-	src altsrc.Sourcer,
 ) *cli.Command {
 	//nolint:exhaustruct
 	return &cli.Command{
@@ -29,9 +27,29 @@ func NewCommand(
 		Aliases: []string{"i"},
 		Usage:   "initialise migration directory",
 		Flags: []cli.Flag{
-			cmdutil.MigrationsDirFlag(src),
-			cmdutil.DatabaseURLFlag(src),
-			cmdutil.ExcludeSchemasFlag(src),
+			&cli.StringFlag{
+				Name:  cmdutil.MigrationsDir,
+				Usage: "directory with migration files",
+				Value: "./migrations",
+				Sources: cli.NewValueSourceChain(
+					cli.EnvVar("CONDUIT_MIGRATIONS_DIR"),
+				),
+			},
+			&cli.StringFlag{
+				Name:     cmdutil.DatabaseURL,
+				Usage:    "database connection URL",
+				Required: true,
+				Sources: cli.NewValueSourceChain(
+					cli.EnvVar("CONDUIT_DATABASE_URL"),
+				),
+			},
+			&cli.StringSliceFlag{
+				Name:  cmdutil.ExcludeSchemas,
+				Usage: "PostgreSQL schemas to exclude",
+				Sources: cli.NewValueSourceChain(
+					cli.EnvVar("CONDUIT_EXCLUDE_SCHEMAS"),
+				),
+			},
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			store := hashsum.NewFSStore(fs, "conduit.sum")
