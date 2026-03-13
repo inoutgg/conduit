@@ -7,10 +7,10 @@ import (
 )
 
 const (
-	Verbose          = "verbose"
-	DatabaseURL      = "database-url"
-	MigrationsDir    = "migrations-dir"
-	ExcludeSchemas   = "exclude-schema"
+	Verbose              = "verbose"
+	DatabaseURL          = "database-url"
+	MigrationsDir        = "migrations-dir"
+	ExcludeSchemas       = "exclude-schema"
 	SkipSchemaDriftCheck = "skip-schema-drift-check"
 )
 

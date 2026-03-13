@@ -10,11 +10,11 @@ import (
 	"github.com/spf13/afero"
 
 	"go.inout.gg/conduit/internal/conduittemplate"
+	"go.inout.gg/conduit/internal/migrationfile"
 	"go.inout.gg/conduit/internal/migrations"
 	"go.inout.gg/conduit/pkg/conduitversion"
 	"go.inout.gg/conduit/pkg/hashsum"
 	"go.inout.gg/conduit/pkg/pgdiff"
-	"go.inout.gg/conduit/pkg/sqlsplit"
 	"go.inout.gg/conduit/pkg/timegenerator"
 )
 
@@ -50,13 +50,9 @@ func Init(
 	}
 
 	migrationsFs := afero.NewBasePathFs(fs, migrationsPath)
-	migrationFilename := conduitversion.MigrationFilename(
-		conduitversion.NewFromTime(timeGen.Now()),
-		"conduit_initial_schema",
-		conduitversion.MigrationDirectionUp,
-	)
 
-	if err := createInitialMigration(migrationsFs, migrationFilename); err != nil {
+	migrationFilename, err := createInitialMigration(migrationsFs, timeGen)
+	if err != nil {
 		return nil, err
 	}
 
@@ -65,12 +61,12 @@ func Init(
 		return nil, fmt.Errorf("failed to parse database URL: %w", err)
 	}
 
-	stmts, err := sqlsplit.Split(migrations.Schema)
+	migrationStmts, err := migrationfile.ReadStmtsFromDir(fs, migrationsPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse initial schema: %w", err)
+		return nil, fmt.Errorf("failed to read migration files: %w", err)
 	}
 
-	hash, err := pgdiff.GenerateSchemaHash(ctx, connConfig, stmts, args.ExcludeSchemas)
+	hash, err := pgdiff.GenerateSchemaHash(ctx, connConfig, migrationStmts, args.ExcludeSchemas)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate schema hash: %w", err)
 	}
@@ -122,10 +118,16 @@ func createMigrationDir(fs afero.Fs, dir string) error {
 	return nil
 }
 
-func createInitialMigration(fs afero.Fs, filename string) error {
+func createInitialMigration(fs afero.Fs, timeGen timegenerator.Generator) (string, error) {
+	filename := conduitversion.MigrationFilename(
+		conduitversion.NewFromTime(timeGen.Now()),
+		"conduit_initial_schema",
+		conduitversion.MigrationDirectionUp,
+	)
+
 	if err := afero.WriteFile(fs, filename, migrations.Schema, 0o644); err != nil {
-		return fmt.Errorf("failed to create initial migration file: %w", err)
+		return "", fmt.Errorf("failed to create initial migration file: %w", err)
 	}
 
-	return nil
+	return filename, nil
 }
