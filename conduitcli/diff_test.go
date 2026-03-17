@@ -14,7 +14,7 @@ import (
 
 	"go.inout.gg/conduit"
 	"go.inout.gg/conduit/internal/testutil"
-	"go.inout.gg/conduit/pkg/hashsum"
+	"go.inout.gg/conduit/pkg/lockfile"
 	"go.inout.gg/conduit/pkg/timegenerator"
 )
 
@@ -25,7 +25,7 @@ func TestDiff(t *testing.T) {
 		t.Parallel()
 
 		fs := afero.NewMemMapFs()
-		store := hashsum.NewFSStore(fs, "conduit.sum")
+		store := lockfile.NewFSStore(fs, "conduit.lock")
 		args := DiffArgs{
 			RootDir:       "/",
 			MigrationsDir: "/nonexistent",
@@ -45,7 +45,7 @@ func TestDiff(t *testing.T) {
 		t.Parallel()
 
 		fs, baseDir, dir := testutil.NewMigrationsDirBuilder(t).Build()
-		store := hashsum.NewFSStore(fs, "conduit.sum")
+		store := lockfile.NewFSStore(fs, "conduit.lock")
 		args := DiffArgs{
 			RootDir:       baseDir,
 			MigrationsDir: dir,
@@ -70,7 +70,7 @@ func TestDiff(t *testing.T) {
 CREATE TABLE posts (id int, user_id int);`).
 			Build()
 
-		store := hashsum.NewFSStore(fs, "conduit.sum")
+		store := lockfile.NewFSStore(fs, "conduit.lock")
 		args := DiffArgs{
 			RootDir:       baseDir,
 			MigrationsDir: dir,
@@ -86,18 +86,18 @@ CREATE TABLE posts (id int, user_id int);`).
 		testutil.SnapshotFS(t, fs, baseDir)
 	})
 
-	t.Run("should return error, when source schema hash does not match conduit.sum", func(t *testing.T) {
+	t.Run("should return error, when source schema hash does not match conduit.lock", func(t *testing.T) {
 		t.Parallel()
 
 		databaseURL := os.Getenv("TEST_DATABASE_URL")
 		fs, baseDir, dir := testutil.NewMigrationsDirBuilder(t).
 			WithFile("20230601120000_init.up.sql", "CREATE TABLE users (id int);").
-			WithBaseFile("conduit.sum", "0000000000000000").
+			WithBaseFile("conduit.lock", "20230601120000_init 0000000000000000\n").
 			WithBaseFile("schema.sql", `CREATE TABLE users (id int);
 CREATE TABLE posts (id int, user_id int);`).
 			Build()
 
-		store := hashsum.NewFSStore(fs, "conduit.sum")
+		store := lockfile.NewFSStore(fs, "conduit.lock")
 		args := DiffArgs{
 			RootDir:       baseDir,
 			MigrationsDir: dir,
@@ -119,7 +119,7 @@ CREATE TABLE posts (id int, user_id int);`).
 		}
 	})
 
-	t.Run("should succeed, when source schema hash matches conduit.sum", func(t *testing.T) {
+	t.Run("should succeed, when source schema hash matches conduit.lock", func(t *testing.T) {
 		t.Parallel()
 
 		databaseURL := os.Getenv("TEST_DATABASE_URL")
@@ -129,8 +129,8 @@ CREATE TABLE posts (id int, user_id int);`).
 CREATE TABLE posts (id int, user_id int);`).
 			Build()
 
-		// First run to generate the correct conduit.sum.
-		store := hashsum.NewFSStore(fs, "conduit.sum")
+		// First run to generate the correct conduit.lock.
+		store := lockfile.NewFSStore(fs, "conduit.lock")
 		args := DiffArgs{
 			RootDir:       baseDir,
 			MigrationsDir: dir,
@@ -141,7 +141,7 @@ CREATE TABLE posts (id int, user_id int);`).
 		_, err := Diff(t.Context(), fs, timeGen, bi, store, args)
 		require.NoError(t, err)
 
-		// Update schema to trigger a new diff, using the existing conduit.sum
+		// Update schema to trigger a new diff, using the existing conduit.lock
 		// which now contains the correct target hash from the first run.
 		require.NoError(
 			t,
@@ -157,7 +157,7 @@ CREATE TABLE comments (id int, post_id int);`), 0o644),
 			DatabaseURL:   databaseURL,
 		}
 
-		// Act — second diff should succeed because the source hash matches conduit.sum.
+		// Act — second diff should succeed because the source hash matches conduit.lock.
 		_, err = Diff(t.Context(), fs, timegenerator.Stub{
 			T: time.Date(2024, 2, 15, 12, 30, 45, 0, time.UTC),
 		}, bi, store, args2)
@@ -174,7 +174,7 @@ CREATE TABLE comments (id int, post_id int);`), 0o644),
 			WithBaseFile("schema.sql", "CREATE TABLE users (id int);").
 			Build()
 
-		store := hashsum.NewFSStore(fs, "conduit.sum")
+		store := lockfile.NewFSStore(fs, "conduit.lock")
 		args := DiffArgs{
 			RootDir:       baseDir,
 			MigrationsDir: dir,
@@ -222,7 +222,7 @@ CREATE INDEX ON posts(col_h);
 CREATE INDEX ON posts(col_i);`).
 			Build()
 
-		store := hashsum.NewFSStore(fs, "conduit.sum")
+		store := lockfile.NewFSStore(fs, "conduit.lock")
 		args := DiffArgs{
 			RootDir:       baseDir,
 			MigrationsDir: dir,

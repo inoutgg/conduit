@@ -15,7 +15,7 @@ import (
 	"go.inout.gg/conduit/conduitcli"
 	"go.inout.gg/conduit/internal/cmdutil"
 	"go.inout.gg/conduit/pkg/conduitbuildinfo"
-	"go.inout.gg/conduit/pkg/hashsum"
+	"go.inout.gg/conduit/pkg/lockfile"
 	"go.inout.gg/conduit/pkg/timegenerator"
 )
 
@@ -55,7 +55,7 @@ func NewCommand(
 				return errors.New("missing required argument: <name>")
 			}
 
-			store := hashsum.NewFSStore(fs, "conduit.sum")
+			store := lockfile.NewFSStore(fs, "conduit.lock")
 			args := conduitcli.DiffArgs{
 				RootDir:              ".",
 				MigrationsDir:        filepath.Clean(cmd.String(cmdutil.MigrationsDir)),
@@ -81,7 +81,7 @@ func NewCommand(
 				fmt.Fprintln(stderr, "Created "+f.Path)
 			}
 
-			fmt.Fprintln(stderr, "Updated conduit.sum")
+			fmt.Fprintln(stderr, "Updated conduit.lock")
 
 			return nil
 		},

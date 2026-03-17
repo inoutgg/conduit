@@ -39,9 +39,14 @@ func GeneratePlan(
 ) (Plan, error) {
 	var result Plan
 
-	sourceStmts, err := migrationfile.ReadStmtsFromDir(fs, migrationsDir)
+	sourceMigrations, err := migrationfile.ReadMigrationsFromDir(fs, migrationsDir)
 	if err != nil {
 		return result, fmt.Errorf("failed to read migrations: %w", err)
+	}
+
+	var sourceStmts []sqlsplit.Stmt
+	for _, m := range sourceMigrations {
+		sourceStmts = append(sourceStmts, m.Stmts...)
 	}
 
 	targetStmts, err := readStmtsFromFile(fs, schemaPath)
@@ -127,33 +132,38 @@ func GeneratePlan(
 	return result, nil
 }
 
-// GenerateSchemaHash applies the given DDL statements and returns the
-// resulting schema hash.
-func GenerateSchemaHash(
+// GenerateSchemaHashChain applies migrations incrementally to a temporary
+// database and returns the cumulative schema hash after each migration group.
+func GenerateSchemaHashChain(
 	ctx context.Context,
 	connConfig *pgx.ConnConfig,
-	stmts []sqlsplit.Stmt,
+	migrationGroups [][]sqlsplit.Stmt,
 	excludeSchemas []string,
-) (string, error) {
+) ([]string, error) {
+	internalStmts, err := sqlsplit.Split(migrations.Schema)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse conduit internal schema: %w", err)
+	}
+
 	factory, err := newTempDbFactory(ctx, connConfig)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	defer factory.Close()
 
 	db, err := factory.Create(ctx)
 	if err != nil {
-		return "", fmt.Errorf("failed to create temp db: %w", err)
+		return nil, fmt.Errorf("failed to create temp db: %w", err)
 	}
 	defer db.Close(ctx)
 
-	for _, stmt := range stmts {
+	for _, stmt := range internalStmts {
 		if stmt.Type != sqlsplit.StmtTypeQuery {
 			continue
 		}
 
 		if _, err := db.ConnPool.ExecContext(ctx, stmt.Content); err != nil {
-			return "", fmt.Errorf("failed to execute statement: %w", err)
+			return nil, fmt.Errorf("failed to execute conduit internal schema: %w", err)
 		}
 	}
 
@@ -162,12 +172,28 @@ func GenerateSchemaHash(
 		schemaOpts = append(schemaOpts, schema.WithExcludeSchemas(excludeSchemas...))
 	}
 
-	hash, err := schema.GetSchemaHash(ctx, db.ConnPool, schemaOpts...)
-	if err != nil {
-		return "", fmt.Errorf("failed to get schema hash: %w", err)
+	hashes := make([]string, 0, len(migrationGroups))
+
+	for _, group := range migrationGroups {
+		for _, stmt := range group {
+			if stmt.Type != sqlsplit.StmtTypeQuery {
+				continue
+			}
+
+			if _, err := db.ConnPool.ExecContext(ctx, stmt.Content); err != nil {
+				return nil, fmt.Errorf("failed to execute statement: %w", err)
+			}
+		}
+
+		hash, err := schema.GetSchemaHash(ctx, db.ConnPool, schemaOpts...)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get schema hash: %w", err)
+		}
+
+		hashes = append(hashes, hash)
 	}
 
-	return hash, nil
+	return hashes, nil
 }
 
 // DumpSchema extracts the schema of a live Postgres database as DDL statements.

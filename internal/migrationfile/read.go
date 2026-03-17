@@ -13,15 +13,22 @@ import (
 	"go.inout.gg/conduit/pkg/sqlsplit"
 )
 
-// ReadStmtsFromDir reads all up-migration SQL files from dir, ordered by
-// version, and returns the parsed statements.
-func ReadStmtsFromDir(fs afero.Fs, dir string) ([]sqlsplit.Stmt, error) {
+// Migration groups the parsed statements of a single up-migration file
+// together with its parsed filename.
+type Migration struct {
+	Parsed conduitversion.ParsedMigrationFilename
+	Stmts  []sqlsplit.Stmt
+}
+
+// ReadMigrationsFromDir reads all up-migration SQL files from dir, ordered by
+// version, and returns each migration with its parsed filename and statements.
+func ReadMigrationsFromDir(fs afero.Fs, dir string) ([]Migration, error) {
 	entries, err := afero.ReadDir(fs, dir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read directory: %w", err)
 	}
 
-	migrations := make([]conduitversion.ParsedMigrationFilename, 0, len(entries))
+	parsed := make([]conduitversion.ParsedMigrationFilename, 0, len(entries))
 	for _, entry := range entries {
 		name := entry.Name()
 		if entry.IsDir() || !strings.HasSuffix(name, ".sql") {
@@ -37,16 +44,16 @@ func ReadStmtsFromDir(fs afero.Fs, dir string) ([]sqlsplit.Stmt, error) {
 			continue
 		}
 
-		migrations = append(migrations, m)
+		parsed = append(parsed, m)
 	}
 
-	slices.SortStableFunc(migrations, func(a, b conduitversion.ParsedMigrationFilename) int {
+	slices.SortStableFunc(parsed, func(a, b conduitversion.ParsedMigrationFilename) int {
 		return a.Compare(b)
 	})
 
-	var allStmts []sqlsplit.Stmt
+	result := make([]Migration, 0, len(parsed))
 
-	for _, m := range migrations {
+	for _, m := range parsed {
 		filename := m.Filename()
 		path := filepath.Join(dir, filename)
 
@@ -55,10 +62,13 @@ func ReadStmtsFromDir(fs afero.Fs, dir string) ([]sqlsplit.Stmt, error) {
 			return nil, fmt.Errorf("failed to read migration file %s: %w", path, err)
 		}
 
-		allStmts = append(allStmts, stmts...)
+		result = append(result, Migration{
+			Parsed: m,
+			Stmts:  stmts,
+		})
 	}
 
-	return allStmts, nil
+	return result, nil
 }
 
 func readStmtsFromFile(fs afero.Fs, path string) ([]sqlsplit.Stmt, error) {

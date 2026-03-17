@@ -14,10 +14,12 @@ import (
 
 	"go.inout.gg/conduit"
 	"go.inout.gg/conduit/internal/conduittemplate"
+	"go.inout.gg/conduit/internal/migrationfile"
 	"go.inout.gg/conduit/pkg/conduitbuildinfo"
 	"go.inout.gg/conduit/pkg/conduitversion"
-	"go.inout.gg/conduit/pkg/hashsum"
+	"go.inout.gg/conduit/pkg/lockfile"
 	"go.inout.gg/conduit/pkg/pgdiff"
+	"go.inout.gg/conduit/pkg/sqlsplit"
 	"go.inout.gg/conduit/pkg/timegenerator"
 )
 
@@ -56,7 +58,7 @@ func Diff(
 	fs afero.Fs,
 	timeGen timegenerator.Generator,
 	bi conduitbuildinfo.BuildInfo,
-	store hashsum.Store,
+	store lockfile.Store,
 	args DiffArgs,
 ) (*DiffResult, error) {
 	if !exists(fs, args.MigrationsDir) {
@@ -81,15 +83,41 @@ func Diff(
 	}
 
 	if !args.SkipSchemaDriftCheck {
-		if ok, actual, err := store.Compare(args.RootDir, []byte(plan.SourceSchemaHash)); err == nil {
-			if !ok {
-				return nil, fmt.Errorf(
-					"%w: expected hash %s, got %s",
-					conduit.ErrSchemaDrift,
-					actual,
-					plan.SourceSchemaHash,
-				)
+		entries, err := store.Read(args.RootDir)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read lockfile: %w", err)
+		}
+
+		// Quick check: compare last lockfile hash against the source schema hash.
+		// If they differ, compute the full chain to pinpoint the culprit.
+		if len(entries) > 0 && entries[len(entries)-1].Hash != plan.SourceSchemaHash {
+			migrations, err := migrationfile.ReadMigrationsFromDir(fs, args.MigrationsDir)
+			if err != nil {
+				return nil, fmt.Errorf("failed to read migrations: %w", err)
 			}
+
+			groups := make([][]sqlsplit.Stmt, len(migrations))
+			for i, m := range migrations {
+				groups[i] = m.Stmts
+			}
+
+			hashes, err := pgdiff.GenerateSchemaHashChain(ctx, connConfig, groups, args.ExcludeSchemas)
+			if err != nil {
+				return nil, fmt.Errorf("failed to compute schema hash chain: %w", err)
+			}
+
+			if chainErr := compareChain(entries, migrations, hashes); chainErr != nil {
+				return nil, chainErr
+			}
+
+			// Chain is consistent but last hash differs from plan source —
+			// this means the lockfile itself is stale.
+			return nil, fmt.Errorf(
+				"%w: expected hash %s, got %s",
+				conduit.ErrSchemaDrift,
+				entries[len(entries)-1].Hash,
+				plan.SourceSchemaHash,
+			)
 		}
 	}
 
@@ -136,8 +164,29 @@ func Diff(
 		})
 	}
 
-	if err := store.Save(args.RootDir, []byte(plan.TargetSchemaHash)); err != nil {
-		return nil, fmt.Errorf("failed to write hash sum: %w", err)
+	// Recompute the full hash chain including the newly written migrations.
+	allMigrations, err := migrationfile.ReadMigrationsFromDir(fs, args.MigrationsDir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read migrations: %w", err)
+	}
+
+	groups := make([][]sqlsplit.Stmt, len(allMigrations))
+	for i, m := range allMigrations {
+		groups[i] = m.Stmts
+	}
+
+	hashes, err := pgdiff.GenerateSchemaHashChain(ctx, connConfig, groups, args.ExcludeSchemas)
+	if err != nil {
+		return nil, fmt.Errorf("failed to compute schema hash chain: %w", err)
+	}
+
+	entries := make([]lockfile.Entry, len(allMigrations))
+	for i, m := range allMigrations {
+		entries[i] = lockfile.Entry{Parsed: m.Parsed, Hash: hashes[i]}
+	}
+
+	if err := store.Save(args.RootDir, entries); err != nil {
+		return nil, fmt.Errorf("failed to write lockfile: %w", err)
 	}
 
 	return &DiffResult{Files: files}, nil

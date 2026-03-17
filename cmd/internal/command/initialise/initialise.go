@@ -11,7 +11,7 @@ import (
 
 	"go.inout.gg/conduit/conduitcli"
 	"go.inout.gg/conduit/internal/cmdutil"
-	"go.inout.gg/conduit/pkg/hashsum"
+	"go.inout.gg/conduit/pkg/lockfile"
 	"go.inout.gg/conduit/pkg/timegenerator"
 )
 
@@ -52,7 +52,7 @@ func NewCommand(
 			},
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
-			store := hashsum.NewFSStore(fs, "conduit.sum")
+			store := lockfile.NewFSStore(fs, "conduit.lock")
 			args := conduitcli.InitArgs{
 				RootDir:        ".",
 				ConfigName:     "conduit.yaml",
@@ -69,7 +69,7 @@ func NewCommand(
 			fmt.Fprintln(stderr, "Created "+result.MigrationsDirPath)
 			fmt.Fprintln(stderr, "Created "+result.MigrationPath)
 			fmt.Fprintln(stderr, "Created "+result.ConfigPath)
-			fmt.Fprintln(stderr, "Created "+result.SumPath)
+			fmt.Fprintln(stderr, "Created "+result.LockfilePath)
 			fmt.Fprintln(stderr)
 			fmt.Fprintln(stderr, "Initialised conduit in "+result.MigrationsDirPath)
 

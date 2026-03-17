@@ -1,4 +1,4 @@
-package rehash
+package validate
 
 import (
 	"context"
@@ -23,8 +23,8 @@ func NewCommand(
 ) *cli.Command {
 	//nolint:exhaustruct
 	return &cli.Command{
-		Name:  "rehash",
-		Usage: "recompute conduit.lock from existing migrations",
+		Name:  "validate",
+		Usage: "validate the migration chain against conduit.lock",
 		Flags: []cli.Flag{
 			cmdutil.ExcludeSchemasFlag(src),
 			cmdutil.DatabaseURLFlag(src),
@@ -32,18 +32,18 @@ func NewCommand(
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			store := lockfile.NewFSStore(fs, "conduit.lock")
-			args := conduitcli.RehashArgs{
+			args := conduitcli.ValidateArgs{
 				RootDir:        ".",
 				MigrationsDir:  filepath.Clean(cmd.String(cmdutil.MigrationsDir)),
 				DatabaseURL:    cmd.String(cmdutil.DatabaseURL),
 				ExcludeSchemas: cmd.StringSlice(cmdutil.ExcludeSchemas),
 			}
 
-			if err := conduitcli.Rehash(ctx, fs, store, args); err != nil {
-				return fmt.Errorf("failed to rehash: %w", err)
+			if err := conduitcli.Validate(ctx, fs, store, args); err != nil {
+				return fmt.Errorf("failed to validate: %w", err)
 			}
 
-			fmt.Fprintln(stderr, "Updated conduit.lock")
+			fmt.Fprintln(stderr, "Migration chain is valid.")
 
 			return nil
 		},

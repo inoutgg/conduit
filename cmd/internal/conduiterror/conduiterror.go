@@ -22,8 +22,9 @@ func Display(w io.Writer, err error) {
 
 	switch {
 	case errors.Is(err, conduit.ErrSchemaDrift):
-		hint = "the database schema was modified outside of migrations (manual DDL).\n" +
-			"Run 'conduit diff' to generate a migration that captures the changes.\n" +
+		hint = "one or more migrations have been modified since the lockfile was generated.\n" +
+			"Run 'conduit rehash' to recompute conduit.lock from the current migrations.\n" +
+			"Run 'conduit validate' to identify the exact migration that diverged.\n" +
 			"To skip this check: --skip-schema-drift-check"
 	case errors.Is(err, conduit.ErrHazardDetected):
 		hint = "these operations can cause table locks, downtime, or irreversible data loss in production.\n" +

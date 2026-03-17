@@ -12,7 +12,7 @@ import (
 	"go.inout.gg/conduit/internal/testutil"
 )
 
-func TestReadStmtsFromDir(t *testing.T) {
+func TestReadMigrationsFromDir(t *testing.T) {
 	t.Parallel()
 
 	t.Run("should sort files by version, when added out of order", func(t *testing.T) {
@@ -24,10 +24,10 @@ func TestReadStmtsFromDir(t *testing.T) {
 			WithFile("20230601130000_second.up.sql", "CREATE TABLE second (id int);").
 			Build()
 
-		stmts, err := ReadStmtsFromDir(fs, dir)
+		migrations, err := ReadMigrationsFromDir(fs, dir)
 
 		require.NoError(t, err)
-		snaps.MatchSnapshot(t, stmts)
+		snaps.MatchSnapshot(t, migrations)
 	})
 
 	t.Run("should skip non-sql files, when directory contains mixed file types", func(t *testing.T) {
@@ -40,10 +40,10 @@ func TestReadStmtsFromDir(t *testing.T) {
 			WithFile(".gitkeep", "").
 			Build()
 
-		stmts, err := ReadStmtsFromDir(fs, dir)
+		migrations, err := ReadMigrationsFromDir(fs, dir)
 
 		require.NoError(t, err)
-		snaps.MatchSnapshot(t, stmts)
+		snaps.MatchSnapshot(t, migrations)
 	})
 
 	t.Run("should skip subdirectories, when directory name ends in .sql", func(t *testing.T) {
@@ -54,10 +54,10 @@ func TestReadStmtsFromDir(t *testing.T) {
 			WithFile("20230601120000_first.up.sql", "CREATE TABLE first (id int);").
 			Build()
 
-		stmts, err := ReadStmtsFromDir(fs, dir)
+		migrations, err := ReadMigrationsFromDir(fs, dir)
 
 		require.NoError(t, err)
-		snaps.MatchSnapshot(t, stmts)
+		snaps.MatchSnapshot(t, migrations)
 	})
 
 	t.Run("should return error, when directory does not exist", func(t *testing.T) {
@@ -65,7 +65,7 @@ func TestReadStmtsFromDir(t *testing.T) {
 
 		fs := afero.NewMemMapFs()
 
-		_, err := ReadStmtsFromDir(fs, "/nonexistent")
+		_, err := ReadMigrationsFromDir(fs, "/nonexistent")
 
 		require.Error(t, err)
 		assert.ErrorContains(t, err, "failed to read directory")
@@ -79,7 +79,7 @@ func TestReadStmtsFromDir(t *testing.T) {
 			WithReadError("20230601120000_first.up.sql", os.ErrPermission).
 			Build()
 
-		_, err := ReadStmtsFromDir(fs, dir)
+		_, err := ReadMigrationsFromDir(fs, dir)
 
 		require.Error(t, err)
 		assert.ErrorContains(t, err, "failed to read file")
@@ -92,7 +92,7 @@ func TestReadStmtsFromDir(t *testing.T) {
 			WithFile("20230601120000_bad.up.sql", "SELECT 'unclosed string").
 			Build()
 
-		_, err := ReadStmtsFromDir(fs, dir)
+		_, err := ReadMigrationsFromDir(fs, dir)
 
 		require.Error(t, err)
 		assert.ErrorContains(t, err, "unclosed string")
@@ -105,7 +105,7 @@ func TestReadStmtsFromDir(t *testing.T) {
 			WithFile("invalid_filename.sql", "CREATE TABLE test (id int);").
 			Build()
 
-		_, err := ReadStmtsFromDir(fs, dir)
+		_, err := ReadMigrationsFromDir(fs, dir)
 
 		require.Error(t, err)
 		assert.ErrorContains(t, err, "failed to parse migration filename")
@@ -116,10 +116,10 @@ func TestReadStmtsFromDir(t *testing.T) {
 
 		fs, _, dir := testutil.NewMigrationsDirBuilder(t).Build()
 
-		stmts, err := ReadStmtsFromDir(fs, dir)
+		migrations, err := ReadMigrationsFromDir(fs, dir)
 
 		require.NoError(t, err)
-		assert.Empty(t, stmts)
+		assert.Empty(t, migrations)
 	})
 
 	t.Run("should return empty slice, when directory contains only non-sql files", func(t *testing.T) {
@@ -129,10 +129,10 @@ func TestReadStmtsFromDir(t *testing.T) {
 			WithFile("README.md", "# Migrations").
 			Build()
 
-		stmts, err := ReadStmtsFromDir(fs, dir)
+		migrations, err := ReadMigrationsFromDir(fs, dir)
 
 		require.NoError(t, err)
-		assert.Empty(t, stmts)
+		assert.Empty(t, migrations)
 	})
 
 	t.Run("should skip down files, when both up and down migrations exist", func(t *testing.T) {
@@ -143,10 +143,10 @@ func TestReadStmtsFromDir(t *testing.T) {
 			WithFile("20230601120000_users.down.sql", "DROP TABLE users;").
 			Build()
 
-		stmts, err := ReadStmtsFromDir(fs, dir)
+		migrations, err := ReadMigrationsFromDir(fs, dir)
 
 		require.NoError(t, err)
-		snaps.MatchSnapshot(t, stmts)
+		snaps.MatchSnapshot(t, migrations)
 	})
 
 	t.Run("should parse all statements, when file contains multiple DDL", func(t *testing.T) {
@@ -158,10 +158,10 @@ CREATE TABLE posts (id int);
 CREATE INDEX idx_posts ON posts (id);`).
 			Build()
 
-		stmts, err := ReadStmtsFromDir(fs, dir)
+		migrations, err := ReadMigrationsFromDir(fs, dir)
 
 		require.NoError(t, err)
-		snaps.MatchSnapshot(t, stmts)
+		snaps.MatchSnapshot(t, migrations)
 	})
 
 	t.Run("should aggregate statements in order, when multiple files exist", func(t *testing.T) {
@@ -172,9 +172,9 @@ CREATE INDEX idx_posts ON posts (id);`).
 			WithFile("20230601130000_second.up.sql", "CREATE TABLE c (id int);").
 			Build()
 
-		stmts, err := ReadStmtsFromDir(fs, dir)
+		migrations, err := ReadMigrationsFromDir(fs, dir)
 
 		require.NoError(t, err)
-		snaps.MatchSnapshot(t, stmts)
+		snaps.MatchSnapshot(t, migrations)
 	})
 }

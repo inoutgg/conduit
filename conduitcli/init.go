@@ -13,8 +13,9 @@ import (
 	"go.inout.gg/conduit/internal/migrationfile"
 	"go.inout.gg/conduit/internal/migrations"
 	"go.inout.gg/conduit/pkg/conduitversion"
-	"go.inout.gg/conduit/pkg/hashsum"
+	"go.inout.gg/conduit/pkg/lockfile"
 	"go.inout.gg/conduit/pkg/pgdiff"
+	"go.inout.gg/conduit/pkg/sqlsplit"
 	"go.inout.gg/conduit/pkg/timegenerator"
 )
 
@@ -32,16 +33,16 @@ type InitResult struct {
 	MigrationsDirPath string
 	MigrationPath     string
 	ConfigPath        string
-	SumPath           string
+	LockfilePath      string
 }
 
 // Init scaffolds a new conduit project: migrations directory, initial schema
-// migration, conduit.sum, and conduit.yaml config file.
+// migration, conduit.lock, and conduit.yaml config file.
 func Init(
 	ctx context.Context,
 	fs afero.Fs,
 	timeGen timegenerator.Generator,
-	store hashsum.Store,
+	store lockfile.Store,
 	args InitArgs,
 ) (*InitResult, error) {
 	migrationsPath := filepath.Join(args.RootDir, args.MigrationsDir)
@@ -61,18 +62,28 @@ func Init(
 		return nil, fmt.Errorf("failed to parse database URL: %w", err)
 	}
 
-	migrationStmts, err := migrationfile.ReadStmtsFromDir(fs, migrationsPath)
+	allMigrations, err := migrationfile.ReadMigrationsFromDir(fs, migrationsPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read migration files: %w", err)
 	}
 
-	hash, err := pgdiff.GenerateSchemaHash(ctx, connConfig, migrationStmts, args.ExcludeSchemas)
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate schema hash: %w", err)
+	groups := make([][]sqlsplit.Stmt, len(allMigrations))
+	for i, m := range allMigrations {
+		groups[i] = m.Stmts
 	}
 
-	if err := store.Save(args.RootDir, []byte(hash)); err != nil {
-		return nil, fmt.Errorf("failed to write conduit.sum: %w", err)
+	hashes, err := pgdiff.GenerateSchemaHashChain(ctx, connConfig, groups, args.ExcludeSchemas)
+	if err != nil {
+		return nil, fmt.Errorf("failed to compute schema hash chain: %w", err)
+	}
+
+	entries := make([]lockfile.Entry, len(allMigrations))
+	for i, m := range allMigrations {
+		entries[i] = lockfile.Entry{Parsed: m.Parsed, Hash: hashes[i]}
+	}
+
+	if err := store.Save(args.RootDir, entries); err != nil {
+		return nil, fmt.Errorf("failed to write lockfile: %w", err)
 	}
 
 	if err := writeConfigFile(fs, args.RootDir, args.ConfigName, ConfigArgs{
@@ -86,7 +97,7 @@ func Init(
 		MigrationsDirPath: args.MigrationsDir,
 		MigrationPath:     filepath.Join(args.MigrationsDir, migrationFilename),
 		ConfigPath:        args.ConfigName,
-		SumPath:           "conduit.sum",
+		LockfilePath:      "conduit.lock",
 	}, nil
 }
 

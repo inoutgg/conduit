@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"go.inout.gg/conduit/internal/testutil"
-	"go.inout.gg/conduit/pkg/hashsum"
+	"go.inout.gg/conduit/pkg/lockfile"
 )
 
 func TestInit(t *testing.T) {
@@ -19,7 +19,7 @@ func TestInit(t *testing.T) {
 
 		databaseURL := os.Getenv("TEST_DATABASE_URL")
 		fs, baseDir, migrationsDir := testutil.NewMigrationsDirBuilder(t).Build()
-		store := hashsum.NewFSStore(fs, "conduit.sum")
+		store := lockfile.NewFSStore(fs, "conduit.lock")
 		args := InitArgs{
 			RootDir:       baseDir,
 			ConfigName:    "conduit.yaml",
@@ -34,7 +34,7 @@ func TestInit(t *testing.T) {
 		assert.Equal(t, migrationsDir, result.MigrationsDirPath)
 		assert.NotEmpty(t, result.MigrationPath)
 		assert.Equal(t, "conduit.yaml", result.ConfigPath)
-		assert.Equal(t, "conduit.sum", result.SumPath)
+		assert.Equal(t, "conduit.lock", result.LockfilePath)
 		testutil.SnapshotFS(t, fs, baseDir)
 	})
 }

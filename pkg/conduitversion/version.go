@@ -56,6 +56,10 @@ func (f ParsedMigrationFilename) Compare(other ParsedMigrationFilename) int {
 	return cmp.Compare(f.Name, other.Name)
 }
 
+func (f ParsedMigrationFilename) String() string {
+	return f.Version.String() + "_" + f.Name
+}
+
 // Filename reconstructs the migration filename from its parsed components.
 func (f ParsedMigrationFilename) Filename() string {
 	return MigrationFilename(f.Version, f.Name, f.Direction)

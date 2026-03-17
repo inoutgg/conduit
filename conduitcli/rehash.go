@@ -8,8 +8,7 @@ import (
 	"github.com/spf13/afero"
 
 	"go.inout.gg/conduit/internal/migrationfile"
-	"go.inout.gg/conduit/internal/migrations"
-	"go.inout.gg/conduit/pkg/hashsum"
+	"go.inout.gg/conduit/pkg/lockfile"
 	"go.inout.gg/conduit/pkg/pgdiff"
 	"go.inout.gg/conduit/pkg/sqlsplit"
 )
@@ -22,12 +21,12 @@ type RehashArgs struct {
 	ExcludeSchemas []string
 }
 
-// Rehash recomputes the schema hash from existing migrations and persists it
-// to conduit.sum.
+// Rehash recomputes the schema hash chain from existing migrations and
+// persists it to conduit.lock.
 func Rehash(
 	ctx context.Context,
 	fs afero.Fs,
-	store hashsum.Store,
+	store lockfile.Store,
 	args RehashArgs,
 ) error {
 	if !exists(fs, args.MigrationsDir) {
@@ -40,25 +39,28 @@ func Rehash(
 		return fmt.Errorf("failed to parse database URL: %w", err)
 	}
 
-	stmts, err := sqlsplit.Split(migrations.Schema)
-	if err != nil {
-		return fmt.Errorf("failed to parse conduit internal schema: %w", err)
-	}
-
-	migrationStmts, err := migrationfile.ReadStmtsFromDir(fs, args.MigrationsDir)
+	migrations, err := migrationfile.ReadMigrationsFromDir(fs, args.MigrationsDir)
 	if err != nil {
 		return fmt.Errorf("failed to read migrations: %w", err)
 	}
 
-	stmts = append(stmts, migrationStmts...)
-
-	hash, err := pgdiff.GenerateSchemaHash(ctx, connConfig, stmts, args.ExcludeSchemas)
-	if err != nil {
-		return fmt.Errorf("failed to generate schema hash: %w", err)
+	groups := make([][]sqlsplit.Stmt, len(migrations))
+	for i, m := range migrations {
+		groups[i] = m.Stmts
 	}
 
-	if err := store.Save(args.RootDir, []byte(hash)); err != nil {
-		return fmt.Errorf("failed to write conduit.sum: %w", err)
+	hashes, err := pgdiff.GenerateSchemaHashChain(ctx, connConfig, groups, args.ExcludeSchemas)
+	if err != nil {
+		return fmt.Errorf("failed to compute schema hash chain: %w", err)
+	}
+
+	entries := make([]lockfile.Entry, len(migrations))
+	for i, m := range migrations {
+		entries[i] = lockfile.Entry{Parsed: m.Parsed, Hash: hashes[i]}
+	}
+
+	if err := store.Save(args.RootDir, entries); err != nil {
+		return fmt.Errorf("failed to write lockfile: %w", err)
 	}
 
 	return nil

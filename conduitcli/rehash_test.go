@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"go.inout.gg/conduit/internal/testutil"
-	"go.inout.gg/conduit/pkg/hashsum"
+	"go.inout.gg/conduit/pkg/lockfile"
 )
 
 func TestRehash(t *testing.T) {
@@ -19,7 +19,7 @@ func TestRehash(t *testing.T) {
 		t.Parallel()
 
 		fs := afero.NewMemMapFs()
-		store := hashsum.NewFSStore(fs, "conduit.sum")
+		store := lockfile.NewFSStore(fs, "conduit.lock")
 		args := RehashArgs{
 			RootDir:       "/",
 			MigrationsDir: "/nonexistent",
@@ -36,7 +36,7 @@ func TestRehash(t *testing.T) {
 		t.Parallel()
 
 		fs, _, dir := testutil.NewMigrationsDirBuilder(t).Build()
-		store := hashsum.NewFSStore(fs, "conduit.sum")
+		store := lockfile.NewFSStore(fs, "conduit.lock")
 		args := RehashArgs{
 			RootDir:       "/",
 			MigrationsDir: dir,
@@ -49,16 +49,16 @@ func TestRehash(t *testing.T) {
 		assert.ErrorContains(t, err, "failed to parse database URL")
 	})
 
-	t.Run("should update conduit.sum with correct hash", func(t *testing.T) {
+	t.Run("should update conduit.lock with correct hash", func(t *testing.T) {
 		t.Parallel()
 
 		databaseURL := os.Getenv("TEST_DATABASE_URL")
 		fs, baseDir, dir := testutil.NewMigrationsDirBuilder(t).
 			WithFile("20230601120000_init.up.sql", "CREATE TABLE users (id int);").
-			WithBaseFile("conduit.sum", "0000000000000000").
+			WithBaseFile("conduit.lock", "20230601120000_init 0000000000000000\n").
 			Build()
 
-		store := hashsum.NewFSStore(fs, "conduit.sum")
+		store := lockfile.NewFSStore(fs, "conduit.lock")
 		args := RehashArgs{
 			RootDir:       baseDir,
 			MigrationsDir: dir,
@@ -69,11 +69,13 @@ func TestRehash(t *testing.T) {
 
 		require.NoError(t, err)
 
-		// Verify the hash was updated from the stale value.
-		sum, err := afero.ReadFile(fs, baseDir+"/conduit.sum")
+		// Verify the lockfile was updated from the stale value.
+		entries, err := store.Read(baseDir)
 		require.NoError(t, err)
-		assert.NotEqual(t, "0000000000000000", string(sum))
-		assert.NotEmpty(t, string(sum))
+		require.Len(t, entries, 1)
+		assert.Equal(t, "20230601120000_init", entries[0].Parsed.String())
+		assert.NotEqual(t, "0000000000000000", entries[0].Hash)
+		assert.NotEmpty(t, entries[0].Hash)
 	})
 
 	t.Run("should produce hash consistent with diff", func(t *testing.T) {
@@ -86,8 +88,8 @@ func TestRehash(t *testing.T) {
 CREATE TABLE posts (id int, user_id int);`).
 			Build()
 
-		// Run diff to generate a migration and conduit.sum.
-		store := hashsum.NewFSStore(fs, "conduit.sum")
+		// Run diff to generate a migration and conduit.lock.
+		store := lockfile.NewFSStore(fs, "conduit.lock")
 		_, err := Diff(t.Context(), fs, timeGen, bi, store, DiffArgs{
 			RootDir:       baseDir,
 			MigrationsDir: dir,
@@ -97,13 +99,13 @@ CREATE TABLE posts (id int, user_id int);`).
 		})
 		require.NoError(t, err)
 
-		diffSum, err := afero.ReadFile(fs, baseDir+"/conduit.sum")
+		diffEntries, err := store.Read(baseDir)
 		require.NoError(t, err)
 
-		// Corrupt the sum file.
-		require.NoError(t, afero.WriteFile(fs, baseDir+"/conduit.sum", []byte("corrupted"), 0o644))
+		// Corrupt the lockfile.
+		require.NoError(t, afero.WriteFile(fs, baseDir+"/conduit.lock", []byte("corrupted"), 0o644))
 
-		// Rehash should restore the correct hash.
+		// Rehash should restore the correct lockfile.
 		err = Rehash(t.Context(), fs, store, RehashArgs{
 			RootDir:       baseDir,
 			MigrationsDir: dir,
@@ -111,8 +113,8 @@ CREATE TABLE posts (id int, user_id int);`).
 		})
 		require.NoError(t, err)
 
-		rehashSum, err := afero.ReadFile(fs, baseDir+"/conduit.sum")
+		rehashEntries, err := store.Read(baseDir)
 		require.NoError(t, err)
-		assert.Equal(t, string(diffSum), string(rehashSum))
+		assert.Equal(t, diffEntries, rehashEntries)
 	})
 }
